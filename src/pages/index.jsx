@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAppContext } from '../../pokenae.WebComponent/src/context/AppContext';
+import CustomButton from '../../pokenae.WebComponent/src/components/CustomButton';
 
 const Index = () => {
   const { showInfo, showSuccess, showWarning, showError } = useAppContext();
@@ -8,10 +9,10 @@ const Index = () => {
     <div>
       <a href={'./subpage'}>sub</a>
       <div>
-        <button onClick={() => showInfo('This is an info message', 3000)}>Show Info</button>
-        <button onClick={() => showSuccess('This is a success message', 3000)}>Show Success</button>
-        <button onClick={() => showWarning('This is a warning message', 3000)}>Show Warning</button>
-        <button onClick={() => showError('This is an error message', 3000)}>Show Error</button>
+        <CustomButton onClick={() => showInfo('This is an info message', 3000)}>Show Info</CustomButton>
+        <CustomButton onClick={() => showSuccess('This is a success message', 3000)}>Show Success</CustomButton>
+        <CustomButton onClick={() => showWarning('This is a warning message', 3000)}>Show Warning</CustomButton>
+        <CustomButton onClick={() => showError('This is an error message', 3000)}>Show Error</CustomButton>
       </div>
     </div>
   );
