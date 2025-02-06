@@ -9,10 +9,10 @@ const Index = () => {
     <div>
       <a href={'./subpage'}>sub</a>
       <div>
-        <CustomButton onClick={() => showInfo('This is an info message', 3000)}>Show Info</CustomButton>
-        <CustomButton onClick={() => showSuccess('This is a success message', 3000)}>Show Success</CustomButton>
-        <CustomButton onClick={() => showWarning('This is a warning message', 3000)}>Show Warning</CustomButton>
-        <CustomButton onClick={() => showError('This is an error message', 3000)}>Show Error</CustomButton>
+        <CustomButton onClick={() => showInfo('This is an info message', 3)}>Show Info</CustomButton>
+        <CustomButton onClick={() => showSuccess('This is a success message', 3)}>Show Success</CustomButton>
+        <CustomButton onClick={() => showWarning('This is a warning message', 3)}>Show Warning</CustomButton>
+        <CustomButton onClick={() => showError('This is an error message')}>Show Error</CustomButton>
       </div>
     </div>
   );
