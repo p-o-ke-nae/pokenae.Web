@@ -1,0 +1,24 @@
+{
+  "name": "pokenae",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack --port 3001",
+    "build": "next build",
+    "start": "next start -p 80 & echo $! > .pidfile",
+    "stop": "kill $(cat .pidfile) && rm .pidfile",
+    "lint": "next lint",
+    "update-components": "cd C:\\Users\\o_leg\\source\\repos\\pokenae.Web\\pokenae.WebComponent && git pull origin main && npm install && cd c:\\Users\\o_leg\\source\\repos\\pokenae.Web"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "next": "15.1.6"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19"
+  }
+}

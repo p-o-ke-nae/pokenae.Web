@@ -1,0 +1,3 @@
+[submodule "pokenae.WebComponent"]
+  path = pokenae.WebComponent
+  url = https://github.com/p-o-ke-nae/pokenae.WebComponent.git

@@ -1,0 +1,88 @@
+.modalContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #105ae4;
+  padding: 20px;
+  border-radius: 10px;
+  height: 70vh;
+}
+
+.modalImageFrame {
+  width: 100%;
+  height: 30%;
+  display: block;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modalText {
+  color: #f1f1f1;
+  text-align: center;
+  width: 70%;
+  height: 65%;
+  background-color: #333;
+  padding: 10px;
+  border-radius: 5px;
+  margin: auto;
+  margin-bottom: 0px;
+}
+
+.modalInfoWrapper {
+  height: 100%;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modalTextItem {
+  width: 90%;
+  border: 2px solid #ccc;
+  padding: 10px;
+  margin: auto;
+  margin-top: 2.5px;
+  margin-bottom: 2.5px;
+  border-radius: 5px;
+  background-color: #fff;
+  color: #000;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalTextItemHeader {
+  font-weight: bold;
+  margin-bottom: 5px;
+  border-bottom: 1px solid #ccc;
+}
+
+.modalTextItemDetail {
+  flex-grow: 1;
+}
+
+.modalButtons {
+  position: fixed;
+  top: 50%;
+  background-color: #f1f1f1;
+  border: none;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.prevRecord {
+  left: 10px;
+}
+.prevRecord::after {
+  content: '<<';
+}
+
+.nextRecord {
+  right: 10px;
+}
+.nextRecord::after {
+  content: '>>';
+}
+
+.customModalRed {
+  background-color: rgb(212, 57, 37) !important;
+}
