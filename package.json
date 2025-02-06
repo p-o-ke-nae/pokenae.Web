@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack --port 3001",
     "build": "next build",
     "start": "next start -p 80 & echo $! > .pidfile",
-    "stop": "kill $(cat .pidfile) && rm .pidfile",
+    "stop": "if [ -f .pidfile ]; then kill $(cat .pidfile) && rm .pidfile; else echo 'No .pidfile found'; fi",
     "lint": "next lint",
     "update-components": "cd C:\\Users\\o_leg\\source\\repos\\pokenae.Web\\pokenae.WebComponent && git pull origin main && npm install && cd c:\\Users\\o_leg\\source\\repos\\pokenae.Web"
   },
