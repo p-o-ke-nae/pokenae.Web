@@ -7,7 +7,7 @@ import {
   CustomButton, 
   CustomHeader,
   useAppContext 
-} from '../../../pokenae.WebComponent/src/components';
+} from '@webcomponent/components';
 import styles from './subpage.module.css';
 
 export default function SubPage() {

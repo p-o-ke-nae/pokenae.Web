@@ -12,7 +12,17 @@ const nextConfig = {
   },
   
   // WebComponentライブラリの設定
-  transpilePackages: ['pokenae-webcomponent']
+  transpilePackages: ['pokenae-webcomponent'],
+  
+  // Webpackのエイリアス設定
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@components': require('path').resolve(__dirname, 'pokenae.WebComponent/src/components'),
+      '@webcomponent': require('path').resolve(__dirname, 'pokenae.WebComponent/src')
+    };
+    return config;
+  }
 };
 
 export default nextConfig;

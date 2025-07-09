@@ -1,6 +1,6 @@
 import React from 'react';
-import CustomModal from '../../../pokenae.WebComponent/src/components/CustomModal';
-import CustomImage from '../../../pokenae.WebComponent/src/components/CustomImage';
+import CustomModal from '@webcomponent/components/CustomModal';
+import CustomImage from '@webcomponent/components/CustomImage';
 import styles from './DexDetail.module.css';
 
 const DexDetail = ({ modalData, closeModal, handlePrevRow, handleNextRow, columns }) => {

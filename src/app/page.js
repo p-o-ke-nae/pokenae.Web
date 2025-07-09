@@ -7,7 +7,7 @@ import {
   CustomHeader, 
   CustomButton,
   useAppContext 
-} from '../../pokenae.WebComponent/src/components';
+} from '@webcomponent/components';
 import styles from './page.module.css';
 
 export default function HomePage() {

@@ -1,11 +1,11 @@
 import React, { useEffect } from 'react';
 import Image from 'next/image';
 import styles from './page.module.css';
-import CustomButton from '../../pokenae.WebComponent/src/components/CustomButton';
+import CustomButton from '@webcomponent/components/CustomButton';
 import { useState, useMemo, useRef } from 'react';
-import CustomTable from '../../pokenae.WebComponent/src/components/CustomTable';
+import CustomTable from '@webcomponent/components/CustomTable';
 import DexDetail from './components/DexDetail';
-import CustomLoading from '../../pokenae.WebComponent/src/components/CustomLoading';
+import CustomLoading from '@webcomponent/components/CustomLoading';
 
 const Collection = ({ showInfo, showWarning, showConfirm }) => { 
   const tableRef = useRef(null);

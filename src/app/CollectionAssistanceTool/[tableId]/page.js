@@ -11,7 +11,7 @@ import {
   CustomModal,
   CustomLabel,
   useAppContext
-} from '../../../../pokenae.WebComponent/src/components';
+} from '@webcomponent/components';
 import { collectionApiWithFallback } from '../../../utils/demoData';
 import styles from './CollectionDetail.module.css';
 

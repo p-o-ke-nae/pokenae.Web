@@ -6,7 +6,7 @@ import {
   Layout,
   CustomHeader, 
   CustomLoading 
-} from '../../../pokenae.WebComponent/src/components';
+} from '@webcomponent/components';
 import styles from './callback.module.css';
 
 export default function CallbackPage() {
