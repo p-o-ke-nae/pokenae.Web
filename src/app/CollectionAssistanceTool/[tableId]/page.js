@@ -12,6 +12,7 @@ import {
   CustomLabel,
   useAppContext
 } from '@webcomponent/components';
+import DexDetail from '../../../components/DexDetail';
 import { collectionApiWithFallback } from '../../../utils/demoData';
 import styles from './CollectionDetail.module.css';
 
@@ -29,9 +30,9 @@ export default function CollectionDetailPage() {
 
   const [isDemo, setIsDemo] = useState(false);
   
-  // レコード詳細モーダル関連
-  const [selectedRecord, setSelectedRecord] = useState(null);
-  const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  // DexDetailモーダル関連
+  const [modalData, setModalData] = useState(null);
+  const [currentRowIndex, setCurrentRowIndex] = useState(-1);
 
   useEffect(() => {
     const loadCollectionData = async () => {
@@ -194,9 +195,9 @@ export default function CollectionDetailPage() {
 
       return {
         key: columnId, // columnIdを直接キーとして使用
-        name: columnId, // 後方互換性のため
+        name: columnId, // DexDetailで使用するnameプロパティ
         label: label,
-        header: label,
+        header: label, // DexDetailで表示されるヘッダー
         editable: false,
         type: uiType,
         visible: isVisible,
@@ -404,19 +405,40 @@ export default function CollectionDetailPage() {
     }
   };
 
-  // 行クリック時の処理（レコード詳細モーダルを開く）
+  // 行クリック時の処理（DexDetailモーダルを開く）
   const handleRowClick = (rowIndex) => {
-    const clickedRecord = tableData[rowIndex];
-    if (clickedRecord) {
-      setSelectedRecord(clickedRecord);
-      setIsRecordModalOpen(true);
+    if (rowIndex >= 0 && rowIndex < tableData.length) {
+      const currentRow = tableData[rowIndex];
+      const prevRow = rowIndex > 0 ? tableData[rowIndex - 1] : null;
+      const nextRow = rowIndex < tableData.length - 1 ? tableData[rowIndex + 1] : null;
+      
+      setCurrentRowIndex(rowIndex);
+      setModalData({
+        row: currentRow,
+        prevRow: prevRow,
+        nextRow: nextRow
+      });
     }
   };
 
-  // レコード詳細モーダルを閉じる
-  const handleCloseRecordModal = () => {
-    setIsRecordModalOpen(false);
-    setSelectedRecord(null);
+  // DexDetailモーダルを閉じる
+  const closeModal = () => {
+    setModalData(null);
+    setCurrentRowIndex(-1);
+  };
+
+  // 前のレコードに移動
+  const handlePrevRow = () => {
+    if (currentRowIndex > 0) {
+      handleRowClick(currentRowIndex - 1);
+    }
+  };
+
+  // 次のレコードに移動
+  const handleNextRow = () => {
+    if (currentRowIndex < tableData.length - 1) {
+      handleRowClick(currentRowIndex + 1);
+    }
   };
 
   const handleExport = () => {
@@ -534,119 +556,14 @@ export default function CollectionDetailPage() {
           </div>
         </div>
 
-        {/* レコード詳細モーダル */}
-        {isRecordModalOpen && selectedRecord && (
-          <CustomModal
-            isOpen={isRecordModalOpen}
-            onClose={handleCloseRecordModal}
-            title="レコード詳細"
-            width="600px"
-          >
-            <div style={{ padding: '20px' }}>
-              {/* レコードのメタデータ */}
-              <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
-                <h4 style={{ margin: '0 0 10px 0', color: '#333' }}>基本情報</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '14px' }}>
-                  <div><strong>レコードID:</strong> {selectedRecord.recordId || selectedRecord.id}</div>
-                  <div><strong>テーブルID:</strong> {selectedRecord.tableId}</div>
-                  {selectedRecord.createdBy && (
-                    <div><strong>作成者:</strong> {selectedRecord.createdBy}</div>
-                  )}
-                  {selectedRecord.createdAt && (
-                    <div><strong>作成日時:</strong> {new Date(selectedRecord.createdAt).toLocaleString('ja-JP')}</div>
-                  )}
-                  {selectedRecord.updatedAt && (
-                    <div><strong>更新日時:</strong> {new Date(selectedRecord.updatedAt).toLocaleString('ja-JP')}</div>
-                  )}
-                  {selectedRecord.backgroundColor && (
-                    <div>
-                      <strong>背景色:</strong> 
-                      <span 
-                        style={{ 
-                          display: 'inline-block', 
-                          width: '20px', 
-                          height: '20px', 
-                          backgroundColor: selectedRecord.backgroundColor, 
-                          marginLeft: '8px',
-                          border: '1px solid #ccc',
-                          verticalAlign: 'middle'
-                        }}
-                      ></span>
-                      <span style={{ marginLeft: '8px' }}>{selectedRecord.backgroundColor}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* レコードのデータ */}
-              <div>
-                <h4 style={{ margin: '0 0 15px 0', color: '#333' }}>データ</h4>
-                <div style={{ display: 'grid', gap: '15px' }}>
-                  {columns
-                    .filter(col => col.visible && col.key in selectedRecord)
-                    .map(column => (
-                      <div key={column.key} style={{ 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        padding: '12px',
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #e0e0e0',
-                        borderRadius: '6px'
-                      }}>
-                        <div style={{ 
-                          fontWeight: 'bold', 
-                          minWidth: '120px', 
-                          color: '#555',
-                          marginRight: '15px'
-                        }}>
-                          {column.label}:
-                        </div>
-                        <div style={{ 
-                          flex: 1,
-                          fontSize: '16px',
-                          color: '#333'
-                        }}>
-                          {column.type === 'boolean' ? (
-                            <span style={{ 
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              backgroundColor: selectedRecord[column.key] === '読了' ? '#e8f5e8' : '#fff3cd',
-                              color: selectedRecord[column.key] === '読了' ? '#155724' : '#856404',
-                              fontSize: '14px',
-                              fontWeight: 'bold'
-                            }}>
-                              {selectedRecord[column.key] || '未設定'}
-                            </span>
-                          ) : column.type === 'number' ? (
-                            <span style={{ fontWeight: 'bold' }}>
-                              {selectedRecord[column.key] || '0'}
-                            </span>
-                          ) : (
-                            <span>
-                              {selectedRecord[column.key] || '（未入力）'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-
-              {/* モーダルのボタン */}
-              <div style={{ 
-                marginTop: '30px', 
-                display: 'flex', 
-                justifyContent: 'flex-end',
-                gap: '10px'
-              }}>
-                <CustomButton
-                  onClick={handleCloseRecordModal}
-                  label="閉じる"
-                />
-              </div>
-            </div>
-          </CustomModal>
-        )}
+        {/* DexDetailモーダル */}
+        <DexDetail
+          modalData={modalData}
+          closeModal={closeModal}
+          handlePrevRow={handlePrevRow}
+          handleNextRow={handleNextRow}
+          columns={columns}
+        />
       </div>
     </Layout>
   );
