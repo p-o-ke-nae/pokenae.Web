@@ -1,4 +1,5 @@
 // CollectionAssistanceTool API Client
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7077';
 
 // 簡単なリクエストキャッシュ（開発時のデバッグ用）
