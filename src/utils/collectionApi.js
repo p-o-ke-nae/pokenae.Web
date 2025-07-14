@@ -1,6 +1,49 @@
 // CollectionAssistanceTool API Client
+import { demoData } from './demoData.js';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7077';
+const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' || API_BASE_URL === 'mock';
+
+// モックデータ応答用のヘルパー関数
+const mockResponse = (data, delay = 100) => {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(data), delay);
+  });
+};
+
+// モックリクエストハンドラー
+const handleMockRequest = async (endpoint, options = {}) => {
+  const method = options.method || 'GET';
+  
+  // コレクション一覧取得
+  if (endpoint === '/api/Collection' && method === 'GET') {
+    return mockResponse(demoData.collections);
+  }
+  
+  // 特定のコレクション取得
+  const collectionMatch = endpoint.match(/^\/api\/Collection\/(.+)$/);
+  if (collectionMatch && method === 'GET') {
+    const collectionId = collectionMatch[1];
+    const collection = demoData.collections.find(c => c.id === collectionId);
+    if (collection) {
+      return mockResponse(collection);
+    } else {
+      throw new Error('Collection not found');
+    }
+  }
+  
+  // レコード取得（コレクション内のアイテム）
+  const recordsMatch = endpoint.match(/^\/api\/Record\/table\/(.+)$/);
+  if (recordsMatch && method === 'GET') {
+    const tableId = recordsMatch[1];
+    const items = demoData.collectionItems[tableId] || [];
+    return mockResponse(items);
+  }
+  
+  // その他のエンドポイントはモックデータなしでエラー
+  console.warn('Mock data not available for:', endpoint);
+  return mockResponse({ message: 'Mock endpoint not implemented' });
+};
 
 // 簡単なリクエストキャッシュ（開発時のデバッグ用）
 const requestCache = new Map();
@@ -8,6 +51,12 @@ const CACHE_DURATION = 5000; // 5秒間キャッシュ
 
 // APIリクエストのベース関数
 const apiRequest = async (endpoint, options = {}) => {
+  // モックモードの場合は、実際のAPIを呼ばずにモックデータを返す
+  if (USE_MOCK_DATA) {
+    console.log('Using mock data for:', endpoint);
+    return handleMockRequest(endpoint, options);
+  }
+
   const url = `${API_BASE_URL}${endpoint}`;
   const requestMethod = options.method || 'GET';
   const cacheKey = `${requestMethod}:${url}`;
@@ -127,6 +176,11 @@ export const collectionApi = {
     return await apiRequest(`/api/Record/table/${tableId}`, { method: 'GET' });
   },
 
+  // カラム情報取得
+  getColumns: async (tableId) => {
+    return await apiRequest(`/api/CollectionTable/${tableId}/columns`, { method: 'GET' });
+  },
+
   // コレクション新規作成
   createCollection: async (collectionData) => {
     return await apiRequest('/api/CollectionTable', {
@@ -196,3 +250,15 @@ export const handleApiError = (error, showError) => {
   
   return errorMessage;
 };
+
+// 個別関数としてもエクスポート（互換性のため）
+export const getCollections = collectionApi.getCollections;
+export const getCollectionById = collectionApi.getCollectionById;
+export const getRecords = collectionApi.getRecords;
+export const getColumns = collectionApi.getColumns;
+export const createCollection = collectionApi.createCollection;
+export const updateCollection = collectionApi.updateCollection;
+export const deleteCollection = collectionApi.deleteCollection;
+export const createRecord = collectionApi.createRecord;
+export const updateRecord = collectionApi.updateRecord;
+export const deleteRecord = collectionApi.deleteRecord;

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collectionApiWithFallback } from '@/utils/demoData';
 
 export default function ApiTestPage() {
   const [testResults, setTestResults] = useState([]);
@@ -39,19 +38,6 @@ export default function ApiTestPage() {
     await testApiEndpoint('API Base URL確認', async () => {
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7077';
       return { baseUrl };
-    });
-
-    // フォールバック機能付きAPIのテスト
-    await testApiEndpoint('コレクション一覧取得（フォールバック付き）', async () => {
-      return await collectionApiWithFallback.getCollections();
-    });
-
-    await testApiEndpoint('コレクション詳細取得（フォールバック付き - UUID）', async () => {
-      return await collectionApiWithFallback.getCollectionById('f1dbf3a5-3b86-4939-99e8-d564a11b4326');
-    });
-
-    await testApiEndpoint('カラム情報取得（フォールバック付き - UUID）', async () => {
-      return await collectionApiWithFallback.getColumns('f1dbf3a5-3b86-4939-99e8-d564a11b4326');
     });
 
     // Direct fetch テスト（実際のエンドポイント）

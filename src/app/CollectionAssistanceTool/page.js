@@ -9,7 +9,7 @@ import {
   CustomLoading,
   useAppContext
 } from '@webcomponent/components';
-import { collectionApiWithFallback } from '../../utils/demoData';
+import { collectionApi } from '../../utils/collectionApi';
 import styles from './CollectionAssistanceTool.module.css';
 
 const CollectionAssistanceIndex = () => {
@@ -19,24 +19,19 @@ const CollectionAssistanceIndex = () => {
   const [collections, setCollections] = useState([]);
   const [error, setError] = useState(null);
 
-  const [isDemo, setIsDemo] = useState(false);
-
   useEffect(() => {
     const fetchCollections = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
-        const response = await collectionApiWithFallback.getCollections();
+        const response = await collectionApi.getCollections();
         
-        if (response.isDemo) {
-          setIsDemo(true);
-          setError(response.message);
-        }
+        const collections = response;
         
-        setCollections(response.data || response);
+        setCollections(response);
         
-        if ((response.data || response).length === 0) {
+        if (response.length === 0) {
           showInfo('利用可能なコレクションがありません');
         }
       } catch (error) {

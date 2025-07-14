@@ -13,7 +13,7 @@ import {
   useAppContext
 } from '@webcomponent/components';
 import DexDetail from '../../../components/DexDetail';
-import { collectionApiWithFallback } from '../../../utils/demoData';
+import { collectionApi } from '../../../utils/collectionApi';
 import styles from './CollectionDetail.module.css';
 
 export default function CollectionDetailPage() {
@@ -27,8 +27,6 @@ export default function CollectionDetailPage() {
   const [tableData, setTableData] = useState([]);
   const [columns, setColumns] = useState([]);
   const [error, setError] = useState(null);
-
-  const [isDemo, setIsDemo] = useState(false);
   
   // DexDetailモーダル関連
   const [modalData, setModalData] = useState(null);
@@ -39,17 +37,28 @@ export default function CollectionDetailPage() {
       try {
         setIsLoading(true);
         setError(null);
+        setLoadingMessage('APIサーバーへの接続を確認しています...');
+
+        // APIサーバーの接続テスト
+        try {
+          const healthCheck = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7077'}/api/CollectionTable`, {
+            method: 'HEAD',
+            mode: 'cors',
+            credentials: 'omit',
+          });
+          console.log('API Server Health Check:', healthCheck.status);
+        } catch (healthError) {
+          console.warn('API Server Health Check failed:', healthError);
+          throw new Error(`APIサーバー（${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7077'}）に接続できません`);
+        }
+
         setLoadingMessage('コレクション情報を取得しています...');
 
-        // コレクション詳細を取得（フォールバック付き）
-        const collectionResponse = await collectionApiWithFallback.getCollectionById(params.tableId);
+        // コレクション詳細を取得
+        const collectionResponse = await collectionApi.getCollectionById(params.tableId);
+        console.log('Collection API Response:', collectionResponse);
         
-        if (collectionResponse.isDemo) {
-          setIsDemo(true);
-          setError(collectionResponse.message);
-        }
-        
-        const collection = collectionResponse.data || collectionResponse;
+        const collection = collectionResponse;
         setCollectionData(collection);
 
         setLoadingMessage('カラム情報を処理しています...');
@@ -64,7 +73,7 @@ export default function CollectionDetailPage() {
           // カラム情報がない場合は、別途取得を試みる
           try {
             setLoadingMessage('カラム情報を別途取得しています...');
-            const columnsResponse = await collectionApiWithFallback.getColumns(params.tableId);
+            const columnsResponse = await collectionApi.getColumns(params.tableId);
             if (columnsResponse.data) {
               columnsData = columnsResponse.data.map(item => ({
                 key: item.name?.toLowerCase().replace(/\s+/g, '_'),
@@ -72,11 +81,10 @@ export default function CollectionDetailPage() {
                 editable: !item.required || item.name !== 'id',
                 type: item.type || 'string'
               }));
-            }
-          } catch (columnError) {
+            }            } catch (columnError) {
             console.warn('Failed to fetch columns separately:', columnError);
-            // フォールバック用デフォルトカラム
-            columnsData = getDefaultColumns(params.tableId);
+            // APIからカラム情報を取得できない場合は空配列
+            columnsData = [];
           }
         }
 
@@ -90,8 +98,8 @@ export default function CollectionDetailPage() {
         try {
           setLoadingMessage('レコードデータを取得しています...');
           // 実際のAPIからレコードデータを取得
-          const { collectionApi } = await import('../../../utils/collectionApi');
           recordsResponse = await collectionApi.getRecords(params.tableId);
+          console.log('Records API Response:', recordsResponse);
           
           if (recordsResponse && Array.isArray(recordsResponse)) {
             // レコードデータからカラム情報を更新（カラム名や表示設定を含む）
@@ -117,28 +125,30 @@ export default function CollectionDetailPage() {
           console.log('Using collection items:', collection.items.length, 'items');
           setTableData(collection.items);
         } else {
-          // デモデータを生成
-          console.log('Generating demo data for tableId:', params.tableId);
-          const demoData = generateDemoData(params.tableId, 25);
-          console.log('Generated demo data:', demoData.length, 'items');
-          setTableData(demoData);
+          console.log('No data available from API');
+          setTableData([]);
         }
 
         const collectionName = collection.name || 'コレクション';
-        showSuccess(`${collectionName}のデータを読み込みました${collectionResponse.isDemo ? '（デモモード）' : ''}`);
+        showSuccess(`${collectionName}のデータを読み込みました`);
 
       } catch (error) {
         console.error('Failed to load collection data:', error);
-        setError('データの読み込みに失敗しました');
-        setLoadingMessage('エラーが発生しました。デモデータを準備しています...');
+        const errorMessage = `データの読み込みに失敗しました: ${error.message}`;
+        setError(errorMessage);
+        setLoadingMessage('');
         
-        // エラー時はデモデータを表示
-        const fallbackCollection = getFallbackCollection(params.tableId);
-        setCollectionData(fallbackCollection);
-        setColumns(getDefaultColumns(params.tableId));
-        const fallbackData = generateDemoData(params.tableId, 25);
-        console.log('Using fallback demo data:', fallbackData.length, 'items');
-        setTableData(fallbackData);
+        // APIサーバーが起動していない場合の情報表示
+        if (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED')) {
+          showError('APIサーバー（localhost:7077）に接続できません。サーバーが起動しているか確認してください。');
+        } else {
+          showError(errorMessage);
+        }
+        
+        // エラー時は空のデータを設定
+        setCollectionData(null);
+        setColumns([]);
+        setTableData([]);
       } finally {
         setIsLoading(false);
         setLoadingMessage('');
@@ -258,136 +268,6 @@ export default function CollectionDetailPage() {
     });
   };
 
-
-  // デフォルトカラム定義（UUIDとデモ用ID両方に対応）
-  const getDefaultColumns = (tableId) => {
-    const columnMap = {
-      // UUIDベース（実際のAPIレスポンス）
-      'f1dbf3a5-3b86-4939-99e8-d564a11b4326': [
-        { key: 'cd2489c5-1450-4adf-8b87-5a3391698e20', name: 'cd2489c5-1450-4adf-8b87-5a3391698e20', label: '書籍名', header: '書籍名', editable: true, type: 'text', visible: true, showHeader: true, width: '200px' },
-        { key: '67658541-811b-43bb-ad04-6be9e4524743', name: '67658541-811b-43bb-ad04-6be9e4524743', label: '著者名', header: '著者名', editable: true, type: 'text', visible: true, showHeader: true, width: '150px' },
-        { key: 'c17b598a-7132-4c3d-9dec-2dbf8886bd94', name: 'c17b598a-7132-4c3d-9dec-2dbf8886bd94', label: '発行年', header: '発行年', editable: true, type: 'number', visible: true, showHeader: true, width: '100px' },
-        { key: 'e4af5dd5-fd0c-4b03-bfe6-04e7aba576dc', name: 'e4af5dd5-fd0c-4b03-bfe6-04e7aba576dc', label: '所持', header: '所持', editable: true, type: 'boolean', visible: true, showHeader: true, width: '100px' },
-        { key: 'b2a3c709-da83-4dea-8143-736f231de357', name: 'b2a3c709-da83-4dea-8143-736f231de357', label: '評価', header: '評価', editable: true, type: 'text', visible: true, showHeader: true, width: '200px' }
-      ],
-      // デモ用ID（従来の互換性）
-      'demo1': [
-        { key: 'number', name: 'number', label: '図鑑番号', header: '図鑑番号', editable: false, visible: true, showHeader: true, width: '100px' },
-        { key: 'name', name: 'name', label: 'ポケモン名', header: 'ポケモン名', editable: false, visible: true, showHeader: true, width: '150px' },
-        { key: 'type', name: 'type', label: 'タイプ', header: 'タイプ', editable: false, visible: true, showHeader: true, width: '100px' },
-        { key: 'status', name: 'status', label: 'ステータス', header: 'ステータス', editable: true, visible: true, showHeader: true, width: '100px' },
-        { key: 'condition', name: 'condition', label: 'コンディション', header: 'コンディション', editable: true, visible: true, showHeader: true, width: '120px' }
-      ],
-      'demo2': [
-        { key: 'cardId', name: 'cardId', label: 'カードID', header: 'カードID', editable: false, visible: true, showHeader: true, width: '100px' },
-        { key: 'name', name: 'name', label: 'カード名', header: 'カード名', editable: false, visible: true, showHeader: true, width: '150px' },
-        { key: 'rarity', name: 'rarity', label: 'レア度', header: 'レア度', editable: false, visible: true, showHeader: true, width: '100px' },
-        { key: 'status', name: 'status', label: 'ステータス', header: 'ステータス', editable: true, visible: true, showHeader: true, width: '100px' },
-        { key: 'price', name: 'price', label: '価格', header: '価格', editable: true, visible: true, showHeader: true, width: '100px' }
-      ],
-      'demo3': [
-        { key: 'promoId', name: 'promoId', label: 'プロモID', header: 'プロモID', editable: false, visible: true, showHeader: true, width: '100px' },
-        { key: 'name', name: 'name', label: 'カード名', header: 'カード名', editable: false, visible: true, showHeader: true, width: '150px' },
-        { key: 'event', name: 'event', label: 'イベント', header: 'イベント', editable: false, visible: true, showHeader: true, width: '120px' },
-        { key: 'status', name: 'status', label: 'ステータス', header: 'ステータス', editable: true, visible: true, showHeader: true, width: '100px' },
-        { key: 'date', name: 'date', label: '入手日', header: '入手日', editable: true, visible: true, showHeader: true, width: '120px' }
-      ]
-    };
-
-    return columnMap[tableId] || [
-      { key: 'id', name: 'id', label: 'ID', header: 'ID', editable: false, visible: true, showHeader: true, width: '100px' },
-      { key: 'name', name: 'name', label: '名前', header: '名前', editable: true, visible: true, showHeader: true, width: '150px' },
-      { key: 'status', name: 'status', label: 'ステータス', header: 'ステータス', editable: true, visible: true, showHeader: true, width: '100px' }
-    ];
-  };
-
-  // フォールバックコレクション情報（UUIDとデモ用ID両方に対応）
-  const getFallbackCollection = (tableId) => {
-    const fallbackMap = {
-      // UUIDベース（実際のAPIレスポンス）
-      'f1dbf3a5-3b86-4939-99e8-d564a11b4326': { 
-        id: 'f1dbf3a5-3b86-4939-99e8-d564a11b4326', 
-        name: '読書記録（デモ）',
-        description: '読んだ本や読みたい本を管理するコレクション（デモモード）',
-        ownerId: '11111111-1111-1111-1111-111111111111'
-      },
-      // デモ用ID（従来の互換性）
-      'demo1': { id: 'demo1', name: 'ポケモン図鑑コレクション（デモ）' },
-      'demo2': { id: 'demo2', name: 'レアカードコレクション（デモ）' },
-      'demo3': { id: 'demo3', name: 'プロモカードコレクション（デモ）' }
-    };
-
-    return fallbackMap[tableId] || { id: tableId, name: `コレクション ${tableId}` };
-  };
-
-  // デモデータ生成（UUIDとデモ用ID両方に対応）
-  const generateDemoData = (tableId, count) => {
-    return Array.from({ length: count }, (_, index) => {
-      const baseData = { 
-        id: `demo-${tableId}-${index + 1}`, // ユニークID確保
-        index: index + 1 
-      };
-
-      if (tableId === 'f1dbf3a5-3b86-4939-99e8-d564a11b4326') {
-        // 読書記録のデモデータ（実際のAPIレスポンス形式に合わせて）
-        const books = [
-          { title: 'Book Title', author: 'Author Name' },
-          { title: 'BLACK・CAT', author: '新井素子' },
-          { title: 'ポケットモンスター', author: 'ゲームフリーク' },
-          { title: 'ハリー・ポッターと賢者の石', author: 'J.K.ローリング' },
-          { title: '1984年', author: 'ジョージ・オーウェル' },
-        ];
-        const book = books[index % books.length];
-        const years = [1905, 1996, 2020, 1997, 1949];
-        const completed = [true, true, false, true, false];
-        const notes = ['ok', 'GOD', '', 'とても面白い', '重要な作品'];
-        
-        return {
-          ...baseData,
-          // 新しいAPIのcolumnIDを使用
-          'cd2489c5-1450-4adf-8b87-5a3391698e20': book.title || '', // 書籍名
-          '67658541-811b-43bb-ad04-6be9e4524743': book.author || '', // 著者名
-          'c17b598a-7132-4c3d-9dec-2dbf8886bd94': years[index % years.length] || '', // 発行年
-          'e4af5dd5-fd0c-4b03-bfe6-04e7aba576dc': completed[index % completed.length] ? '読了' : '未読', // 所持
-          'b2a3c709-da83-4dea-8143-736f231de357': notes[index % notes.length] || '' // 評価
-        };
-      } else if (tableId === 'demo1') {
-        return {
-          ...baseData,
-          number: `#${(index + 1).toString().padStart(3, '0')}`,
-          name: `ポケモン${index + 1}`,
-          type: ['ノーマル', 'みず', 'ほのお', 'くさ', 'でんき'][index % 5],
-          status: ['所有', '未所有', '探索中'][index % 3],
-          condition: ['良好', '普通', '要注意'][index % 3]
-        };
-      } else if (tableId === 'demo2') {
-        return {
-          ...baseData,
-          cardId: `R${(index + 1).toString().padStart(3, '0')}`,
-          name: `レアカード${index + 1}`,
-          rarity: ['★', '★★', '★★★', '★★★★', '★★★★★'][index % 5],
-          status: ['所有', '未所有'][index % 2],
-          price: `${(index + 1) * 100}円`
-        };
-      } else if (tableId === 'demo3') {
-        return {
-          ...baseData,
-          promoId: `P${(index + 1).toString().padStart(3, '0')}`,
-          name: `プロモカード${index + 1}`,
-          event: ['コミケ', 'ポケセン', 'イベント', 'キャンペーン'][index % 4],
-          status: ['所有', '未所有'][index % 2],
-          date: '2025-07-10'
-        };
-      } else {
-        return {
-          ...baseData,
-          name: `アイテム${index + 1}`,
-          status: ['所有', '未所有'][index % 2]
-        };
-      }
-    });
-  };
-
   const handleDataChange = async (newData) => {
     try {
       setIsSaving(true);
@@ -480,10 +360,9 @@ export default function CollectionDetailPage() {
   return (
     <Layout>
       <div className={styles.container}>
-        {(error || isDemo) && (
+        {error && (
           <div className={styles.errorBanner}>
-            <p>{isDemo ? '⚠️ デモモード' : '⚠️ APIエラー'}: {error}</p>
-            {isDemo && <p>APIサーバーに接続できないため、デモデータを表示しています</p>}
+            <p>⚠️ APIエラー: {error}</p>
           </div>
         )}
         
@@ -502,6 +381,7 @@ export default function CollectionDetailPage() {
         </div>
         
         <div className={styles.metaInfo}>
+          <p>API Base URL: <code>{process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7077'}</code></p>
           <p>コレクションID: <code>{params.tableId}</code></p>
           <p>総件数: {tableData.length} 件</p>
           {collectionData?.description && (
