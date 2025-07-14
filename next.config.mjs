@@ -1,10 +1,11 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // App Routerを使用
-  experimental: {
-    appDir: true
-  },
-  
   // ページ構成を明確にするための設定
   trailingSlash: false,
   env: {
@@ -18,8 +19,8 @@ const nextConfig = {
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@components': require('path').resolve(__dirname, 'pokenae.WebComponent/src/components'),
-      '@webcomponent': require('path').resolve(__dirname, 'pokenae.WebComponent/src')
+      '@components': path.resolve(__dirname, 'pokenae.WebComponent/src/components'),
+      '@webcomponent': path.resolve(__dirname, 'pokenae.WebComponent/src')
     };
     return config;
   }
