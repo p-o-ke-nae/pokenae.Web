@@ -242,7 +242,8 @@ export default function CollectionDetailPage() {
             // タイプに応じて値を変換
             switch (valueItem.type || valueItem.dataType) {
               case 'Boolean':
-                tableRow[columnId] = valueItem.value === 'True' ? '読了' : '未読';
+                // チェックボックス表示用にboolean値として保持
+                tableRow[columnId] = valueItem.value === 'True';
                 break;
               case 'Number':
                 tableRow[columnId] = valueItem.value;
@@ -286,15 +287,11 @@ export default function CollectionDetailPage() {
   };
 
   // 行クリック時の処理（DexDetailモーダルを開く）
-  const handleRowClick = (rowIndex) => {
+  const handleRowClick = (rowIndex, row, prevRow, nextRow) => {
     if (rowIndex >= 0 && rowIndex < tableData.length) {
-      const currentRow = tableData[rowIndex];
-      const prevRow = rowIndex > 0 ? tableData[rowIndex - 1] : null;
-      const nextRow = rowIndex < tableData.length - 1 ? tableData[rowIndex + 1] : null;
-      
       setCurrentRowIndex(rowIndex);
       setModalData({
-        row: currentRow,
+        row: row,
         prevRow: prevRow,
         nextRow: nextRow
       });
@@ -310,14 +307,34 @@ export default function CollectionDetailPage() {
   // 前のレコードに移動
   const handlePrevRow = () => {
     if (currentRowIndex > 0) {
-      handleRowClick(currentRowIndex - 1);
+      const newIndex = currentRowIndex - 1;
+      const currentRow = tableData[newIndex];
+      const prevRow = newIndex > 0 ? tableData[newIndex - 1] : null;
+      const nextRow = newIndex < tableData.length - 1 ? tableData[newIndex + 1] : null;
+      
+      setCurrentRowIndex(newIndex);
+      setModalData({
+        row: currentRow,
+        prevRow: prevRow,
+        nextRow: nextRow
+      });
     }
   };
 
   // 次のレコードに移動
   const handleNextRow = () => {
     if (currentRowIndex < tableData.length - 1) {
-      handleRowClick(currentRowIndex + 1);
+      const newIndex = currentRowIndex + 1;
+      const currentRow = tableData[newIndex];
+      const prevRow = newIndex > 0 ? tableData[newIndex - 1] : null;
+      const nextRow = newIndex < tableData.length - 1 ? tableData[newIndex + 1] : null;
+      
+      setCurrentRowIndex(newIndex);
+      setModalData({
+        row: currentRow,
+        prevRow: prevRow,
+        nextRow: nextRow
+      });
     }
   };
 
