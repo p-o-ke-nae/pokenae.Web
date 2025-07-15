@@ -33,7 +33,7 @@ export const APP_CONFIG = {
   NAME: process.env.NEXT_PUBLIC_APP_NAME || 'Pokenae Web',
   VERSION: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
   USE_MOCK_DATA: process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' || API_CONFIG.BASE_URL === 'mock',
-  DEBUG_MODE: process.env.NEXT_PUBLIC_DEBUG_MODE === 'true'
+  DEBUG_MODE: process.env.NEXT_PUBLIC_DEBUG_MODE === 'true' || process.env.NODE_ENV === 'development'
 };
 
 // UI設定
