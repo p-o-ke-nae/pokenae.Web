@@ -24,24 +24,27 @@ const DexDetail = ({ modalData, closeModal, handlePrevRow, handleNextRow, column
         )}
         <div className={styles.modalText}>
           <div className={styles.modalInfoWrapper}>
-            {columns.map((column) => (
-              column.type !== 'image' && modalData.row[column.key || column.name] !== undefined && (
-                <div key={column.key || column.name} className={styles.modalTextItem}>
-                  <div className={styles.modalTextItemHeader}>{column.header}</div>
+            {columns.map((column) => {
+              const columnKey = column.key || column.name;
+              const columnValue = modalData.row[columnKey];
+              
+              return column.type !== 'image' && (
+                <div key={columnKey} className={styles.modalTextItem}>
+                  <div className={styles.modalTextItemHeader}>{column.header || column.label}</div>
                   <div className={styles.modalTextItemDetail}>
                     {column.type === 'boolean' ? (
                       <CustomCheckBox
-                        value={modalData.row[column.key || column.name]}
+                        value={columnValue}
                         status="readonly"
                         onChange={() => {}}
                       />
                     ) : (
-                      modalData.row[column.key || column.name]
+                      <span>{columnValue !== undefined && columnValue !== null ? columnValue : '（データなし）'}</span>
                     )}
                   </div>
                 </div>
               )
-            ))}
+            })}
           </div>
         </div>
       </div>

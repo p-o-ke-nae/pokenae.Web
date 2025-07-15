@@ -171,8 +171,22 @@ export const collectionApi = {
   },
 
   // レコード一覧取得
-  getRecords: async (tableId) => {
-    return await apiRequest(`${API_CONFIG.ENDPOINTS.RECORD}/table/${tableId}`, { method: 'GET' });
+  getRecords: async (tableId, options = {}) => {
+    // 全列の値を取得するためのクエリパラメータを追加
+    const queryParams = new URLSearchParams();
+    
+    if (options.includeHidden !== false) {
+      queryParams.append('includeHiddenColumns', 'true');
+    }
+    
+    if (options.includeAllValues !== false) {
+      queryParams.append('includeAllValues', 'true');
+    }
+    
+    const queryString = queryParams.toString();
+    const endpoint = `${API_CONFIG.ENDPOINTS.RECORD}/table/${tableId}${queryString ? '?' + queryString : ''}`;
+    
+    return await apiRequest(endpoint, { method: 'GET' });
   },
 
   // カラム情報取得

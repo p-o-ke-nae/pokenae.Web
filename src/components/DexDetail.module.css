@@ -36,6 +36,20 @@
   position: relative;
 }
 
+.sectionTitle {
+  color: #f1f1f1;
+  font-size: 1.1em;
+  font-weight: bold;
+  margin: 15px 0 10px 0;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #555;
+  text-align: left;
+}
+
+.sectionTitle:first-child {
+  margin-top: 5px;
+}
+
 .modalTextItem {
   width: 90%;
   border: 2px solid #ccc;
