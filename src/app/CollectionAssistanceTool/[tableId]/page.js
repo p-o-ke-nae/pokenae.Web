@@ -545,7 +545,7 @@ export default function CollectionDetailPage() {
         <div className={styles.header}>
           <CustomHeader>{collectionData?.name || 'コレクション詳細'}</CustomHeader>
           <div className={styles.headerActions}>
-            <CustomButton 
+            {/* <CustomButton 
               onClick={handleManualRefresh}
               label="手動更新"
               disabled={isLoading || isSaving}
@@ -562,7 +562,7 @@ export default function CollectionDetailPage() {
             <CustomButton 
               onClick={handleExport}
               label="CSVエクスポート"
-            />
+            /> */}
             {/* 認証機能を使用する場合は以下のコメントを外してください
             <AuthStartButton
               label="認証"
