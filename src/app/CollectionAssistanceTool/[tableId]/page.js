@@ -122,7 +122,7 @@ export default function CollectionDetailPage() {
         }
 
         const collectionName = collection.name || 'コレクション';
-        showSuccess(`${collectionName}のデータを読み込みました`);
+        // showSuccess(`${collectionName}のデータを読み込みました`);
 
       } catch (error) {
         console.error('Failed to load collection data:', error);
@@ -563,20 +563,29 @@ export default function CollectionDetailPage() {
               onClick={handleExport}
               label="CSVエクスポート"
             />
+            {/* 認証機能を使用する場合は以下のコメントを外してください
+            <AuthStartButton
+              label="認証"
+              authProvider="oauth"
+              preserveCurrentPage={true}
+              onSuccess={() => showInfo('認証を開始しました')}
+              onError={(error) => showError(`認証エラー: ${error.message}`)}
+            />
+            */}
           </div>
         </div>
         
         <div className={styles.metaInfo}>
-          <p>API Base URL: <code>{API_CONFIG.BASE_URL}</code></p>
-          <p>コレクションID: <code>{params.tableId}</code></p>
-          <p>総件数: {tableData.length} 件</p>
+          {/* <p>API Base URL: <code>{API_CONFIG.BASE_URL}</code></p> */}
+          {/* <p>コレクションID: <code>{params.tableId}</code></p> */}
+          {/* <p>総件数: {tableData.length} 件</p> */}
           {lastUpdated && (
             <p>最終更新: {lastUpdated.toLocaleString('ja-JP')}</p>
           )}
           <p>
             自動更新: {isAutoRefreshEnabled ? 
               <span style={{color: 'green'}}>
-                有効 ({refreshIntervalMs / 1000}秒間隔) - 設定ファイルで制御
+                有効 ({refreshIntervalMs / 1000}秒間隔)
               </span> : 
               <span style={{color: 'red'}}>無効</span>
             }
@@ -584,18 +593,18 @@ export default function CollectionDetailPage() {
           {collectionData?.description && (
             <p>説明: {collectionData.description}</p>
           )}
-          {collectionData?.ownerId && (
+          {/* {collectionData?.ownerId && (
             <p>オーナーID: <code>{collectionData.ownerId}</code></p>
-          )}
-          {collectionData?.columnIds && (
+          )} */}
+          {/* {collectionData?.columnIds && (
             <p>カラム数: {collectionData.columnIds.length} 個 (表示: {columns.length} 個)</p>
           )}
           {collectionData?.createdAt && (
             <p>作成日時: {new Date(collectionData.createdAt).toLocaleString('ja-JP')}</p>
-          )}
-          {collectionData?.sheetId && (
+          )} */}
+          {/* {collectionData?.sheetId && (
             <p>SheetID: <code>{collectionData.sheetId}</code></p>
-          )}
+          )} */}
         </div>
         
         <div className={styles.content}>
