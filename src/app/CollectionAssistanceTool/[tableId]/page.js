@@ -65,9 +65,7 @@ export default function CollectionDetailPage() {
             method: 'HEAD',
             ...API_CONFIG.DEFAULT_OPTIONS,
           });
-          console.log('API Server Health Check:', healthCheck.status);
         } catch (healthError) {
-          console.warn('API Server Health Check failed:', healthError);
           throw new Error(`APIサーバー（${API_CONFIG.BASE_URL}）に接続できません`);
         }
 
@@ -75,8 +73,6 @@ export default function CollectionDetailPage() {
 
         // コレクション詳細を取得
         const collectionResponse = await collectionApi.getCollectionById(params.tableId);
-        console.log('Collection API Response:', collectionResponse);
-        
         const collection = collectionResponse;
         setCollectionData(collection);
 
@@ -87,7 +83,6 @@ export default function CollectionDetailPage() {
         let allColumnsData = [];
         if (collection.columnIds && collection.columnIds.length > 0) {
           // columnIdsから動的にカラム定義を作成
-          console.log('Found columnIds:', collection.columnIds);
           const columnResult = createColumnsFromColumnIds(collection.columnIds);
           columnsData = columnResult.visibleColumns;
           allColumnsData = columnResult.allColumns;
@@ -118,16 +113,11 @@ export default function CollectionDetailPage() {
 
         setColumns(columnsData);
         setAllColumns(allColumnsData);
-        console.log('Visible columns set in state:', columnsData);
-        console.log('All columns set in state:', allColumnsData);
 
         // 初回レコードデータ読込（カラム情報設定後）
-        console.log('About to load records. columnsData.length:', columnsData.length);
         if (columnsData.length > 0) {
-          console.log('Loading records with provided columns');
           await loadRecordsData(columnsData);
         } else {
-          console.warn('No visible columns found, attempting to load records anyway');
           await loadRecordsData();
         }
 
@@ -165,85 +155,47 @@ export default function CollectionDetailPage() {
     try {
       setLoadingMessage('レコードデータを取得しています...');
       
-      console.log('=== loadRecordsData START ===');
-      console.log('providedColumns:', providedColumns);
-      console.log('current columns state:', columns);
-      console.log('collectionData:', collectionData);
-      
-      // 実際のAPIからレコードデータを取得
-      console.log('Requesting records for tableId:', params.tableId);
-      
       // tableIdの検証
       if (!params.tableId || typeof params.tableId !== 'string' || params.tableId.trim() === '') {
         throw new Error('Invalid tableId parameter');
       }
       
-      const recordsResponse = await collectionApi.getRecords(params.tableId, {
-        includeHidden: true,
-        includeAllValues: true
-      });
-      console.log('Records API Response:', recordsResponse);
-      console.log('Records response type:', typeof recordsResponse);
-      console.log('Records is array:', Array.isArray(recordsResponse));
+      const recordsResponse = await collectionApi.getRecords(params.tableId);
       
       if (recordsResponse && Array.isArray(recordsResponse)) {
         // カラム情報を引数から取得、なければ現在のstateから取得
         let currentColumns = providedColumns || columns;
-        console.log('currentColumns after fallback:', currentColumns);          // 初回読み込み時でカラム情報がない場合は、レコードデータから直接生成
-          if (currentColumns.length === 0) {
-            console.log('No column information available, generating from record data...');
-            console.log('recordsResponse sample:', recordsResponse[0]);
+        
+        // 初回読み込み時でカラム情報がない場合は、レコードデータから直接生成
+        if (currentColumns.length === 0) {
+          if (recordsResponse.length > 0 && recordsResponse[0].values) {
+            const firstRecord = recordsResponse[0];
+            // 全カラムIDを収集（レコードのvalues配列から）
+            const allColumnIds = firstRecord.values.map(valueItem => valueItem.columnId);
             
-            // レコードデータから直接カラム定義を生成
-            if (recordsResponse.length > 0 && recordsResponse[0].values) {
-              const firstRecord = recordsResponse[0];
-              // 全カラムIDを収集（レコードのvalues配列から）
-              const allColumnIds = firstRecord.values.map(valueItem => valueItem.columnId);
-              console.log('Extracted columnIds from record data:', allColumnIds);
-              
-              const columnResult = createColumnsFromColumnIds(allColumnIds, recordsResponse);
-              currentColumns = columnResult.visibleColumns;
-              const allColumnsFromRecord = columnResult.allColumns;
-              
-              console.log('Generated visible columns from record data:', currentColumns);
-              console.log('Generated all columns from record data:', allColumnsFromRecord);
-              
-              setColumns(currentColumns);
-              setAllColumns(allColumnsFromRecord);
-            } else {
-              console.warn('No record data available to generate columns');
-            }
+            const columnResult = createColumnsFromColumnIds(allColumnIds, recordsResponse);
+            currentColumns = columnResult.visibleColumns;
+            const allColumnsFromRecord = columnResult.allColumns;
+            
+            setColumns(currentColumns);
+            setAllColumns(allColumnsFromRecord);
           }
+        }
         
         // カラム情報が存在する場合のみテーブルデータを変換
         if (currentColumns.length > 0) {
-          console.log('Converting records to table data...');
-          // APIレスポンス形式からテーブル用データに変換（全列情報も渡す）
           const tableRecords = convertRecordsToTableData(recordsResponse, currentColumns, allColumns);
-          console.log('Converted table records:', tableRecords);
-          setTableData(tableRecords);
+          setTableData([...tableRecords]); // 新しい配列参照で確実に更新
           setLastUpdated(new Date());
-          
-          console.log('Records updated:', tableRecords.length, 'records');
-          console.log('Visible columns:', currentColumns.length, 'columns');
-          console.log('All columns:', allColumns.length, 'columns');
         } else {
-          console.warn('No column information available for data conversion');
-          console.warn('currentColumns.length:', currentColumns.length);
-          console.warn('allColumns.length:', allColumns.length);
           setTableData([]);
         }
       } else {
-        console.log('No records available from API or invalid response format');
-        console.log('recordsResponse:', recordsResponse);
         setTableData([]);
       }
       
-      console.log('=== loadRecordsData END ===');
     } catch (recordError) {
-      console.error('Failed to fetch records from API:', recordError);
-      console.error('Error details:', recordError.message);
-      console.error('Error stack:', recordError.stack);
+      console.error('Failed to fetch records:', recordError);
       
       // エラー詳細をユーザーに表示
       if (recordError.message.includes('400')) {
@@ -253,8 +205,6 @@ export default function CollectionDetailPage() {
       } else {
         showError(`レコードデータの取得に失敗しました: ${recordError.message}`);
       }
-      
-      // エラー時は既存データを保持
     } finally {
       setLoadingMessage('');
     }
@@ -280,7 +230,7 @@ export default function CollectionDetailPage() {
         
         // ログ出力（設定で有効な場合のみ）
         if (refreshConfig.systemSettings.LOG_REFRESH_ACTIVITY) {
-          console.log(`Auto refresh started with interval: ${refreshIntervalMs}ms (${refreshIntervalMs / 1000}秒) - configured in refreshConfig.js`);
+          console.log(`Auto refresh started with interval: ${refreshIntervalMs}ms (${refreshIntervalMs / 1000}秒)`);
         }
       }
     };
@@ -308,6 +258,18 @@ export default function CollectionDetailPage() {
     }
   };
 
+  // tableDataの更新を確認（開発モードでのみ）
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && tableData.length > 0) {
+      // 開発者ツールでのみ確認可能
+      window.__POKENAE_DEBUG = {
+        tableDataCount: tableData.length,
+        lastUpdated: lastUpdated,
+        firstRecord: tableData[0]
+      };
+    }
+  }, [tableData, lastUpdated]);
+
   // コンポーネントのアンマウント時にintervalをクリア
   useEffect(() => {
     return () => {
@@ -326,26 +288,18 @@ export default function CollectionDetailPage() {
     }
   };
 
-  // APIレスポンスのcolumnIdsからカラム定義を作成（レコードデータからカラム情報を抽出）
+  // APIレスポンスのcolumnIdsからカラム定義を作成
   const createColumnsFromColumnIds = (columnIds, recordsData = null) => {
-    console.log('=== createColumnsFromColumnIds START ===');
-    console.log('columnIds:', columnIds);
-    console.log('recordsData length:', recordsData?.length);
-    
     if (!columnIds || !Array.isArray(columnIds)) {
-      console.warn('Invalid columnIds provided:', columnIds);
       return { visibleColumns: [], allColumns: [] };
     }
 
     // レコードデータからカラム名と表示設定を抽出
     const columnInfoMap = {};
     if (recordsData && Array.isArray(recordsData) && recordsData.length > 0) {
-      console.log('Extracting column info from record data...');
-      // 最初のレコードからカラム情報を取得
       const firstRecord = recordsData[0];
       if (firstRecord.values && Array.isArray(firstRecord.values)) {
         firstRecord.values.forEach(valueItem => {
-          console.log('Processing value item:', valueItem);
           columnInfoMap[valueItem.columnId] = {
             name: valueItem.columnName,
             isVisible: valueItem.isVisible,
@@ -354,8 +308,6 @@ export default function CollectionDetailPage() {
         });
       }
     }
-
-    console.log('Column info map:', columnInfoMap);
 
     // フォールバック用カラムラベルマッピング
     const fallbackColumnLabelMap = {
@@ -369,10 +321,8 @@ export default function CollectionDetailPage() {
     const allColumns = columnIds.map((columnId, index) => {
       const columnInfo = columnInfoMap[columnId];
       const label = columnInfo?.name || fallbackColumnLabelMap[columnId] || `カラム${index + 1}`;
-      const isVisible = columnInfo?.isVisible === true; // 厳密にtrueかチェック
+      const isVisible = columnInfo?.isVisible === true;
       const dataType = columnInfo?.dataType || 'Text';
-
-      console.log(`Column ${columnId}: label=${label}, isVisible=${isVisible}, dataType=${dataType}`);
 
       // データタイプからUIタイプを決定
       let uiType = 'text';
@@ -383,14 +333,14 @@ export default function CollectionDetailPage() {
       }
 
       return {
-        key: columnId, // columnIdを直接キーとして使用
-        name: columnId, // DexDetailで使用するnameプロパティ
+        key: columnId,
+        name: columnId,
         label: label,
-        header: label, // DexDetailで表示されるヘッダー
+        header: label,
         editable: false,
         type: uiType,
         visible: isVisible,
-        showHeader: isVisible, // 非表示列はヘッダーも非表示
+        showHeader: isVisible,
         width: uiType === 'number' ? '100px' : uiType === 'boolean' ? '100px' : '150px'
       };
     });
@@ -398,40 +348,25 @@ export default function CollectionDetailPage() {
     // 表示用：isVisible === true の列のみをフィルタリング
     const visibleColumns = allColumns.filter(column => column.visible === true);
     
-    console.log('All columns generated:', allColumns);
-    console.log('Visible columns after filtering:', visibleColumns);
-    console.log('=== createColumnsFromColumnIds END ===');
-    
     return { visibleColumns, allColumns };
   };
 
   // APIレスポンスのレコードデータをテーブル用データに変換
   const convertRecordsToTableData = (records, columns, allColumns = []) => {
-    console.log('=== convertRecordsToTableData START ===');
-    console.log('Input records count:', records?.length);
-    console.log('Input visible columns count:', columns?.length);
-    console.log('Input all columns count:', allColumns?.length);
-    console.log('Sample record:', records?.[0]);
-    
     if (!records || !Array.isArray(records) || records.length === 0) {
-      console.warn('No records to convert');
       return [];
     }
     
     if (!columns || !Array.isArray(columns) || columns.length === 0) {
-      console.warn('No columns defined for conversion');
       return [];
     }
     
     // 処理対象の全カラム（DexDetail用に非表示列も含める）
     const processingColumns = allColumns.length > 0 ? allColumns : columns;
-    console.log('Processing columns:', processingColumns.map(col => ({ key: col.key, label: col.label, visible: col.visible })));
     
     const result = records.map((record, index) => {
-      console.log(`Processing record ${index}:`, record);
-      
       const tableRow = {
-        id: record.id || `record-${Date.now()}-${index}`, // より確実なユニークID
+        id: record.id || `record-${Date.now()}-${index}`,
         recordId: record.id,
         tableId: record.tableId,
         backgroundColor: record.backgroundColor,
@@ -440,58 +375,40 @@ export default function CollectionDetailPage() {
         createdBy: record.createdBy
       };
 
-      // values配列からcolumnIdに基づいてデータを展開（全列を処理、DexDetail用）
+      // values配列からcolumnIdに基づいてデータを展開
       if (record.values && Array.isArray(record.values)) {
-        console.log(`Record ${index} values:`, record.values);
-        
         record.values.forEach(valueItem => {
           const columnId = valueItem.columnId;
-          console.log(`Processing value item for column ${columnId}:`, valueItem);
           
           if (columnId) {
-            // すべての列を処理（APIレスポンスに含まれているすべての値を保存）
             let convertedValue;
             try {
-              console.log(`Converting value for ${columnId}: value="${valueItem.value}", type="${valueItem.type || valueItem.dataType}"`);
-              
               switch (valueItem.type || valueItem.dataType) {
                 case 'Boolean':
-                  // チェックボックス表示用にboolean値として保持
                   convertedValue = valueItem.value === 'True';
                   break;
                 case 'Number':
-                  // 数値型の場合、有効な数値かチェック
                   const numValue = parseFloat(valueItem.value);
                   convertedValue = isNaN(numValue) ? '' : valueItem.value;
                   break;
                 case 'Empty':
-                  // Emptyタイプは常に空文字列（値が設定されていてもクリア）
                   convertedValue = '';
                   break;
                 default: // Text
                   convertedValue = valueItem.value || '';
               }
-              console.log(`Setting tableRow[${columnId}] = "${convertedValue}" (type: ${typeof convertedValue}, originalType: ${valueItem.type})`);
               tableRow[columnId] = convertedValue;
             } catch (conversionError) {
               console.warn(`Value conversion error for column ${columnId}:`, conversionError);
-              console.warn('Original value:', valueItem.value);
-              console.warn('Value type:', valueItem.type);
-              // エラー時は空文字列に設定
               tableRow[columnId] = '';
             }
-          } else {
-            console.warn('valueItem has no columnId:', valueItem);
           }
         });
       }
 
-      // 処理対象のカラムIDに対してのみデフォルト値を設定（undefinedを防ぐ）
+      // 処理対象のカラムIDに対してのみデフォルト値を設定
       processingColumns.forEach(column => {
         if (!(column.key in tableRow)) {
-          console.log(`Setting default value for missing column ${column.key} (${column.label})`);
-          
-          // データタイプに応じたデフォルト値を設定
           let defaultValue = '';
           if (column.type === 'boolean') {
             defaultValue = false;
@@ -500,19 +417,13 @@ export default function CollectionDetailPage() {
           } else {
             defaultValue = '（データなし）';
           }
-          
           tableRow[column.key] = defaultValue;
         }
       });
 
-      console.log(`Final tableRow for record ${index}:`, tableRow);
-      console.log(`Final tableRow keys:`, Object.keys(tableRow));
       return tableRow;
     });
     
-    console.log('=== convertRecordsToTableData END ===');
-    console.log('Final result count:', result.length);
-    console.log('Final result:', result);
     return result;
   };
 
@@ -705,12 +616,6 @@ export default function CollectionDetailPage() {
                 <p>データを保存しています...</p>
               </div>
             )}
-            {/* デバッグ: CustomTableに渡されるデータ */}
-            {console.log('About to render CustomTable with:')}
-            {console.log('tableData:', tableData)}
-            {console.log('columns:', columns)}
-            {console.log('tableData.length:', tableData.length)}
-            {console.log('columns.length:', columns.length)}
             <CustomTable 
               data={tableData}
               columns={columns}
@@ -735,6 +640,8 @@ export default function CollectionDetailPage() {
           handlePrevRow={handlePrevRow}
           handleNextRow={handleNextRow}
           columns={allColumns.length > 0 ? allColumns : columns} // 全列情報を渡す（非表示列も含む）
+          tableData={tableData} // リアルタイム更新用
+          currentRowIndex={currentRowIndex} // 現在の行インデックス
         />
       </div>
     </Layout>

@@ -1,11 +1,32 @@
-import React from 'react';
+import React, { useMemo, useEffect } from 'react';
 import CustomModal from '@webcomponent/components/CustomModal';
 import CustomImage from '@webcomponent/components/CustomImage';
 import CustomCheckBox from '@webcomponent/components/CustomCheckBox';
 import styles from './DexDetail.module.css';
 
-const DexDetail = ({ modalData, closeModal, handlePrevRow, handleNextRow, columns }) => {
+const DexDetail = ({ modalData, closeModal, handlePrevRow, handleNextRow, columns, tableData, currentRowIndex }) => {
   if (!modalData || !modalData.row) return null;
+
+  // リアルタイムデータを取得（useMemoで最適化）
+  const currentRow = useMemo(() => {
+    if (tableData && currentRowIndex !== undefined && currentRowIndex >= 0 && currentRowIndex < tableData.length) {
+      return tableData[currentRowIndex];
+    }
+    // フォールバック：元のmodalData.rowを使用
+    return modalData.row;
+  }, [tableData, currentRowIndex, modalData.row]);
+
+  // 開発モードでのデバッグ情報（プロダクションでは実行されない）
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      window.__POKENAE_DEXDETAIL_DEBUG = {
+        currentRowIndex,
+        currentRowData: currentRow,
+        isUsingRealTimeData: !!(tableData && currentRowIndex !== undefined),
+        timestamp: new Date().toISOString()
+      };
+    }
+  }, [currentRow, currentRowIndex, tableData]);
 
   // 一番先頭の画像タイプのカラムを取得
   const firstImageColumn = columns.find(column => column.type === 'image');
@@ -16,7 +37,7 @@ const DexDetail = ({ modalData, closeModal, handlePrevRow, handleNextRow, column
         {firstImageColumn && (
           <div className={styles.modalImageFrame}>
             <CustomImage 
-              value={modalData.row[firstImageColumn.key || firstImageColumn.name]} 
+              value={currentRow[firstImageColumn.key || firstImageColumn.name]} 
               metaData={firstImageColumn.metaData}
               label={firstImageColumn.label}
             />
@@ -26,7 +47,7 @@ const DexDetail = ({ modalData, closeModal, handlePrevRow, handleNextRow, column
           <div className={styles.modalInfoWrapper}>
             {columns.map((column) => {
               const columnKey = column.key || column.name;
-              const columnValue = modalData.row[columnKey];
+              const columnValue = currentRow[columnKey];
               
               return column.type !== 'image' && (
                 <div key={columnKey} className={styles.modalTextItem}>

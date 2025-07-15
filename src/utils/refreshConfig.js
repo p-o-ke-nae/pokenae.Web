@@ -17,13 +17,13 @@ export const REFRESH_CONFIG = {
   // ページ別設定（必要に応じて個別設定可能）
   PAGE_SETTINGS: {
     'CollectionDetail': {
-      defaultInterval: 30000, // 30秒に変更（APIサーバー負荷軽減）
-      enabled: false, // 一時的に自動更新を無効化（デバッグ用）
+      defaultInterval: 5000, // 30秒に変更（APIサーバー負荷軽減）
+      enabled: true, // 
       minInterval: 5000, // 最小間隔（5秒未満は設定不可）
       maxInterval: 600000 // 最大間隔（10分超過は設定不可）
     },
     'DashBoard': {
-      defaultInterval: 60000,
+      defaultInterval: 10000,
       enabled: true,
       minInterval: 10000,
       maxInterval: 300000
