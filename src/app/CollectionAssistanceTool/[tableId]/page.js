@@ -14,6 +14,7 @@ import {
 } from '@webcomponent/components';
 import DexDetail from '../../../components/DexDetail';
 import { collectionApi } from '../../../utils/collectionApi';
+import { API_CONFIG, buildApiUrl } from '../../../utils/config';
 import styles from './CollectionDetail.module.css';
 
 export default function CollectionDetailPage() {
@@ -41,15 +42,14 @@ export default function CollectionDetailPage() {
 
         // APIサーバーの接続テスト
         try {
-          const healthCheck = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7077'}/api/CollectionTable`, {
+          const healthCheck = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.COLLECTION_TABLE), {
             method: 'HEAD',
-            mode: 'cors',
-            credentials: 'omit',
+            ...API_CONFIG.DEFAULT_OPTIONS,
           });
           console.log('API Server Health Check:', healthCheck.status);
         } catch (healthError) {
           console.warn('API Server Health Check failed:', healthError);
-          throw new Error(`APIサーバー（${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7077'}）に接続できません`);
+          throw new Error(`APIサーバー（${API_CONFIG.BASE_URL}）に接続できません`);
         }
 
         setLoadingMessage('コレクション情報を取得しています...');
@@ -140,7 +140,7 @@ export default function CollectionDetailPage() {
         
         // APIサーバーが起動していない場合の情報表示
         if (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED')) {
-          showError('APIサーバー（localhost:7077）に接続できません。サーバーが起動しているか確認してください。');
+          showError(`APIサーバー（${API_CONFIG.BASE_URL}）に接続できません。サーバーが起動しているか確認してください。`);
         } else {
           showError(errorMessage);
         }
@@ -398,7 +398,7 @@ export default function CollectionDetailPage() {
         </div>
         
         <div className={styles.metaInfo}>
-          <p>API Base URL: <code>{process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7077'}</code></p>
+          <p>API Base URL: <code>{API_CONFIG.BASE_URL}</code></p>
           <p>コレクションID: <code>{params.tableId}</code></p>
           <p>総件数: {tableData.length} 件</p>
           {collectionData?.description && (

@@ -1,8 +1,9 @@
 // CollectionAssistanceTool API Client
 import { demoData } from './demoData.js';
+import { API_CONFIG, APP_CONFIG, buildApiUrl, buildCollectionTableUrl, buildRecordUrl } from './config.js';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7077';
-const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' || API_BASE_URL === 'mock';
+const API_BASE_URL = API_CONFIG.BASE_URL;
+const USE_MOCK_DATA = APP_CONFIG.USE_MOCK_DATA;
 
 // モックデータ応答用のヘルパー関数
 const mockResponse = (data, delay = 100) => {
@@ -72,15 +73,13 @@ const apiRequest = async (endpoint, options = {}) => {
   
   const defaultOptions = {
     method: 'GET', // デフォルトはGETメソッド（明示的に指定）
+    ...API_CONFIG.DEFAULT_OPTIONS,
     headers: {
-      'Content-Type': 'application/json',
+      ...API_CONFIG.DEFAULT_OPTIONS.headers,
       'Accept': 'application/json',
       // CORSのためのヘッダー追加
       'Access-Control-Allow-Origin': '*',
     },
-    // 開発環境でのSSL証明書チェックを無効化（Node.js環境）
-    mode: 'cors',
-    credentials: 'omit', // 認証情報は送信しない
   };
 
   const config = {
@@ -163,27 +162,27 @@ const apiRequest = async (endpoint, options = {}) => {
 export const collectionApi = {
   // コレクションテーブル一覧取得（実際のエンドポイントは要確認）
   getCollections: async () => {
-    return await apiRequest('/api/CollectionTable', { method: 'GET' });
+    return await apiRequest(API_CONFIG.ENDPOINTS.COLLECTION_TABLE, { method: 'GET' });
   },
 
   // コレクションテーブル詳細取得
   getCollectionById: async (tableId) => {
-    return await apiRequest(`/api/CollectionTable/${tableId}`, { method: 'GET' });
+    return await apiRequest(`${API_CONFIG.ENDPOINTS.COLLECTION_TABLE}/${tableId}`, { method: 'GET' });
   },
 
   // レコード一覧取得
   getRecords: async (tableId) => {
-    return await apiRequest(`/api/Record/table/${tableId}`, { method: 'GET' });
+    return await apiRequest(`${API_CONFIG.ENDPOINTS.RECORD}/table/${tableId}`, { method: 'GET' });
   },
 
   // カラム情報取得
   getColumns: async (tableId) => {
-    return await apiRequest(`/api/CollectionTable/${tableId}/columns`, { method: 'GET' });
+    return await apiRequest(`${API_CONFIG.ENDPOINTS.COLLECTION_TABLE}/${tableId}/columns`, { method: 'GET' });
   },
 
   // コレクション新規作成
   createCollection: async (collectionData) => {
-    return await apiRequest('/api/CollectionTable', {
+    return await apiRequest(API_CONFIG.ENDPOINTS.COLLECTION_TABLE, {
       method: 'POST',
       body: JSON.stringify(collectionData),
     });
@@ -191,7 +190,7 @@ export const collectionApi = {
 
   // コレクション更新
   updateCollection: async (tableId, collectionData) => {
-    return await apiRequest(`/api/CollectionTable/${tableId}`, {
+    return await apiRequest(`${API_CONFIG.ENDPOINTS.COLLECTION_TABLE}/${tableId}`, {
       method: 'PUT',
       body: JSON.stringify(collectionData),
     });
@@ -199,14 +198,14 @@ export const collectionApi = {
 
   // コレクション削除
   deleteCollection: async (tableId) => {
-    return await apiRequest(`/api/CollectionTable/${tableId}`, {
+    return await apiRequest(`${API_CONFIG.ENDPOINTS.COLLECTION_TABLE}/${tableId}`, {
       method: 'DELETE',
     });
   },
 
   // レコード新規作成
   createRecord: async (tableId, recordData) => {
-    return await apiRequest(`/api/Record/table/${tableId}`, {
+    return await apiRequest(`${API_CONFIG.ENDPOINTS.RECORD}/table/${tableId}`, {
       method: 'POST',
       body: JSON.stringify(recordData),
     });
@@ -214,7 +213,7 @@ export const collectionApi = {
 
   // レコード更新
   updateRecord: async (recordId, recordData) => {
-    return await apiRequest(`/api/Record/${recordId}`, {
+    return await apiRequest(`${API_CONFIG.ENDPOINTS.RECORD}/${recordId}`, {
       method: 'PUT',
       body: JSON.stringify(recordData),
     });
@@ -222,7 +221,7 @@ export const collectionApi = {
 
   // レコード削除
   deleteRecord: async (recordId) => {
-    return await apiRequest(`/api/Record/${recordId}`, {
+    return await apiRequest(`${API_CONFIG.ENDPOINTS.RECORD}/${recordId}`, {
       method: 'DELETE',
     });
   },

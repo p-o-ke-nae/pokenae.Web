@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { API_CONFIG, buildApiUrl } from '../../utils/config';
 
 export default function ApiTestPage() {
   const [testResults, setTestResults] = useState([]);
@@ -36,21 +37,20 @@ export default function ApiTestPage() {
 
     // 基本的な接続テスト
     await testApiEndpoint('API Base URL確認', async () => {
-      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7077';
+      const baseUrl = API_CONFIG.BASE_URL;
       return { baseUrl };
     });
 
     // Direct fetch テスト（実際のエンドポイント）
     // 注意: すべてのリクエストでmethod: 'GET'を明示的に指定（一部のサーバーでは必要）
     await testApiEndpoint('Direct Fetch - コレクションテーブル一覧', async () => {
-      const response = await fetch('https://localhost:7077/api/CollectionTable', {
+      const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.COLLECTION_TABLE), {
         method: 'GET',
+        ...API_CONFIG.DEFAULT_OPTIONS,
         headers: {
-          'Content-Type': 'application/json',
+          ...API_CONFIG.DEFAULT_OPTIONS.headers,
           'Accept': 'application/json',
         },
-        mode: 'cors',
-        credentials: 'omit',
       });
       
       console.log('Response Status:', response.status);
@@ -75,14 +75,13 @@ export default function ApiTestPage() {
     const sampleTableId = 'f1dbf3a5-3b86-4939-99e8-d564a11b4326';
     
     await testApiEndpoint(`コレクションテーブル詳細取得 (${sampleTableId})`, async () => {
-      const response = await fetch(`https://localhost:7077/api/CollectionTable/${sampleTableId}`, {
+      const response = await fetch(buildApiUrl(`${API_CONFIG.ENDPOINTS.COLLECTION_TABLE}/${sampleTableId}`), {
         method: 'GET',
+        ...API_CONFIG.DEFAULT_OPTIONS,
         headers: {
-          'Content-Type': 'application/json',
+          ...API_CONFIG.DEFAULT_OPTIONS.headers,
           'Accept': 'application/json',
         },
-        mode: 'cors',
-        credentials: 'omit',
       });
       
       if (!response.ok) {
@@ -99,14 +98,13 @@ export default function ApiTestPage() {
     });
 
     await testApiEndpoint(`レコード一覧取得 (${sampleTableId})`, async () => {
-      const response = await fetch(`https://localhost:7077/api/Record/table/${sampleTableId}`, {
+      const response = await fetch(buildApiUrl(`${API_CONFIG.ENDPOINTS.RECORD}/table/${sampleTableId}`), {
         method: 'GET',
+        ...API_CONFIG.DEFAULT_OPTIONS,
         headers: {
-          'Content-Type': 'application/json',
+          ...API_CONFIG.DEFAULT_OPTIONS.headers,
           'Accept': 'application/json',
         },
-        mode: 'cors',
-        credentials: 'omit',
       });
       
       if (!response.ok) {
@@ -124,15 +122,15 @@ export default function ApiTestPage() {
 
     // HTTP接続テスト（CORS回避のため）
     // 注意: HTTPプロトコルでもmethod: 'GET'の明示的指定が重要
+    // 設定ファイルのHTTPS設定をオーバーライドしてHTTP接続をテスト
     await testApiEndpoint('HTTP接続 - コレクションテーブル一覧', async () => {
       const response = await fetch('http://localhost:7077/api/CollectionTable', {
         method: 'GET',
+        ...API_CONFIG.DEFAULT_OPTIONS,
         headers: {
-          'Content-Type': 'application/json',
+          ...API_CONFIG.DEFAULT_OPTIONS.headers,
           'Accept': 'application/json',
         },
-        mode: 'cors',
-        credentials: 'omit',
       });
       
       console.log('HTTP Response Status:', response.status);
@@ -154,14 +152,14 @@ export default function ApiTestPage() {
     });
 
     await testApiEndpoint(`HTTP接続 - コレクションテーブル詳細 (${sampleTableId})`, async () => {
+      // 設定ファイルのHTTPS設定をオーバーライドしてHTTP接続をテスト
       const response = await fetch(`http://localhost:7077/api/CollectionTable/${sampleTableId}`, {
         method: 'GET',
+        ...API_CONFIG.DEFAULT_OPTIONS,
         headers: {
-          'Content-Type': 'application/json',
+          ...API_CONFIG.DEFAULT_OPTIONS.headers,
           'Accept': 'application/json',
         },
-        mode: 'cors',
-        credentials: 'omit',
       });
       
       if (!response.ok) {
@@ -178,14 +176,14 @@ export default function ApiTestPage() {
     });
 
     await testApiEndpoint(`HTTP接続 - レコード一覧取得 (${sampleTableId})`, async () => {
+      // 設定ファイルのHTTPS設定をオーバーライドしてHTTP接続をテスト
       const response = await fetch(`http://localhost:7077/api/Record/table/${sampleTableId}`, {
         method: 'GET',
+        ...API_CONFIG.DEFAULT_OPTIONS,
         headers: {
-          'Content-Type': 'application/json',
+          ...API_CONFIG.DEFAULT_OPTIONS.headers,
           'Accept': 'application/json',
         },
-        mode: 'cors',
-        credentials: 'omit',
       });
       
       if (!response.ok) {
@@ -204,7 +202,7 @@ export default function ApiTestPage() {
     // 各種エラーパターンのテスト
     // GETメソッドを明示的に指定してエラーレスポンスも正確にテスト
     await testApiEndpoint('存在しないエンドポイントテスト', async () => {
-      const response = await fetch('https://localhost:7077/api/nonexistent', {
+      const response = await fetch(buildApiUrl('/api/nonexistent'), {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -311,7 +309,7 @@ export default function ApiTestPage() {
         <h2>環境情報:</h2>
         <pre style={{ backgroundColor: '#f8f9fa', padding: '10px', borderRadius: '4px', overflow: 'auto' }}>
           {JSON.stringify({
-            'API_BASE_URL': process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7077',
+            'API_BASE_URL': API_CONFIG.BASE_URL,
             'App Name': process.env.NEXT_PUBLIC_APP_NAME || 'Pokenae Web',
             'User Agent': typeof window !== 'undefined' ? window.navigator.userAgent : 'Server Side',
             'Current URL': typeof window !== 'undefined' ? window.location.href : 'Server Side',
@@ -330,6 +328,11 @@ export default function ApiTestPage() {
             <li><strong>HTTPで接続</strong>: 必要に応じて環境変数を <code>NEXT_PUBLIC_API_BASE_URL=http://localhost:7077</code> に設定</li>
             <li><strong>開発時のみ</strong>: ブラウザの <code>--disable-web-security</code> フラグ使用（推奨しません）</li>
           </ol>
+          
+          <div style={{ backgroundColor: '#e8f4fd', padding: '10px', borderRadius: '4px', margin: '10px 0' }}>
+            <strong>💡 設定管理情報:</strong> APIのホストURLは <code>src/utils/config.js</code> で一元管理されています。
+            環境変数 <code>NEXT_PUBLIC_API_BASE_URL</code> で簡単に変更できます。
+          </div>
           
           <h3>一般的なAPIエラー対応:</h3>
           <ul>
