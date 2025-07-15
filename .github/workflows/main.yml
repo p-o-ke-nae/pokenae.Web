@@ -52,4 +52,16 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
           rsync -avz -e "ssh -i private_key -p 22" --exclude node_modules ./ $USERNAME@$HOST:pokenae
-          ssh $USERNAME@$HOST -i private_key -p 22 "cd pokenae && npm run stop && npm run build && nohup npm run start"
+          ssh $USERNAME@$HOST -i private_key -p 22 "cd pokenae && npm run stop && npm run build && nohup npm run start > /dev/null 2>&1 & echo 'Application started successfully'"
+
+      - name: Verify deployment
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.HOST }}
+          USERNAME: ${{ secrets.USERNAME }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > private_key
+          chmod 600 private_key
+          # 少し待ってからプロセスが動いているか確認
+          sleep 5
+          ssh $USERNAME@$HOST -i private_key -p 22 "cd pokenae && if pgrep -f 'npm.*start' > /dev/null; then echo 'Deployment verification successful'; else echo 'Deployment verification failed' && exit 1; fi"
