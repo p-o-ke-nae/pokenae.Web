@@ -445,13 +445,25 @@ export default function CollectionDetailPage() {
   };
 
   // 行クリック時の処理（DexDetailモーダルを開く）
-  const handleRowClick = (rowIndex, row, prevRow, nextRow) => {
-    if (rowIndex >= 0 && rowIndex < tableData.length) {
-      setCurrentRowIndex(rowIndex);
+  const handleRowClick = (pageRowIndex, row, prevRow, nextRow) => {
+    // ページ内のインデックスを全体のインデックスに変換
+    // CustomTableから渡される値を使って、tableDataから正しいインデックスを見つける
+    const globalRowIndex = tableData.findIndex(item => 
+      item.id === row.id || 
+      (item.recordId && item.recordId === row.recordId) ||
+      JSON.stringify(item) === JSON.stringify(row)
+    );
+    
+    if (globalRowIndex >= 0 && globalRowIndex < tableData.length) {
+      // 全体のテーブルデータから正しい前後のレコードを取得
+      const globalPrevRow = globalRowIndex > 0 ? tableData[globalRowIndex - 1] : null;
+      const globalNextRow = globalRowIndex < tableData.length - 1 ? tableData[globalRowIndex + 1] : null;
+      
+      setCurrentRowIndex(globalRowIndex);
       setModalData({
         row: row,
-        prevRow: prevRow,
-        nextRow: nextRow
+        prevRow: globalPrevRow,
+        nextRow: globalNextRow
       });
     }
   };
