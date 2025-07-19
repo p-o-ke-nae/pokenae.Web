@@ -66,6 +66,42 @@
   color: #333;
 }
 
+/* HTMLとして描画される説明文のスタイル */
+.metaInfo div[dangerouslySetInnerHTML] {
+  line-height: 1.5;
+  margin: 0.5rem 0;
+}
+
+.metaInfo div[dangerouslySetInnerHTML] h1,
+.metaInfo div[dangerouslySetInnerHTML] h2,
+.metaInfo div[dangerouslySetInnerHTML] h3,
+.metaInfo div[dangerouslySetInnerHTML] h4,
+.metaInfo div[dangerouslySetInnerHTML] h5,
+.metaInfo div[dangerouslySetInnerHTML] h6 {
+  margin: 1rem 0 0.5rem 0;
+  color: #333;
+}
+
+.metaInfo div[dangerouslySetInnerHTML] p {
+  margin: 0.5rem 0;
+  color: #555;
+}
+
+.metaInfo div[dangerouslySetInnerHTML] strong,
+.metaInfo div[dangerouslySetInnerHTML] b {
+  font-weight: bold;
+  color: #333;
+}
+
+.metaInfo div[dangerouslySetInnerHTML] em,
+.metaInfo div[dangerouslySetInnerHTML] i {
+  font-style: italic;
+}
+
+.metaInfo div[dangerouslySetInnerHTML] u {
+  text-decoration: underline;
+}
+
 .content {
   background: white;
   border-radius: 8px;

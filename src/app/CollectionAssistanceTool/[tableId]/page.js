@@ -22,6 +22,24 @@ import {
 } from '../../../utils/refreshConfig';
 import styles from './CollectionDetail.module.css';
 
+// HTMLサニタイゼーション関数
+const sanitizeHtml = (htmlString) => {
+  if (typeof window !== 'undefined' && window.DOMPurify) {
+    return window.DOMPurify.sanitize(htmlString);
+  }
+  
+  // フォールバック: 基本的なHTMLタグのみ許可
+  const allowedTags = ['p', 'span', 'div', 'strong', 'em', 'b', 'i', 'u', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+  const allowedAttributes = ['style', 'class'];
+  
+  // 簡易サニタイゼーション（本格的な実装ではDOMPurifyの使用を推奨）
+  let sanitized = htmlString.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  sanitized = sanitized.replace(/on\w+="[^"]*"/gi, '');
+  sanitized = sanitized.replace(/javascript:/gi, '');
+  
+  return sanitized;
+};
+
 export default function CollectionDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -50,6 +68,16 @@ export default function CollectionDetailPage() {
     // ユーザー設定を優先、なければ設定ファイルのデフォルト値
     return UserPreferences.load(STORAGE_KEYS.REFRESH_ENABLED, refreshConfig.defaultEnabled);
   });
+
+  // DOMPurifyライブラリの動的読み込み
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !window.DOMPurify) {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  }, []);
 
   // コレクション初期読込（一度のみ）
   useEffect(() => {
@@ -445,15 +473,8 @@ export default function CollectionDetailPage() {
   };
 
   // 行クリック時の処理（DexDetailモーダルを開く）
-  const handleRowClick = (pageRowIndex, row, prevRow, nextRow) => {
-    // ページ内のインデックスを全体のインデックスに変換
-    // CustomTableから渡される値を使って、tableDataから正しいインデックスを見つける
-    const globalRowIndex = tableData.findIndex(item => 
-      item.id === row.id || 
-      (item.recordId && item.recordId === row.recordId) ||
-      JSON.stringify(item) === JSON.stringify(row)
-    );
-    
+  const handleRowClick = (globalRowIndex, row, prevRow, nextRow) => {
+    // CustomTableから既にグローバルインデックスが渡されるため、そのまま使用
     if (globalRowIndex >= 0 && globalRowIndex < tableData.length) {
       // 全体のテーブルデータから正しい前後のレコードを取得
       const globalPrevRow = globalRowIndex > 0 ? tableData[globalRowIndex - 1] : null;
@@ -603,7 +624,9 @@ export default function CollectionDetailPage() {
             }
           </p>
           {collectionData?.description && (
-            <p>説明: {collectionData.description}</p>
+            <div>
+              説明: <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(collectionData.description) }} />
+            </div>
           )}
           {/* {collectionData?.ownerId && (
             <p>オーナーID: <code>{collectionData.ownerId}</code></p>
