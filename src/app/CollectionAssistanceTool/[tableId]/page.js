@@ -678,7 +678,7 @@ export default function CollectionDetailPage() {
               onDataChange={handleDataChange}
               onRowClick={handleRowClick}
               tableSettings={{
-                sortableColumns: columns.filter(col => col.visible === true).map(col => col.key || col.name),
+                sortableColumns: [], // ソート機能を全て無効化にゃん
                 fixedColumns: 0,
                 allowRowAddition: false,
                 allowRowDeletion: false,
