@@ -1,35 +1,36 @@
-import React, { useMemo, useEffect } from 'react';
+"use client";
+import React, { useMemo, useEffect, useCallback } from 'react';
 import CustomModal from '@webcomponent/components/CustomModal';
 import CustomImage from '@webcomponent/components/CustomImage';
 import CustomCheckBox from '@webcomponent/components/CustomCheckBox';
 import styles from './DexDetail.module.css';
 
-const DexDetail = ({ modalData, closeModal, handlePrevRow, handleNextRow, columns, tableData, currentRowIndex }) => {
+const DexDetail = React.memo(({ modalData, closeModal, handlePrevRow, handleNextRow, columns, tableData, currentRowIndex }) => {
   if (!modalData || !modalData.row) return null;
 
   // リアルタイムデータを取得（useMemoで最適化）
   const currentRow = useMemo(() => {
-    if (tableData && currentRowIndex !== undefined && currentRowIndex >= 0 && currentRowIndex < tableData.length) {
-      return tableData[currentRowIndex];
+    try {
+      if (tableData && currentRowIndex !== undefined && currentRowIndex >= 0 && currentRowIndex < tableData.length) {
+        return tableData[currentRowIndex];
+      }
+      // フォールバック：元のmodalData.rowを使用
+      return modalData.row;
+    } catch (error) {
+      console.warn('DexDetail: Error getting current row data', error);
+      return modalData.row;
     }
-    // フォールバック：元のmodalData.rowを使用
-    return modalData.row;
   }, [tableData, currentRowIndex, modalData.row]);
 
-  // 開発モードでのデバッグ情報（プロダクションでは実行されない）
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      window.__POKENAE_DEXDETAIL_DEBUG = {
-        currentRowIndex,
-        currentRowData: currentRow,
-        isUsingRealTimeData: !!(tableData && currentRowIndex !== undefined),
-        timestamp: new Date().toISOString()
-      };
-    }
-  }, [currentRow, currentRowIndex, tableData]);
-
   // 一番先頭の画像タイプのカラムを取得
-  const firstImageColumn = columns.find(column => column.type === 'image');
+  const firstImageColumn = useMemo(() => {
+    try {
+      return columns?.find(column => column.type === 'image') || null;
+    } catch (error) {
+      console.warn('DexDetail: Error finding image column', error);
+      return null;
+    }
+  }, [columns]);
 
   return (
     <CustomModal isOpen={!!modalData} onClose={closeModal} showCloseButton={true} className={styles.customModalRed}>
@@ -37,7 +38,7 @@ const DexDetail = ({ modalData, closeModal, handlePrevRow, handleNextRow, column
         {firstImageColumn && (
           <div className={styles.modalImageFrame}>
             <CustomImage 
-              value={currentRow[firstImageColumn.key || firstImageColumn.name]} 
+              value={currentRow?.[firstImageColumn.key || firstImageColumn.name]} 
               metaData={firstImageColumn.metaData}
               label={firstImageColumn.label}
             />
@@ -45,26 +46,35 @@ const DexDetail = ({ modalData, closeModal, handlePrevRow, handleNextRow, column
         )}
         <div className={styles.modalText}>
           <div className={styles.modalInfoWrapper}>
-            {columns.map((column) => {
-              const columnKey = column.key || column.name;
-              const columnValue = currentRow[columnKey];
-              
-              return column.type !== 'image' && (
-                <div key={columnKey} className={styles.modalTextItem}>
-                  <div className={styles.modalTextItemHeader}>{column.header || column.label}</div>
-                  <div className={styles.modalTextItemDetail}>
-                    {column.type === 'boolean' ? (
-                      <CustomCheckBox
-                        value={columnValue}
-                        status="readonly"
-                        onChange={() => {}}
-                      />
-                    ) : (
-                      <span>{columnValue !== undefined && columnValue !== null ? columnValue : '（データなし）'}</span>
-                    )}
+            {columns?.map((column) => {
+              try {
+                const columnKey = column.key || column.name;
+                const columnValue = currentRow?.[columnKey];
+                
+                if (column.type === 'image') {
+                  return null;
+                }
+                
+                return (
+                  <div key={`modal-item-${columnKey}`} className={styles.modalTextItem}>
+                    <div className={styles.modalTextItemHeader}>{column.header || column.label}</div>
+                    <div className={styles.modalTextItemDetail}>
+                      {column.type === 'boolean' ? (
+                        <CustomCheckBox
+                          value={columnValue}
+                          status="readonly"
+                          onChange={() => {}}
+                        />
+                      ) : (
+                        <span>{columnValue !== undefined && columnValue !== null ? columnValue : '（データなし）'}</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )
+                );
+              } catch (error) {
+                console.warn('DexDetail: Error rendering column', column, error);
+                return null;
+              }
             })}
           </div>
         </div>
@@ -74,6 +84,8 @@ const DexDetail = ({ modalData, closeModal, handlePrevRow, handleNextRow, column
       <button className={`${styles.nextRecord} ${styles.modalButtons}`} onClick={handleNextRow} disabled={!modalData.nextRow}></button>
     </CustomModal>
   );
-};
+});
+
+DexDetail.displayName = 'DexDetail';
 
 export default DexDetail;

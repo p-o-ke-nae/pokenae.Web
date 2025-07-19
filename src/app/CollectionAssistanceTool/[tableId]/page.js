@@ -331,7 +331,8 @@ export default function CollectionDetailPage() {
           columnInfoMap[valueItem.columnId] = {
             name: valueItem.columnName,
             isVisible: valueItem.isVisible,
-            dataType: valueItem.dataType
+            dataType: valueItem.dataType,
+            width: valueItem.width
           };
         });
       }
@@ -351,6 +352,7 @@ export default function CollectionDetailPage() {
       const label = columnInfo?.name || fallbackColumnLabelMap[columnId] || `カラム${index + 1}`;
       const isVisible = columnInfo?.isVisible === true;
       const dataType = columnInfo?.dataType || 'Text';
+      const width = columnInfo?.width;
 
       // データタイプからUIタイプを決定
       let uiType = 'text';
@@ -358,6 +360,15 @@ export default function CollectionDetailPage() {
         uiType = 'number';
       } else if (dataType === 'Boolean') {
         uiType = 'boolean';
+      }
+
+      // 幅の設定：APIから取得した値を優先、フォールバックはデータタイプに基づく
+      let columnWidth;
+      if (width && typeof width === 'number') {
+        columnWidth = `${width}px`;
+      } else {
+        // フォールバック：データタイプに基づく幅設定
+        columnWidth = uiType === 'number' ? '100px' : uiType === 'boolean' ? '100px' : '150px';
       }
 
       return {
@@ -369,7 +380,7 @@ export default function CollectionDetailPage() {
         type: uiType,
         visible: isVisible,
         showHeader: isVisible,
-        width: uiType === 'number' ? '100px' : uiType === 'boolean' ? '100px' : '150px'
+        width: columnWidth
       };
     });
     
