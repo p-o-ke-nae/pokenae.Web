@@ -674,7 +674,7 @@ export default function CollectionDetailPage() {
             <CustomTable 
               data={tableData}
               columns={columns}
-              rowsPerPage={15}
+              rowsPerPage={50}
               onDataChange={handleDataChange}
               onRowClick={handleRowClick}
               tableSettings={{
@@ -682,7 +682,7 @@ export default function CollectionDetailPage() {
                 fixedColumns: 0,
                 allowRowAddition: false,
                 allowRowDeletion: false,
-                recordsPerPageOptions: [10, 15, 25, 50]
+                recordsPerPageOptions: [10, 50, 100, 1000, 1500]
               }}
             />
           </div>
