@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack --port 3001",
     "build": "next build",
     "prebuild": "npm run cleanup:pages",
-    "start": "next start -p 443 & echo $! > .pidfile",
+    "start": "next start -p 3001 & echo $! > .pidfile",
     "stop": "if [ -f .pidfile ]; then kill $(cat .pidfile) && rm .pidfile; else echo 'No .pidfile found'; fi",
     "lint": "next lint",
     "cleanup:pages": "node ./scripts/cleanup-pages.js",
