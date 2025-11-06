@@ -4,15 +4,21 @@ on:
   push:
     branches:
       - main
+      - develop
   pull_request:
     types: [closed]
     branches:
       - main
+      - develop
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+
+    env:
+      DEPLOY_DIR: ${{ github.ref == 'refs/heads/main' && 'pokenae' || 'pokenae-develop' }}
+      PORT: ${{ github.ref == 'refs/heads/main' && '3001' || '3002' }}
 
     steps:
       - name: Checkout code
@@ -46,7 +52,7 @@ jobs:
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
-          ssh $USERNAME@$HOST -i private_key -p 22 "mkdir -p pokenae"
+          ssh $USERNAME@$HOST -i private_key -p 22 "mkdir -p ${{ env.DEPLOY_DIR }}"
 
       - name: Deploy to ConoHa VPS
         env:
@@ -56,8 +62,8 @@ jobs:
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
-          rsync -avz -e "ssh -i private_key -p 22" --exclude node_modules ./ $USERNAME@$HOST:pokenae
-          ssh $USERNAME@$HOST -i private_key -p 22 "cd pokenae && npm run stop && npm run build && nohup npm run start > /dev/null 2>&1 & echo 'Application started successfully'"
+          rsync -avz -e "ssh -i private_key -p 22" --exclude node_modules ./ $USERNAME@$HOST:${{ env.DEPLOY_DIR }}
+          ssh $USERNAME@$HOST -i private_key -p 22 "cd ${{ env.DEPLOY_DIR }} && npm run stop && npm run build && nohup npm start -p ${{ env.PORT }} > /dev/null 2>&1 & echo \$! > .pidfile && echo 'Application started successfully'"
 
       - name: Verify deployment
         env:
@@ -69,4 +75,4 @@ jobs:
           chmod 600 private_key
           # 少し待ってからプロセスが動いているか確認
           sleep 5
-          ssh $USERNAME@$HOST -i private_key -p 22 "cd pokenae && if pgrep -f 'npm.*start' > /dev/null; then echo 'Deployment verification successful'; else echo 'Deployment verification failed' && exit 1; fi"
+          ssh $USERNAME@$HOST -i private_key -p 22 "cd ${{ env.DEPLOY_DIR }} && if pgrep -f 'npm.*start' > /dev/null; then echo 'Deployment verification successful'; else echo 'Deployment verification failed' && exit 1; fi"
