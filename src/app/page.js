@@ -23,7 +23,7 @@ export default function HomePage() {
         
         <div className={styles.features}>
           <div className={styles.featureCard}>
-            <h2>🎯 コレクション支援ツール</h2>
+            <h2>🎯 コレクション支援ツールtest from fix-authentication</h2>
             <p>あなたのコレクションを効率的に管理できます。収集状況の確認、アイテムの追加・編集が簡単に行えます。</p>
             <Link href="/CollectionAssistanceTool" className={styles.button}>
               コレクション管理を開始
