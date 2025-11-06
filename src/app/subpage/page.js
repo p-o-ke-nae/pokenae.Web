@@ -16,7 +16,7 @@ export default function SubPage() {
   return (
     <Layout>
       <div className={styles.container}>
-        <CustomHeader>サブページ（テスト用from main）</CustomHeader>
+        <CustomHeader>サブページ（テスト用from main 2）</CustomHeader>
         
         <div className={styles.content}>
           <p>これはテスト用のサブページです。pokenae.WebComponentライブラリのコンポーネントを使用しています。</p>
