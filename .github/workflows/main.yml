@@ -63,7 +63,7 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
           rsync -avz -e "ssh -i private_key -p 22" --exclude node_modules ./ $USERNAME@$HOST:${{ env.DEPLOY_DIR }}
-          ssh $USERNAME@$HOST -i private_key -p 22 "cd ${{ env.DEPLOY_DIR }} && npm run stop && npm run build && nohup npm start -p ${{ env.PORT }} > /dev/null 2>&1 & echo \$! > .pidfile && echo 'Application started successfully'"
+          ssh $USERNAME@$HOST -i private_key -p 22 "cd ${{ env.DEPLOY_DIR }} && npm run stop || true && npm ci --production && npm run build && PORT=${{ env.PORT }} nohup npm start > nohup.out 2>&1 & echo \$! > .pidfile && echo 'Application started on port ${{ env.PORT }}'"
 
       - name: Verify deployment
         env:
