@@ -17,13 +17,13 @@ export default function HomePage() {
     <Layout>
       <div className={styles.container}>
         <div className={styles.hero}>
-          <h1>Pokenae Web へようこそ</h1>
+          <h1>Pokenae Web へようこそfrom develop 3</h1>
           <p>コレクション管理システムです。</p>
         </div>
         
         <div className={styles.features}>
           <div className={styles.featureCard}>
-            <h2>🎯 コレクション支援ツールtest from origin/develop</h2>
+            <h2>🎯 コレクション支援ツール</h2>
             <p>あなたのコレクションを効率的に管理できます。収集状況の確認、アイテムの追加・編集が簡単に行えます。</p>
             <Link href="/CollectionAssistanceTool" className={styles.button}>
               コレクション管理を開始
