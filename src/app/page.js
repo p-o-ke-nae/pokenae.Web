@@ -17,7 +17,7 @@ export default function HomePage() {
     <Layout>
       <div className={styles.container}>
         <div className={styles.hero}>
-          <h1>Pokenae Web へようこそfrom main 4</h1>
+          <h1>Pokenae Web へようこそfrom main 5</h1>
           <p>コレクション管理システムです。</p>
         </div>
         
