@@ -18,19 +18,19 @@
 - **機能**:
   - アプリケーションの概要表示
   - 各機能へのナビゲーション
-  - WebComponent ライブラリのデモ機能
+  - 開発者向けツールへのリンク
 
-### 2. コレクション支援ツール (`/CollectionAssistanceTool`)
+### 2. コレクション一覧 (`/collections`)
 
-- **ファイル**: `src/app/CollectionAssistanceTool/page.js`
+- **ファイル**: `src/app/collections/page.js`
 - **説明**: コレクション管理のメインページ
 - **機能**:
   - 利用可能なコレクションテーブルの一覧表示
   - 各テーブルの管理画面への遷移
 
-### 3. コレクション詳細管理 (`/CollectionAssistanceTool/[tableId]`)
+### 3. コレクション詳細管理 (`/collections/[id]`)
 
-- **ファイル**: `src/app/CollectionAssistanceTool/[tableId]/page.js`
+- **ファイル**: `src/app/collections/[id]/page.js`
 - **説明**: 特定のコレクションテーブルの詳細管理
 - **機能**:
   - アイテムの一覧表示（動的データ生成）
@@ -47,21 +47,31 @@
   - 完成度の表示
   - 最近のアクティビティ表示
 
-### 5. サブページ（テスト用） (`/subpage`)
+### 5. 認証コールバック (`/callback`)
 
-- **ファイル**: `src/app/subpage/page.js`
+- **ファイル**: `src/app/callback/page.js`
+- **説明**: OAuth認証処理のコールバックページ
+- **機能**:
+  - 認証情報の処理
+  - リダイレクト処理
+
+### 6. 開発者向けツール (`/dev`)
+
+#### 6.1. コンポーネントテスト (`/dev/subpage`)
+
+- **ファイル**: `src/app/dev/subpage/page.js`
 - **説明**: WebComponent ライブラリのテスト用ページ
 - **機能**:
   - 各種メッセージダイアログのテスト
   - UI コンポーネントの動作確認
 
-### 6. コールバックページ (`/callback`)
+#### 6.2. API診断ツール (`/dev/api-test`)
 
-- **ファイル**: `src/app/callback/page.js`
-- **説明**: 認証処理のコールバックページ
+- **ファイル**: `src/app/dev/api-test/page.js`
+- **説明**: APIサーバーとの接続確認および診断
 - **機能**:
-  - 認証情報の処理
-  - リダイレクト処理
+  - APIエンドポイントの接続テスト
+  - エラー原因の特定とデバッグ情報の提供
 
 ## ディレクトリ構造
 
@@ -72,15 +82,33 @@ src/
 │   ├── page.js                    # トップページ
 │   ├── page.module.css            # トップページスタイル
 │   ├── globals.css                # グローバルスタイル
-│   ├── CollectionAssistanceTool/  # コレクション管理
+│   ├── collections/               # コレクション管理
 │   │   ├── page.js                # コレクション一覧
-│   │   ├── CollectionAssistanceTool.module.css
-│   │   └── [tableId]/             # 動的ルート（未実装）
-│   └── subpage/                   # テスト用ページ
-│       ├── page.js
-│       └── subpage.module.css
-├── components/                    # ページ固有コンポーネント（未使用）
-└── pages/                         # Pages Router（非推奨）
+│   │   ├── collections.module.css # コレクション一覧スタイル
+│   │   └── [id]/                  # 動的ルート（コレクション詳細）
+│   │       ├── page.js            # コレクション詳細ページ
+│   │       └── detail.module.css  # 詳細ページスタイル
+│   ├── stats/                     # 統計情報
+│   │   ├── page.js
+│   │   └── stats.module.css
+│   ├── callback/                  # 認証コールバック
+│   │   ├── page.js
+│   │   └── callback.module.css
+│   └── dev/                       # 開発者向けツール
+│       ├── subpage/               # コンポーネントテスト
+│       │   ├── page.js
+│       │   └── subpage.module.css
+│       └── api-test/              # API診断ツール
+│           └── page.js
+├── components/                    # ページ固有コンポーネント
+│   ├── DexDetail.jsx              # レコード詳細表示コンポーネント
+│   ├── AuthComponents.jsx         # 認証関連コンポーネント
+│   └── Collection.jsx             # コレクション関連コンポーネント
+└── utils/                         # ユーティリティ
+    ├── config.js                  # API設定
+    ├── collectionApi.js           # API通信関数
+    ├── refreshConfig.js           # 自動更新設定
+    └── demoData.js                # デモデータ
 ```
 
 ## 技術スタック
@@ -293,9 +321,27 @@ function MyPage() {
 
 詳細な診断手順とトラブルシューティングについては `API_ERROR_GUIDE.md` を参照してください。
 
-### tableId について
+### コレクションID（id）について
 
 - **形式**: UUID (Globally Unique Identifier)
 - **例**: `f1dbf3a5-3b86-4939-99e8-d564a11b4326`
 - **用途**: コレクションテーブルとレコードの一意識別子として使用
+- **ルーティング**: `/collections/[id]` の動的ルートパラメータとして使用
 - **注意**: 以前のシンプルな ID（1, 2, 3...）とは異なり、UUID を使用
+
+## リファクタリング履歴
+
+### 2025年11月 - ページ構造の簡素化
+
+より標準的でシンプルなページ構成に変更しました：
+
+- **変更内容**:
+  - `/CollectionAssistanceTool` → `/collections` に変更
+  - `/CollectionAssistanceTool/[tableId]` → `/collections/[id]` に変更
+  - テスト用ページを `/dev` ディレクトリ配下に移動
+  - CSSモジュール名を簡潔に統一
+  
+- **理由**:
+  - より一般的で直感的なURL構造
+  - 本番ページと開発ページの明確な分離
+  - メンテナンス性の向上
