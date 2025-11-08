@@ -25,7 +25,7 @@ export default function HomePage() {
           <div className={styles.featureCard}>
             <h2>🎯 コレクション支援ツール</h2>
             <p>あなたのコレクションを効率的に管理できます。収集状況の確認、アイテムの追加・編集が簡単に行えます。</p>
-            <Link href="/CollectionAssistanceTool" className={styles.button}>
+            <Link href="/collections" className={styles.button}>
               コレクション管理を開始
             </Link>
           </div>
@@ -40,13 +40,15 @@ export default function HomePage() {
         </div>
 
         <div className={styles.demoSection}>
-          <CustomHeader>デモセクション</CustomHeader>
-          <CustomButton onClick={() => showInfo('WebComponentライブラリからのメッセージです')}>
-            WebComponent テスト
-          </CustomButton>
-          <Link href="/subpage" className={styles.button}>
-            サブページ（テスト用）
-          </Link>
+          <CustomHeader>開発者向けツール</CustomHeader>
+          <div className={styles.devTools}>
+            <Link href="/dev/subpage" className={`${styles.button} ${styles.buttonSecondary}`}>
+              コンポーネントテスト
+            </Link>
+            <Link href="/dev/api-test" className={`${styles.button} ${styles.buttonSecondary}`}>
+              API診断ツール
+            </Link>
+          </div>
         </div>
       </div>
     </Layout>
