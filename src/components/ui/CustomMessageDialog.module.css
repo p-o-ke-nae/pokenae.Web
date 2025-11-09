@@ -1,0 +1,30 @@
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom:solid 1px var(--main-border-color);
+}
+
+.title {
+    font-size: 20px;
+}
+
+.body {
+    margin: 20px 5px;
+}
+
+.body p {
+    font-size: 18px;
+}
+
+.footer {
+    width:100%;
+    margin-left: 10%;
+    display: flex;
+    gap: 5%;
+}
+
+.footer button {
+    width: 37.5%;
+}
+

@@ -22,12 +22,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
-          submodules: true # サブモジュールをチェックアウト
+          submodules: recursive # サブモジュールを再帰的にチェックアウト
 
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
           node-version: "18.18.0" # Node.jsのバージョンを変更
 
@@ -40,6 +40,11 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      - name: Install submodule dependencies
+        run: |
+          cd pokenae.WebComponent
+          npm install
 
       - name: Build project
         run: npm run build
@@ -63,7 +68,7 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
           rsync -avz -e "ssh -i private_key -p 22" --exclude node_modules ./ $USERNAME@$HOST:${{ env.DEPLOY_DIR }}
-          ssh $USERNAME@$HOST -i private_key -p 22 "cd ${{ env.DEPLOY_DIR }} && npm run stop || true && npm ci --production && npm run build && export PORT=${{ env.PORT }} && nohup npm start > nohup.out 2>&1 & echo \$! > .pidfile && echo 'Application started on port ${{ env.PORT }}'"
+          ssh $USERNAME@$HOST -i private_key -p 22 "cd ${{ env.DEPLOY_DIR }} && npm run stop || true && npm ci --omit=dev && npm run build && PORT=${{ env.PORT }} nohup npm start > nohup.out 2>&1 & echo \$! > .pidfile && echo 'Application started on port ${{ env.PORT }}'"
 
       - name: Verify deployment
         env:
