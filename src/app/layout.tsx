@@ -1,5 +1,5 @@
-import React from 'react';
-import { AppProvider } from '../../pokenae.WebComponent/src/context/AppContext';
+import React, { ReactNode } from 'react';
+import { AppProvider } from '../context/AppContext';
 import './globals.css';
 
 export const metadata = {
@@ -7,7 +7,11 @@ export const metadata = {
   description: 'ポケナエWebアプリケーション - コレクション管理システム',
 };
 
-export default function RootLayout({ children }) {
+interface RootLayoutProps {
+  children: ReactNode;
+}
+
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="ja">
       <body>

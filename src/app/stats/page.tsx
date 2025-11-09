@@ -6,7 +6,7 @@ import {
   Layout,
   CustomHeader, 
   CustomLoading 
-} from '@webcomponent/components';
+} from '@/components/ui';
 import styles from './stats.module.css';
 
 export default function StatsPage() {
@@ -39,7 +39,7 @@ export default function StatsPage() {
       <Layout>
         <div className={styles.container}>
           <CustomHeader>統計情報</CustomHeader>
-          <CustomLoading />
+          <CustomLoading isLoading={true} />
         </div>
       </Layout>
     );
