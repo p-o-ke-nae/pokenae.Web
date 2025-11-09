@@ -7,7 +7,7 @@ import {
   CustomHeader, 
   CustomButton,
   useAppContext 
-} from '@webcomponent/components';
+} from '@/components/ui';
 import styles from './page.module.css';
 
 export default function HomePage() {

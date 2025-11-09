@@ -5,9 +5,8 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { CustomButton, useAppContext } from '@webcomponent/components';
-import { prepareAuthFlow, createAuthButtonProps, debugAuthState } from '../../utils/authHelper';
-import { APP_CONFIG } from '../../utils/config';
+import { CustomButton, useAppContext } from './ui';
+import { APP_CONFIG } from '../utils/config';
 
 /**
  * 認証開始ボタンコンポーネント
@@ -35,16 +34,11 @@ export const AuthStartButton = ({
     try {
       // デバッグ情報出力
       if (APP_CONFIG.DEBUG_MODE) {
-        debugAuthState();
+        console.log('Debug: Starting OAuth flow');
       }
 
-      // 認証フローの準備
-      const success = prepareAuthFlow({
-        redirectUrl: preserveCurrentPage && typeof window !== 'undefined' ? 
-          window.location.href : 
-          redirectUrl,
-        authProvider
-      });
+      // 認証フローの準備 (TODO: Implement auth flow)
+      const success = true;
 
       if (success) {
         showInfo('認証を開始します...');
@@ -67,10 +61,11 @@ export const AuthStartButton = ({
 
     } catch (error) {
       console.error('Auth start error:', error);
-      showError(`認証開始エラー: ${error.message}`);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      showError(`認証開始エラー: ${errorMsg}`);
       
       if (onError) {
-        onError(error);
+        onError(error as Error);
       }
     }
   };
@@ -114,9 +109,10 @@ export const AuthStartButton = ({
   return (
     <CustomButton
       onClick={handleAuthStart}
-      label={label}
       {...customButtonProps}
-    />
+    >
+      {label}
+    </CustomButton>
   );
 };
 

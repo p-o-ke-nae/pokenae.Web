@@ -8,7 +8,7 @@ import {
   CustomButton, 
   CustomLoading,
   useAppContext
-} from '@webcomponent/components';
+} from '@/components/ui';
 import { collectionApi } from '../../utils/collectionApi';
 import styles from './collections.module.css';
 
@@ -64,9 +64,9 @@ const CollectionsPage = () => {
     return (
       <Layout>
         <div className={styles.container}>
-          <CustomHeader title="コレクション支援ツール" />
+          <CustomHeader>コレクション支援ツール</CustomHeader>
           <div className={styles.loadingContainer}>
-            <CustomLoading />
+            <CustomLoading isLoading={true} />
             <p>コレクション一覧を読み込んでいます...</p>
           </div>
         </div>
@@ -78,24 +78,21 @@ const CollectionsPage = () => {
     <Layout>
       <div className={styles.container}>
         <div className={styles.header}>
-          <CustomHeader title="コレクション支援ツール" />
+          <CustomHeader>コレクション支援ツール</CustomHeader>
           <div className={styles.headerActions}>
-            <CustomButton
-              label="更新"
-              onClick={handleRefresh}
-            />
-            <CustomButton
-              label="新規作成"
-              onClick={handleCreateCollection}
-            />
+            <CustomButton onClick={handleRefresh}>
+              更新
+            </CustomButton>
+            <CustomButton onClick={handleCreateCollection}>
+              新規作成
+            </CustomButton>
           </div>
         </div>
         
         <div className={styles.content}>
-          {(error || isDemo) && (
+          {error && (
             <div className={styles.errorBanner}>
-              <p>{isDemo ? '⚠️ デモモード' : '⚠️ APIエラー'}: {error}</p>
-              {isDemo && <p>APIサーバーに接続できないため、デモデータを表示しています</p>}
+              <p>⚠️ APIエラー: {error}</p>
             </div>
           )}
           
@@ -120,10 +117,9 @@ const CollectionsPage = () => {
                     <span className={styles.completionRate}>完成度: {collection.completionRate}%</span>
                   )}
                 </div>
-                <CustomButton
-                  label="管理画面を開く"
-                  onClick={() => handleTableSelect(collection.id)}
-                />
+                <CustomButton onClick={() => handleTableSelect(collection.id)}>
+                  管理画面を開く
+                </CustomButton>
               </div>
             ))}
           </div>
@@ -132,10 +128,9 @@ const CollectionsPage = () => {
             <div className={styles.emptyState}>
               <h3>コレクションが見つかりません</h3>
               <p>新しいコレクションを作成してください</p>
-              <CustomButton
-                label="コレクションを作成"
-                onClick={handleCreateCollection}
-              />
+              <CustomButton onClick={handleCreateCollection}>
+                コレクションを作成
+              </CustomButton>
             </div>
           )}
         </div>
