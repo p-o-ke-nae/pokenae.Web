@@ -22,12 +22,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
-          submodules: true # サブモジュールをチェックアウト
+          submodules: recursive # サブモジュールを再帰的にチェックアウト
 
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
           node-version: "18.18.0" # Node.jsのバージョンを変更
 
@@ -40,6 +40,11 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      - name: Install submodule dependencies
+        run: |
+          cd pokenae.WebComponent
+          npm install
 
       - name: Build project
         run: npm run build
