@@ -47,25 +47,50 @@ const Login = () => {
     // 認証前に現在のページ情報を保存
     saveAuthState();
     
-    // サーバーサイドがredirect_uriを生成する場合、フルホスト+パスを送信
-    const stateParam = `${window.location.origin}/callback`;
+    // セキュアなstateパラメータを生成（CSRF対策）
+    // このstateは以下の情報を含む：
+    // - 暗号学的に安全なランダム値（nonce）
+    // - タイムスタンプ（有効期限チェック用）
+    // - ユーザーエージェント（追加の検証用）
+    const generateStateParam = () => {
+      const array = new Uint8Array(32);
+      crypto.getRandomValues(array);
+      const nonce = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+      
+      const state = {
+        nonce: nonce,
+        timestamp: Date.now(),
+        userAgent: navigator.userAgent
+      };
+      
+      const stateString = btoa(JSON.stringify(state));
+      
+      // sessionStorageに保存して後で検証（CSRF対策）
+      sessionStorage.setItem('auth_state', stateString);
+      
+      return stateString;
+    };
+    
+    const stateParam = generateStateParam();
     
     const params = new URLSearchParams({
       client_id: GOOGLE_AUTH_CONFIG.CLIENT_ID,
       redirect_uri: GOOGLE_AUTH_CONFIG.REDIRECT_URI,
       response_type: 'code',
       scope: GOOGLE_AUTH_CONFIG.SCOPES.join(' '),
-      state: stateParam, // フルURL（ホスト+パス）
+      state: stateParam,
       access_type: 'offline', // オフラインアクセスを要求
+      prompt: 'consent', // ユーザーに常に同意画面を表示
     });
     
     console.log('🚀 Starting Google OAuth flow...', {
-      redirectHost: window.location.origin,
-      stateParam: stateParam,
       redirectUri: GOOGLE_AUTH_CONFIG.REDIRECT_URI,
       currentHost: window.location.hostname,
+      stateGenerated: stateParam.substring(0, 20) + '...',
       fullAuthUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
     });
+    
+    // Googleの認証ページにリダイレクト
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   };
 

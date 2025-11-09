@@ -83,22 +83,35 @@ const DEBUG_MODE = process.env.NODE_ENV === 'development';
 
 /**
  * 認証コードをアクセストークンに交換
+ * 
+ * この関数は以下の処理フローで動作します：
+ * 1. フロントエンド（pokenae.Web）からバックエンド（pokenae.Web API）にcodeとstateを送信
+ * 2. バックエンドはpokenae.UserManager WebAPIに処理を委譲
+ * 3. UserManagerがGoogleとトークン交換を行い、ユーザー情報を検証
+ * 4. UserManagerがアクセストークンを生成して返却
+ * 5. バックエンドがフロントエンドにトークンを返却
+ * 
+ * セキュリティ上の注意：
+ * - Client Secretはフロントエンドに露出させず、バックエンドで管理
+ * - 実際のトークン交換はUserManagerで実行
+ * 
  * @param {string} code - Google認証コード
- * @param {string} state - 状態パラメータ
+ * @param {string} state - 状態パラメータ（検証済み）
  * @returns {Promise<Object>} トークン情報
  */
 export const exchangeCodeForTokens = async (code, state) => {
   try {
     if (DEBUG_MODE) {
-      console.log('🔄 Exchanging code for tokens:', { 
+      console.log('🔄 Sending auth code to backend for delegation:', { 
         code: code.substring(0, 10) + '...', 
-        state,
+        state: state.substring(0, 20) + '...',
         redirectUri: GOOGLE_AUTH_CONFIG.REDIRECT_URI,
         backendBaseUrl: BACKEND_API_CONFIG.BASE_URL
       });
     }
 
     // バックエンドのcallbackエンドポイントにPOSTリクエストを送信
+    // バックエンドはこのリクエストをpokenae.UserManager WebAPIに委譲します
     const backendUrl = `${BACKEND_API_CONFIG.BASE_URL}${BACKEND_API_CONFIG.ENDPOINTS.OAUTH_CALLBACK}`;
     
     const tokenResponse = await fetch(backendUrl, {
@@ -492,38 +505,132 @@ export const safeRedirect = (url) => {
 };
 
 /**
- * ステータスパラメータの生成
- * @returns {string} ステータス
+ * 暗号学的に安全なランダムな文字列を生成
+ * @param {number} length - 生成する文字列の長さ
+ * @returns {string} ランダムな文字列
  */
-export const generateStateParam = () => {
-  const state = {
-    timestamp: Date.now(),
-    randomValue: Math.random().toString(36).substring(2),
-    userAgent: navigator.userAgent
-  };
-
-  return btoa(JSON.stringify(state));
+const generateSecureRandomString = (length = 32) => {
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 };
 
 /**
- * ステータスパラメータの検証とデコード
+ * ステータスパラメータの生成（セキュリティ強化版）
+ * CSRF攻撃とリプレイアタック対策のため、以下を含む：
+ * - 暗号学的に安全なランダム値（nonce）
+ * - タイムスタンプ（有効期限チェック用）
+ * - ユーザーエージェント（追加の検証用）
+ * @returns {string} ステータス
+ */
+export const generateStateParam = () => {
+  const nonce = generateSecureRandomString(32); // 暗号学的に安全なランダム値
+  const state = {
+    nonce: nonce,
+    timestamp: Date.now(),
+    userAgent: navigator.userAgent
+  };
+
+  const stateString = btoa(JSON.stringify(state));
+  
+  // sessionStorageに保存して後で検証
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    sessionStorage.setItem(SESSION_STORAGE_KEYS.AUTH_STATE, stateString);
+  }
+  
+  if (DEBUG_MODE) {
+    console.log('🔐 Generated state parameter:', {
+      nonce: nonce.substring(0, 8) + '...',
+      timestamp: state.timestamp
+    });
+  }
+
+  return stateString;
+};
+
+/**
+ * ステータスパラメータの検証とデコード（セキュリティ強化版）
+ * CSRF攻撃とリプレイアタック対策として：
+ * 1. sessionStorageに保存されたstateと照合
+ * 2. タイムスタンプの有効期限をチェック（5分以内）
+ * 3. ユーザーエージェントの一致を確認
+ * 4. 使用済みstateは削除（リプレイアタック対策）
  * @param {string} state - ステータス
  * @returns {Object} 検証結果
  */
 export const validateAndDecodeState = (state) => {
   try {
+    if (DEBUG_MODE) {
+      console.log('🔍 Validating state parameter...');
+    }
+
+    // stateの形式をチェック
     const decoded = atob(state);
     const parsed = JSON.parse(decoded);
 
-    // タイムスタンプの検証（例: 5分以上前のリクエストは無効）
+    // 必須フィールドの存在確認
+    if (!parsed.nonce || !parsed.timestamp) {
+      if (DEBUG_MODE) {
+        console.error('❌ State validation failed: missing required fields');
+      }
+      return { valid: false, error: 'State parameter is missing required fields' };
+    }
+
+    // sessionStorageに保存されたstateと照合（CSRF対策）
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const storedState = sessionStorage.getItem(SESSION_STORAGE_KEYS.AUTH_STATE);
+      if (!storedState) {
+        if (DEBUG_MODE) {
+          console.error('❌ State validation failed: no stored state found');
+        }
+        return { valid: false, error: 'No stored state found. Possible CSRF attack.' };
+      }
+
+      // 保存されたstateと受信したstateが一致するかチェック
+      if (storedState !== state) {
+        if (DEBUG_MODE) {
+          console.error('❌ State validation failed: state mismatch');
+        }
+        return { valid: false, error: 'State mismatch. Possible CSRF attack.' };
+      }
+
+      // 検証成功後、使用済みstateを削除（リプレイアタック対策）
+      sessionStorage.removeItem(SESSION_STORAGE_KEYS.AUTH_STATE);
+    }
+
+    // タイムスタンプの検証（5分以上前のリクエストは無効）
     const currentTime = Date.now();
-    if (parsed.timestamp && currentTime - parsed.timestamp > 5 * 60 * 1000) {
-      return { valid: false, error: 'Timestamp is too old' };
+    const STATE_EXPIRY_TIME = 5 * 60 * 1000; // 5分
+    if (parsed.timestamp && currentTime - parsed.timestamp > STATE_EXPIRY_TIME) {
+      if (DEBUG_MODE) {
+        console.error('❌ State validation failed: timestamp expired', {
+          age: (currentTime - parsed.timestamp) / 1000 / 60,
+          maxAge: STATE_EXPIRY_TIME / 1000 / 60
+        });
+      }
+      return { valid: false, error: 'State has expired. Please try again.' };
+    }
+
+    // ユーザーエージェントの検証（オプショナル、厳密すぎる場合はスキップ可能）
+    if (parsed.userAgent && typeof navigator !== 'undefined') {
+      if (parsed.userAgent !== navigator.userAgent) {
+        if (DEBUG_MODE) {
+          console.warn('⚠️ User agent mismatch (may be normal for some browsers)');
+        }
+        // 警告のみ、エラーにはしない（ブラウザによってはUser-Agentが変わる可能性があるため）
+      }
+    }
+
+    if (DEBUG_MODE) {
+      console.log('✅ State validation successful');
     }
 
     return { valid: true, data: parsed };
 
   } catch (error) {
+    if (DEBUG_MODE) {
+      console.error('❌ State validation error:', error);
+    }
     return { valid: false, error: 'Invalid state format' };
   }
 };

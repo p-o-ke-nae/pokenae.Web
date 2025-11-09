@@ -44,6 +44,13 @@ const Callback = () => {
         const code = urlParams.get('code');
         const state = urlParams.get('state');
 
+        // エラーパラメータのチェック（Googleが認証拒否した場合など）
+        const error = urlParams.get('error');
+        if (error) {
+          const errorDescription = urlParams.get('error_description') || 'Unknown error';
+          throw new Error(`認証エラー: ${error} - ${errorDescription}`);
+        }
+
         if (!code) {
           throw new Error('認証コードが見つかりません。認証プロセスを再開してください。');
         }
@@ -52,9 +59,61 @@ const Callback = () => {
           throw new Error('状態パラメータが見つかりません。認証プロセスを再開してください。');
         }
 
+        // stateパラメータの検証（CSRF攻撃対策）
+        setMessage('セキュリティ検証を実行しています...');
+        const validateState = (receivedState) => {
+          try {
+            // sessionStorageから保存されたstateを取得
+            const storedState = sessionStorage.getItem('auth_state');
+            if (!storedState) {
+              console.error('❌ No stored state found in sessionStorage');
+              throw new Error('セキュリティエラー: 保存された状態が見つかりません。CSRF攻撃の可能性があります。');
+            }
+
+            // stateの一致を確認
+            if (storedState !== receivedState) {
+              console.error('❌ State mismatch:', {
+                stored: storedState.substring(0, 20) + '...',
+                received: receivedState.substring(0, 20) + '...'
+              });
+              throw new Error('セキュリティエラー: 状態パラメータが一致しません。CSRF攻撃の可能性があります。');
+            }
+
+            // stateをデコードして内容を検証
+            const decoded = atob(receivedState);
+            const parsed = JSON.parse(decoded);
+
+            // タイムスタンプの検証（5分以内）
+            const currentTime = Date.now();
+            const STATE_EXPIRY_TIME = 5 * 60 * 1000; // 5分
+            if (parsed.timestamp && currentTime - parsed.timestamp > STATE_EXPIRY_TIME) {
+              const ageMinutes = Math.round((currentTime - parsed.timestamp) / 1000 / 60);
+              throw new Error(`セキュリティエラー: 認証リクエストの有効期限が切れました（${ageMinutes}分前）。`);
+            }
+
+            // 検証成功後、使用済みstateを削除（リプレイアタック対策）
+            sessionStorage.removeItem('auth_state');
+            
+            console.log('✅ State validation successful');
+            return true;
+
+          } catch (error) {
+            console.error('❌ State validation failed:', error);
+            throw error;
+          }
+        };
+
+        // stateを検証
+        validateState(state);
+
         setMessage('認証コードを処理しています...');
 
-        // 認証フローを完了
+        // バックエンドに認証情報を送信して処理を委譲
+        // この処理では：
+        // 1. フロントエンドからバックエンド（pokenae.Web API）にcodeとstateを送信
+        // 2. バックエンドはpokenae.UserManager WebAPIに処理を委譲
+        // 3. UserManagerがGoogleとトークン交換を行い、ユーザー情報を取得
+        // 4. バックエンドはアクセストークンを返却
         const authResult = await completeAuthFlow(code, state);
         
         if (authResult.success) {
