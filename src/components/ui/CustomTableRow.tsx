@@ -28,8 +28,10 @@ const CustomTableRow = ({ row, columns, handleInputChange, editedCells, handleRo
             {column.type === 'text' ? (
               column.editable ? (
                 <CustomTextBox
+                  metaData={column.metaData}
                   value={row[column.key || column.name]}
                   onChange={(e) => handleInputChange(row.id, column.key || column.name, e.target.value)}
+                  placeholder=""
                 />
               ) : (
                 <CustomLabel metaData={column.metaData}>{row[column.key || column.name]}</CustomLabel>
@@ -37,8 +39,10 @@ const CustomTableRow = ({ row, columns, handleInputChange, editedCells, handleRo
             ) : column.type === 'number' ? (
               column.editable ? (
                 <CustomSpinBox
+                  metaData={column.metaData}
                   value={row[column.key || column.name]}
                   onChange={(e) => handleInputChange(row.id, column.key || column.name, e.target.value)}
+                  placeholder=""
                   min={column.settings?.min || 0}
                   max={column.settings?.max || 100}
                   step={column.settings?.step || 1}
@@ -49,14 +53,18 @@ const CustomTableRow = ({ row, columns, handleInputChange, editedCells, handleRo
             ) : column.type === 'boolean' ? (
               column.editable ? (
                 <CustomCheckBox
+                  metaData={column.metaData}
                   value={row[column.key || column.name]}
                   onChange={(e) => handleInputChange(row.id, column.key || column.name, e.target.checked)}
+                  label=""
                 />
               ) : (
                 <CustomCheckBox
+                  metaData={column.metaData}
                   value={row[column.key || column.name]}
                   status="readonly"
                   onChange={() => {}} // 読み込み専用なので空の関数
+                  label=""
                 />
               )
             ) : column.type === 'image' ? (
