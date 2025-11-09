@@ -1,6 +1,13 @@
 // Google OAuth2認証用の統合ユーティリティ
 // pokenae.WebComponentで使用する認証処理の共通化にゃん
 
+// Window型の拡張
+declare global {
+  interface Window {
+    __POKENAE_AUTH?: any;
+  }
+}
+
 // Google OAuth2設定
 export const GOOGLE_AUTH_CONFIG = {
   CLIENT_ID: '805729941904-h95ej9999oqro2i98q138tiduioamuk9.apps.googleusercontent.com',

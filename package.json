@@ -9,6 +9,7 @@
     "start": "next start",
     "stop": "if [ -f .pidfile ]; then kill $(cat .pidfile) && rm .pidfile; else echo 'No .pidfile found'; fi",
     "lint": "next lint",
+    "type-check": "tsc --noEmit",
     "cleanup:pages": "node ./scripts/cleanup-pages.js",
     "cleanup:pages:powershell": "powershell -ExecutionPolicy Bypass -File ./scripts/cleanup-pages.ps1",
     "cleanup:pages:bash": "bash ./scripts/cleanup-pages.sh",

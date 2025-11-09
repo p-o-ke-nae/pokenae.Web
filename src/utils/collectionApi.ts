@@ -13,7 +13,7 @@ const mockResponse = (data, delay = 100) => {
 };
 
 // モックリクエストハンドラー
-const handleMockRequest = async (endpoint, options = {}) => {
+const handleMockRequest = async (endpoint: string, options: any = {}) => {
   const method = options.method || 'GET';
   
   // コレクション一覧取得
@@ -51,7 +51,7 @@ const requestCache = new Map();
 const CACHE_DURATION = 5000; // 5秒間キャッシュ
 
 // APIリクエストのベース関数
-const apiRequest = async (endpoint, options = {}) => {
+const apiRequest = async (endpoint: string, options: any = {}) => {
   // モックモードの場合は、実際のAPIを呼ばずにモックデータを返す
   if (USE_MOCK_DATA) {
     console.log('Using mock data for:', endpoint);
