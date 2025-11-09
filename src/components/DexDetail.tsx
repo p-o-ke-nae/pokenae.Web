@@ -1,11 +1,21 @@
 "use client";
 import React, { useMemo, useEffect, useCallback } from 'react';
-import CustomModal from '@webcomponent/components/CustomModal';
-import CustomImage from '@webcomponent/components/CustomImage';
-import CustomCheckBox from '@webcomponent/components/CustomCheckBox';
+import CustomModal from './ui/CustomModal';
+import CustomImage from './ui/CustomImage';
+import CustomCheckBox from './ui/CustomCheckBox';
 import styles from './DexDetail.module.css';
 
-const DexDetail = React.memo(({ modalData, closeModal, handlePrevRow, handleNextRow, columns, tableData, currentRowIndex }) => {
+interface DexDetailProps {
+  modalData: any;
+  closeModal: () => void;
+  handlePrevRow: () => void;
+  handleNextRow: () => void;
+  columns: any[];
+  tableData: any[];
+  currentRowIndex: number;
+}
+
+const DexDetail = React.memo<DexDetailProps>(({ modalData, closeModal, handlePrevRow, handleNextRow, columns, tableData, currentRowIndex }) => {
   if (!modalData || !modalData.row) return null;
 
   // リアルタイムデータを取得（useMemoで最適化）
@@ -64,6 +74,8 @@ const DexDetail = React.memo(({ modalData, closeModal, handlePrevRow, handleNext
                           value={columnValue}
                           status="readonly"
                           onChange={() => {}}
+                          label=""
+                          metaData={null}
                         />
                       ) : (
                         <span>{columnValue !== undefined && columnValue !== null ? columnValue : '（データなし）'}</span>

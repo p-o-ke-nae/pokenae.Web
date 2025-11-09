@@ -1,6 +1,6 @@
 // CollectionAssistanceTool API Client
-import { demoData } from './demoData.js';
-import { API_CONFIG, APP_CONFIG, buildApiUrl, buildCollectionTableUrl, buildRecordUrl } from './config.js';
+import { demoData } from './demoData';
+import { API_CONFIG, APP_CONFIG, buildApiUrl, buildCollectionTableUrl, buildRecordUrl } from './config';
 
 const API_BASE_URL = API_CONFIG.BASE_URL;
 const USE_MOCK_DATA = APP_CONFIG.USE_MOCK_DATA;

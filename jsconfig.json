@@ -1,9 +1,0 @@
-{
-  "compilerOptions": {
-    "paths": {
-      "@/*": ["./src/*"],
-      "@components/*": ["./pokenae.WebComponent/src/components/*"],
-      "@webcomponent/*": ["./pokenae.WebComponent/src/*"]
-    }
-  }
-}

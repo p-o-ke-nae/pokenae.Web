@@ -11,7 +11,7 @@ import {
   CustomModal,
   CustomLabel,
   useAppContext
-} from '@webcomponent/components';
+} from '@/components/ui';
 import DexDetail from '../../../components/DexDetail';
 import { collectionApi } from '../../../utils/collectionApi';
 import { API_CONFIG, buildApiUrl } from '../../../utils/config';
@@ -23,9 +23,9 @@ import {
 import styles from './CollectionDetail.module.css';
 
 // HTMLサニタイゼーション関数
-const sanitizeHtml = (htmlString) => {
-  if (typeof window !== 'undefined' && window.DOMPurify) {
-    return window.DOMPurify.sanitize(htmlString);
+const sanitizeHtml = (htmlString: string): string => {
+  if (typeof window !== 'undefined' && (window as any).DOMPurify) {
+    return (window as any).DOMPurify.sanitize(htmlString);
   }
   
   // フォールバック: 基本的なHTMLタグのみ許可
@@ -44,22 +44,22 @@ export default function CollectionDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { showInfo, showSuccess, showError } = useAppContext();
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadingMessage, setLoadingMessage] = useState('データを読み込んでいます...');
-  const [isSaving, setIsSaving] = useState(false);
-  const [collectionData, setCollectionData] = useState(null);
-  const [tableData, setTableData] = useState([]);
-  const [columns, setColumns] = useState([]);
-  const [allColumns, setAllColumns] = useState([]); // DexDetail用の全カラム情報
-  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadingMessage, setLoadingMessage] = useState<string>('データを読み込んでいます...');
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [collectionData, setCollectionData] = useState<any>(null);
+  const [tableData, setTableData] = useState<any[]>([]);
+  const [columns, setColumns] = useState<any[]>([]);
+  const [allColumns, setAllColumns] = useState<any[]>([]); // DexDetail用の全カラム情報
+  const [error, setError] = useState<string | null>(null);
   
   // DexDetailモーダル関連
-  const [modalData, setModalData] = useState(null);
-  const [currentRowIndex, setCurrentRowIndex] = useState(-1);
+  const [modalData, setModalData] = useState<any>(null);
+  const [currentRowIndex, setCurrentRowIndex] = useState<number>(-1);
 
   // 定期更新用
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<NodeJS.Timeout | null>(null);
   
   // 設定ファイルから初期設定を取得
   const refreshConfig = getRefreshConfig('CollectionDetail');
@@ -71,7 +71,7 @@ export default function CollectionDetailPage() {
 
   // DOMPurifyライブラリの動的読み込み
   useEffect(() => {
-    if (typeof window !== 'undefined' && !window.DOMPurify) {
+    if (typeof window !== 'undefined' && !(window as any).DOMPurify) {
       const script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js';
       script.async = true;
@@ -121,7 +121,7 @@ export default function CollectionDetailPage() {
             const columnsResponse = await collectionApi.getColumns(params.tableId);
             if (columnsResponse.data) {
               // 従来の形式でカラム情報を生成（表示・非表示の区別なし）
-              const generatedColumns = columnsResponse.data.map(item => ({
+              const generatedColumns = columnsResponse.data.map((item: any) => ({
                 key: item.name?.toLowerCase().replace(/\s+/g, '_'),
                 label: item.displayName || item.name,
                 editable: !item.required || item.name !== 'id',
@@ -154,12 +154,12 @@ export default function CollectionDetailPage() {
 
       } catch (error) {
         console.error('Failed to load collection data:', error);
-        const errorMessage = `データの読み込みに失敗しました: ${error.message}`;
+        const errorMessage = `データの読み込みに失敗しました: ${error instanceof Error ? error.message : String(error)}`;
         setError(errorMessage);
         setLoadingMessage('');
         
         // APIサーバーが起動していない場合の情報表示
-        if (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED')) {
+        if ((error instanceof Error && error.message.includes('Failed to fetch')) || (error instanceof Error && error.message.includes('ERR_CONNECTION_REFUSED'))) {
           showError(`APIサーバー（${API_CONFIG.BASE_URL}）に接続できません。サーバーが起動しているか確認してください。`);
         } else {
           showError(errorMessage);
@@ -199,7 +199,7 @@ export default function CollectionDetailPage() {
           if (recordsResponse.length > 0 && recordsResponse[0].values) {
             const firstRecord = recordsResponse[0];
             // 全カラムIDを収集（レコードのvalues配列から）
-            const allColumnIds = firstRecord.values.map(valueItem => valueItem.columnId);
+            const allColumnIds = firstRecord.values.map((valueItem: any) => valueItem.columnId);
             
             const columnResult = createColumnsFromColumnIds(allColumnIds, recordsResponse);
             currentColumns = columnResult.visibleColumns;
@@ -226,12 +226,13 @@ export default function CollectionDetailPage() {
       console.error('Failed to fetch records:', recordError);
       
       // エラー詳細をユーザーに表示
-      if (recordError.message.includes('400')) {
+      const errorMsg = recordError instanceof Error ? recordError.message : String(recordError);
+      if (errorMsg.includes('400')) {
         showError('APIリクエストエラー: データ形式に問題があります。管理者に連絡してください。');
-      } else if (recordError.message.includes('Empty type must have an empty value')) {
+      } else if (errorMsg.includes('Empty type must have an empty value')) {
         showError('データ型エラー: 空の値フィールドに不正な値が設定されています。');
       } else {
-        showError(`レコードデータの取得に失敗しました: ${recordError.message}`);
+        showError(`レコードデータの取得に失敗しました: ${errorMsg}`);
       }
     } finally {
       setLoadingMessage('');
@@ -290,7 +291,7 @@ export default function CollectionDetailPage() {
   useEffect(() => {
     if (process.env.NODE_ENV === 'development' && tableData.length > 0) {
       // 開発者ツールでのみ確認可能
-      window.__POKENAE_DEBUG = {
+      (window as any).__POKENAE_DEBUG = {
         tableDataCount: tableData.length,
         lastUpdated: lastUpdated,
         firstRecord: tableData[0]
@@ -317,7 +318,7 @@ export default function CollectionDetailPage() {
   };
 
   // APIレスポンスのcolumnIdsからカラム定義を作成
-  const createColumnsFromColumnIds = (columnIds, recordsData = null) => {
+  const createColumnsFromColumnIds = (columnIds: string[], recordsData: any[] | null = null) => {
     if (!columnIds || !Array.isArray(columnIds)) {
       return { visibleColumns: [], allColumns: [] };
     }
@@ -391,7 +392,7 @@ export default function CollectionDetailPage() {
   };
 
   // APIレスポンスのレコードデータをテーブル用データに変換
-  const convertRecordsToTableData = (records, columns, allColumns = []) => {
+  const convertRecordsToTableData = (records: any[], columns: any[], allColumns: any[] = []) => {
     if (!records || !Array.isArray(records) || records.length === 0) {
       return [];
     }
@@ -448,7 +449,7 @@ export default function CollectionDetailPage() {
       // 処理対象のカラムIDに対してのみデフォルト値を設定
       processingColumns.forEach(column => {
         if (!(column.key in tableRow)) {
-          let defaultValue = '';
+          let defaultValue: any = '';
           if (column.type === 'boolean') {
             defaultValue = false;
           } else if (column.type === 'number') {
@@ -568,7 +569,7 @@ export default function CollectionDetailPage() {
       <Layout>
         <div className={styles.container}>
           <div className={styles.loadingContainer}>
-            <CustomLoading />
+            <CustomLoading isLoading={true} />
             <CustomHeader>読み込み中...</CustomHeader>
             <p>{loadingMessage}</p>
           </div>
@@ -613,7 +614,7 @@ export default function CollectionDetailPage() {
               authProvider="oauth"
               preserveCurrentPage={true}
               onSuccess={() => showInfo('認証を開始しました')}
-              onError={(error) => showError(`認証エラー: ${error.message}`)}
+              onError={(error: Error) => showError(`認証エラー: ${error.message}`)}
             />
             */}
           </div>
@@ -667,7 +668,7 @@ export default function CollectionDetailPage() {
                 borderRadius: '8px',
                 textAlign: 'center'
               }}>
-                <CustomLoading />
+                <CustomLoading isLoading={true} />
                 <p>データを保存しています...</p>
               </div>
             )}

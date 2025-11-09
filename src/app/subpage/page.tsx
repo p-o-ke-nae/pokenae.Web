@@ -7,7 +7,7 @@ import {
   CustomButton, 
   CustomHeader,
   useAppContext 
-} from '@webcomponent/components';
+} from '@/components/ui';
 import styles from './subpage.module.css';
 
 export default function SubPage() {
@@ -22,18 +22,9 @@ export default function SubPage() {
           <p>これはテスト用のサブページです。pokenae.WebComponentライブラリのコンポーネントを使用しています。</p>
           
           <div className={styles.buttonGroup}>
-            <CustomButton 
-              onClick={() => showInfo('インフォメーションメッセージです')}
-              label="情報表示"
-            />
-            <CustomButton 
-              onClick={() => showWarning('警告メッセージです', 2)}
-              label="警告表示"
-            />
-            <CustomButton 
-              onClick={() => showConfirm('確認メッセージです')}
-              label="確認表示"
-            />
+            <CustomButton onClick={() => showInfo('インフォメーションメッセージです')}>情報表示</CustomButton>
+            <CustomButton onClick={() => showWarning('警告メッセージです', 2)}>警告表示</CustomButton>
+            <CustomButton onClick={() => showConfirm('確認', '確認メッセージです')}>確認表示</CustomButton>
           </div>
           
           <div className={styles.navigation}>

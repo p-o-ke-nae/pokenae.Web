@@ -1,11 +1,11 @@
 import React, { useEffect } from 'react';
 import Image from 'next/image';
 import styles from './page.module.css';
-import CustomButton from '@webcomponent/components/CustomButton';
+import CustomButton from './ui/CustomButton';
 import { useState, useMemo, useRef } from 'react';
-import CustomTable from '@webcomponent/components/CustomTable';
-import DexDetail from './components/DexDetail';
-import CustomLoading from '@webcomponent/components/CustomLoading';
+import CustomTable from './ui/CustomTable';
+import DexDetail from './DexDetail';
+import CustomLoading from './ui/CustomLoading';
 
 const Collection = ({ showInfo, showWarning, showConfirm }) => { 
   const tableRef = useRef(null);
@@ -67,7 +67,7 @@ const Collection = ({ showInfo, showWarning, showConfirm }) => {
   const handleExportData = () => {
     if (tableRef.current) {
       const tableData = tableRef.current.getTableData();
-      console.log(exportTableDataAsJson(tableData));
+      console.log(JSON.stringify(tableData, null, 2)); // exportTableDataAsJson
     }
   };
 
@@ -133,6 +133,8 @@ const Collection = ({ showInfo, showWarning, showConfirm }) => {
           handlePrevRow={handlePrevRow}
           handleNextRow={handleNextRow}
           columns={columns}
+          tableData={tableData}
+          currentRowIndex={0}
         />
       )}
 
