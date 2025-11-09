@@ -30,8 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files
+# 環境別のデフォルト設定（.env.development, .env.production, .env.example）はGit管理対象
+# ローカル環境固有の設定（.env.local）はGit管理外
+.env*.local
+.env.test
 
 # vercel
 .vercel

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { API_CONFIG, buildApiUrl } from '../../utils/config';
+import { API_CONFIG, buildApiUrl } from '../../../utils/config';
 
 export default function ApiTestPage() {
   const [testResults, setTestResults] = useState([]);

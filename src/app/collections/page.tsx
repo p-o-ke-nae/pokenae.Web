@@ -10,9 +10,9 @@ import {
   useAppContext
 } from '@/components/ui';
 import { collectionApi } from '../../utils/collectionApi';
-import styles from './CollectionAssistanceTool.module.css';
+import styles from './collections.module.css';
 
-const CollectionAssistanceIndex = () => {
+const CollectionsPage = () => {
   const router = useRouter();
   const { showError, showInfo } = useAppContext();
   const [isLoading, setIsLoading] = useState(true);
@@ -48,7 +48,7 @@ const CollectionAssistanceIndex = () => {
 
   const handleTableSelect = (collectionId) => {
     setIsLoading(true);
-    router.push(`/CollectionAssistanceTool/${collectionId}`);
+    router.push(`/collections/${collectionId}`);
   };
 
   const handleCreateCollection = () => {
@@ -139,4 +139,4 @@ const CollectionAssistanceIndex = () => {
   );
 };
 
-export default CollectionAssistanceIndex;
+export default CollectionsPage;

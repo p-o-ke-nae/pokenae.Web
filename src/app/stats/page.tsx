@@ -91,7 +91,7 @@ export default function StatsPage() {
             <Link href="/" className={styles.backButton}>
               トップページに戻る
             </Link>
-            <Link href="/CollectionAssistanceTool" className={styles.manageButton}>
+            <Link href="/collections" className={styles.manageButton}>
               コレクション管理
             </Link>
           </div>

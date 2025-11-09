@@ -20,7 +20,7 @@ import {
   UserPreferences, 
   STORAGE_KEYS 
 } from '../../../utils/refreshConfig';
-import styles from './CollectionDetail.module.css';
+import styles from './detail.module.css';
 
 // HTMLサニタイゼーション関数
 const sanitizeHtml = (htmlString: string): string => {
@@ -42,6 +42,7 @@ const sanitizeHtml = (htmlString: string): string => {
 
 export default function CollectionDetailPage() {
   const params = useParams();
+  const tableId = params.id; // 旧: params.tableId
   const router = useRouter();
   const { showInfo, showSuccess, showError } = useAppContext();
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -100,7 +101,7 @@ export default function CollectionDetailPage() {
         setLoadingMessage('コレクション情報を取得しています...');
 
         // コレクション詳細を取得
-        const collectionResponse = await collectionApi.getCollectionById(params.tableId);
+        const collectionResponse = await collectionApi.getCollectionById(tableId);
         const collection = collectionResponse;
         setCollectionData(collection);
 
@@ -118,7 +119,7 @@ export default function CollectionDetailPage() {
           // カラム情報がない場合は、別途取得を試みる
           try {
             setLoadingMessage('カラム情報を別途取得しています...');
-            const columnsResponse = await collectionApi.getColumns(params.tableId);
+            const columnsResponse = await collectionApi.getColumns(tableId);
             if (columnsResponse.data) {
               // 従来の形式でカラム情報を生成（表示・非表示の区別なし）
               const generatedColumns = columnsResponse.data.map((item: any) => ({
@@ -176,7 +177,7 @@ export default function CollectionDetailPage() {
     };
 
     loadCollectionData();
-  }, [params.tableId]); // showError, showSuccessを依存配列から削除
+  }, [tableId]); // showError, showSuccessを依存配列から削除
 
   // レコードデータのみを取得する関数
   const loadRecordsData = async (providedColumns = null) => {
@@ -184,11 +185,11 @@ export default function CollectionDetailPage() {
       setLoadingMessage('レコードデータを取得しています...');
       
       // tableIdの検証
-      if (!params.tableId || typeof params.tableId !== 'string' || params.tableId.trim() === '') {
+      if (!tableId || typeof tableId !== 'string' || tableId.trim() === '') {
         throw new Error('Invalid tableId parameter');
       }
       
-      const recordsResponse = await collectionApi.getRecords(params.tableId);
+      const recordsResponse = await collectionApi.getRecords(tableId);
       
       if (recordsResponse && Array.isArray(recordsResponse)) {
         // カラム情報を引数から取得、なければ現在のstateから取得
@@ -601,7 +602,7 @@ export default function CollectionDetailPage() {
               disabled={isLoading || isSaving}
             />
             <CustomButton 
-              onClick={() => router.push('/CollectionAssistanceTool')}
+              onClick={() => router.push('/collections')}
               label="一覧に戻る"
             />
             <CustomButton 
@@ -622,7 +623,7 @@ export default function CollectionDetailPage() {
         
         <div className={styles.metaInfo}>
           {/* <p>API Base URL: <code>{API_CONFIG.BASE_URL}</code></p> */}
-          {/* <p>コレクションID: <code>{params.tableId}</code></p> */}
+          {/* <p>コレクションID: <code>{tableId}</code></p> */}
           {/* <p>総件数: {tableData.length} 件</p> */}
           {lastUpdated && (
             <p>最終更新: {lastUpdated.toLocaleString('ja-JP')}</p>

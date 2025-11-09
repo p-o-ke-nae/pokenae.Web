@@ -95,6 +95,13 @@
   margin-bottom: 0;
 }
 
+.devTools {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 1rem;

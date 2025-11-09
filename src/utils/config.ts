@@ -1,6 +1,10 @@
 // アプリケーション設定の一元管理
 // 環境変数やデフォルト値を管理するにゃん
 
+// 環境判定
+const isDevelopment = process.env.NODE_ENV === 'development';
+const isProduction = process.env.NODE_ENV === 'production';
+
 interface ApiConfig {
   BASE_URL: string;
   ENDPOINTS: {
@@ -22,8 +26,8 @@ interface ApiConfig {
 // API設定
 export const API_CONFIG: ApiConfig = {
   // APIのベースURL
-    // BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7077',
-    BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://collectionassistancetoolapi-geaca2fwetcsgthk.japanwest-01.azurewebsites.net',
+  // 環境変数が設定されていない場合は本番環境のURLをデフォルトとする
+  BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://collectionassistancetoolapi-geaca2fwetcsgthk.japanwest-01.azurewebsites.net',
   
   // エンドポイント定義
   ENDPOINTS: {
@@ -51,6 +55,7 @@ interface AppConfig {
   VERSION: string;
   USE_MOCK_DATA: boolean;
   DEBUG_MODE: boolean;
+  ENVIRONMENT: string;
 }
 
 // アプリケーション設定
@@ -58,7 +63,8 @@ export const APP_CONFIG: AppConfig = {
   NAME: process.env.NEXT_PUBLIC_APP_NAME || 'Pokenae Web',
   VERSION: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
   USE_MOCK_DATA: process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' || API_CONFIG.BASE_URL === 'mock',
-  DEBUG_MODE: process.env.NEXT_PUBLIC_DEBUG_MODE === 'true' || process.env.NODE_ENV === 'development'
+  DEBUG_MODE: process.env.NEXT_PUBLIC_DEBUG_MODE === 'true' || isDevelopment,
+  ENVIRONMENT: isProduction ? 'production' : isDevelopment ? 'development' : 'unknown'
 };
 
 interface UiConfig {
@@ -105,8 +111,10 @@ export const buildCollectionTableUrl = (tableId: string = ''): string => {
 // デバッグ用ログ出力
 if (APP_CONFIG.DEBUG_MODE) {
   console.log('🔧 Config loaded:', {
+    ENVIRONMENT: APP_CONFIG.ENVIRONMENT,
     API_BASE_URL: API_CONFIG.BASE_URL,
     USE_MOCK_DATA: APP_CONFIG.USE_MOCK_DATA,
+    DEBUG_MODE: APP_CONFIG.DEBUG_MODE,
     APP_NAME: APP_CONFIG.NAME
   });
 }

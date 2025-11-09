@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack --port 3001",
     "build": "next build",
     "prebuild": "npm run cleanup:pages",
-    "start": "next start",
+    "start": "next start -p ${PORT:-3001}",
     "stop": "if [ -f .pidfile ]; then kill $(cat .pidfile) && rm .pidfile; else echo 'No .pidfile found'; fi",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
