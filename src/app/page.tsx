@@ -63,7 +63,7 @@ export default function HomePage() {
       id: 1,
       date: '2025-11-09',
       category: 'お知らせ',
-      title: 'トップページfrom develop221122をリニューアルしました',
+      title: 'トップページfrom main251111をリニューアルしました',
       link: '#',
     },
     {
