@@ -7,6 +7,7 @@
     "build": "next build",
     "prebuild": "npm run cleanup:pages",
     "start": "next start -p ${PORT:-3001}",
+    "startdev": "next start -p ${PORT:-3002}",
     "stop": "if [ -f .pidfile ]; then kill $(cat .pidfile) && rm .pidfile; else echo 'No .pidfile found'; fi",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
