@@ -14,8 +14,7 @@
     "cleanup:pages": "node ./scripts/cleanup-pages.js",
     "cleanup:pages:powershell": "powershell -ExecutionPolicy Bypass -File ./scripts/cleanup-pages.ps1",
     "cleanup:pages:bash": "bash ./scripts/cleanup-pages.sh",
-    "cleanup:pages:cross": "bash ./scripts/cleanup-pages-cross.sh",
-    "update-components": "cd C:\\Users\\o_leg\\source\\repos\\pokenae.Web\\pokenae.WebComponent && git pull origin main && npm install && cd c:\\Users\\o_leg\\source\\repos\\pokenae.Web"
+    "cleanup:pages:cross": "bash ./scripts/cleanup-pages-cross.sh"
   },
   "dependencies": {
     "next": "15.1.6",

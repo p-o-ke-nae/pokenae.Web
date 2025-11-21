@@ -12,18 +12,6 @@ const nextConfig = {
     APP_NAME: 'Pokenae Web'
   },
   
-  // WebComponentライブラリの設定
-  transpilePackages: ['pokenae-webcomponent'],
-  
-  // Webpackのエイリアス設定
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@components': path.resolve(__dirname, 'pokenae.WebComponent/src/components'),
-      '@webcomponent': path.resolve(__dirname, 'pokenae.WebComponent/src')
-    };
-    return config;
-  }
 };
 
 export default nextConfig;
