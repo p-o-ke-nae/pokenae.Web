@@ -16,10 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
 
-    env:
-      DEPLOY_DIR: ${{ github.ref == 'refs/heads/main' && 'pokenae' || 'pokenae-develop' }}
-      PORT: ${{ github.ref == 'refs/heads/main' && '3001' || '3002' }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -31,6 +27,35 @@ jobs:
         with:
           node-version: "18.18.0" # Node.jsのバージョンを変更
 
+      - name: Determine deployment target
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            TARGET_BRANCH="${{ github.event.pull_request.base.ref }}"
+          else
+            TARGET_BRANCH="${{ github.ref_name }}"
+          fi
+
+          if [ "$TARGET_BRANCH" = "main" ]; then
+            DEPLOY_DIR="pokenae"
+            PORT="3001"
+          elif [ "$TARGET_BRANCH" = "develop" ]; then
+            DEPLOY_DIR="pokenae-develop"
+            PORT="3002"
+          else
+            echo "[ERROR] Unsupported target branch: $TARGET_BRANCH"
+            exit 1
+          fi
+
+          {
+            echo "TARGET_BRANCH=$TARGET_BRANCH"
+            echo "DEPLOY_DIR=$DEPLOY_DIR"
+            echo "PORT=$PORT"
+          } >> "$GITHUB_ENV"
+
+          echo "[INFO] Deploying branch $TARGET_BRANCH to $DEPLOY_DIR on PORT$PORT"
+
       - name: Create .ssh directory and add known hosts
         env:
           HOST: ${{ secrets.HOST }}
@@ -40,11 +65,6 @@ jobs:
 
       - name: Install dependencies
         run: npm install
-
-      - name: Install submodule dependencies
-        run: |
-          cd pokenae.WebComponent
-          npm install
 
       - name: Build project
         run: npm run build
@@ -57,7 +77,7 @@ jobs:
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
-          ssh $USERNAME@$HOST -i private_key -p 22 "mkdir -p ${{ env.DEPLOY_DIR }}"
+          ssh $USERNAME@$HOST -i private_key -p 22 "mkdir -p $DEPLOY_DIR"
 
       - name: Deploy to ConoHa VPS
         env:
@@ -67,8 +87,31 @@ jobs:
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
-          rsync -avz -e "ssh -i private_key -p 22" --exclude node_modules ./ $USERNAME@$HOST:${{ env.DEPLOY_DIR }}
-          ssh $USERNAME@$HOST -i private_key -p 22 "cd ${{ env.DEPLOY_DIR }} && npm run stop || true && npm ci --omit=dev && npm run build && PORT=${{ env.PORT }} nohup npm start > nohup.out 2>&1 & echo \$! > .pidfile && echo 'Application started on port ${{ env.PORT }}'"
+          rsync -avz -e "ssh -i private_key -p 22" --exclude node_modules ./ $USERNAME@$HOST:$DEPLOY_DIR
+          ssh $USERNAME@$HOST -i private_key -p 22 "TARGET_BRANCH=$TARGET_BRANCH DEPLOY_DIR=$DEPLOY_DIR PORT=$PORT bash -s" <<'EOF'
+          set -euo pipefail
+          echo "[INFO] Received artifacts for branch ${TARGET_BRANCH}"
+          cd "${DEPLOY_DIR}"
+
+          echo "[INFO] Installing production dependencies in directory: $(pwd)"
+          npm ci --omit=dev
+
+          echo "[INFO] Building application before restart"
+          npm run build
+
+          echo "[INFO] Killing any process on PORT${PORT}"
+          if command -v fuser >/dev/null 2>&1; then
+            fuser -k ${PORT}/tcp || true
+          elif command -v lsof >/dev/null 2>&1; then
+            lsof -ti:${PORT} | xargs -r kill -9 || true
+          else
+            echo "[WARN] Neither fuser nor lsof found; skipping explicit port kill"
+          fi
+
+          echo "[INFO] Starting application on PORT${PORT}"
+          nohup env PORT=${PORT} npm run start > nohup.out 2>&1 &
+          echo $! > .pidfile
+          EOF
 
       - name: Verify deployment
         env:
@@ -80,4 +123,26 @@ jobs:
           chmod 600 private_key
           # 少し待ってからプロセスが動いているか確認
           sleep 5
-          ssh $USERNAME@$HOST -i private_key -p 22 "cd ${{ env.DEPLOY_DIR }} && if pgrep -f 'npm.*start' > /dev/null; then echo 'Deployment verification successful'; else echo 'Deployment verification failed' && exit 1; fi"
+          ssh $USERNAME@$HOST -i private_key -p 22 "DEPLOY_DIR=$DEPLOY_DIR PORT=$PORT bash -s" <<'EOF'
+          set -euo pipefail
+          echo "[INFO] Verifying npm start on PORT${PORT} for ${DEPLOY_DIR}"
+          if command -v ss >/dev/null 2>&1; then
+            if ss -ltnp | grep -q ":${PORT}"; then
+              echo "Deployment verification successful on PORT${PORT}"
+              exit 0
+            fi
+          elif command -v netstat >/dev/null 2>&1; then
+            if netstat -ltnp | grep -q ":${PORT}"; then
+              echo "Deployment verification successful on PORT${PORT}"
+              exit 0
+            fi
+          else
+            if pgrep -f "PORT=${PORT}" >/dev/null; then
+              echo "Deployment verification successful via process check"
+              exit 0
+            fi
+          fi
+
+          echo "Deployment verification failed on PORT${PORT}"
+          exit 1
+          EOF
