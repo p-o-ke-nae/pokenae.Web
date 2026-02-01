@@ -98,7 +98,7 @@ export default function ApiExamplePage() {
               </div>
             )}
             
-            {data && (
+            {data !== null && (
               <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded">
                 <strong className="text-black dark:text-white">レスポンス:</strong>
                 <pre className="mt-2 text-sm overflow-x-auto text-zinc-800 dark:text-zinc-200">

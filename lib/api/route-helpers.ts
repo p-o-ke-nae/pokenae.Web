@@ -32,14 +32,16 @@ export function createErrorResponse(
   status: number = 500,
   details?: unknown
 ): NextResponse<ApiResponse> {
+  const error = {
+    code,
+    message,
+    ...(details !== undefined && { details }),
+  };
+
   return NextResponse.json(
     {
       success: false,
-      error: {
-        code,
-        message,
-        ...(details && { details }),
-      },
+      error,
     },
     { status }
   );
