@@ -203,10 +203,9 @@ jobs:
           echo "[INFO] Pulling new image..."
           docker pull "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
 
-          # 既存のコンテナを停止・削除
-          echo "[INFO] Stopping existing container..."
-          docker stop "${CONTAINER_NAME}" 2>/dev/null || true
-          docker rm "${CONTAINER_NAME}" 2>/dev/null || true
+          # 【修正】既存のコンテナを強制削除
+          echo "[INFO] Removing existing container if any..."
+          docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
 
           # 新しいコンテナを起動
           echo "[INFO] Starting new container..."
