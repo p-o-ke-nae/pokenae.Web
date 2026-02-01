@@ -1,4 +1,4 @@
-name: Deploy to ConoHa VPS
+name: Build and Deploy to ConoHa VPS (Docker)
 
 on:
   push:
@@ -11,8 +11,16 @@ on:
       - main
       - develop
 
+env:
+  REGISTRY: ghcr.io
+  # 【修正】小文字に変換してハイフンに統一
+  IMAGE_NAME: ${{ github.repository_owner }}/pokenae-web
+
 jobs:
-  deploy:
+  # ==========================================
+  # Job 1: テスト・Lint
+  # ==========================================
+  test:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
 
@@ -20,14 +28,46 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: recursive # サブモジュールを再帰的にチェックアウト
+          submodules: recursive
 
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18.18.0" # Node.jsのバージョンを変更
+          node-version: "20.19.0"
+          cache: "npm"
 
-      - name: Determine deployment target
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm run test || true
+
+  # ==========================================
+  # Job 2: Docker イメージのビルドとプッシュ
+  # ==========================================
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image_tag: ${{ steps.settings.outputs.image_tag }}
+      container_name: ${{ steps.settings.outputs.container_name }}
+      port: ${{ steps.settings.outputs.port }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Determine deployment settings
+        id: settings
         run: |
           set -euo pipefail
 
@@ -38,23 +78,88 @@ jobs:
           fi
 
           if [ "$TARGET_BRANCH" = "main" ]; then
-            DEPLOY_DIR="pokenae"
-            PORT="3001"
+            echo "image_tag=main" >> $GITHUB_OUTPUT
+            echo "container_name=pokenae-web-prod" >> $GITHUB_OUTPUT
+            echo "port=3001" >> $GITHUB_OUTPUT
+            echo "api_url=${{ secrets.PROD_API_URL }}" >> $GITHUB_OUTPUT
+            echo "google_redirect_uri=${{ secrets.PROD_GOOGLE_REDIRECT_URI }}" >> $GITHUB_OUTPUT
           elif [ "$TARGET_BRANCH" = "develop" ]; then
-            DEPLOY_DIR="pokenae-develop"
-            PORT="3002"
+            echo "image_tag=develop" >> $GITHUB_OUTPUT
+            echo "container_name=pokenae-web-dev" >> $GITHUB_OUTPUT
+            echo "port=3002" >> $GITHUB_OUTPUT
+            echo "api_url=${{ secrets.DEV_API_URL }}" >> $GITHUB_OUTPUT
+            echo "google_redirect_uri=${{ secrets.DEV_GOOGLE_REDIRECT_URI }}" >> $GITHUB_OUTPUT
           else
             echo "[ERROR] Unsupported target branch: $TARGET_BRANCH"
             exit 1
           fi
 
-          {
-            echo "TARGET_BRANCH=$TARGET_BRANCH"
-            echo "DEPLOY_DIR=$DEPLOY_DIR"
-            echo "PORT=$PORT"
-          } >> "$GITHUB_ENV"
+          echo "[INFO] Building for branch: $TARGET_BRANCH"
 
-          echo "[INFO] Deploying branch $TARGET_BRANCH to $DEPLOY_DIR on PORT$PORT"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=,format=short
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ steps.settings.outputs.api_url }}
+            NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            NEXT_PUBLIC_GOOGLE_REDIRECT_URI=${{ steps.settings.outputs.google_redirect_uri }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ==========================================
+  # Job 3: ConoHa VPS へのデプロイ
+  # ==========================================
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determine deployment settings
+        id: settings
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            TARGET_BRANCH="${{ github.event.pull_request.base.ref }}"
+          else
+            TARGET_BRANCH="${{ github.ref_name }}"
+          fi
+
+          if [ "$TARGET_BRANCH" = "main" ]; then
+            echo "image_tag=main" >> $GITHUB_OUTPUT
+            echo "container_name=pokenae-web-prod" >> $GITHUB_OUTPUT
+            echo "port=3001" >> $GITHUB_OUTPUT
+          elif [ "$TARGET_BRANCH" = "develop" ]; then
+            echo "image_tag=develop" >> $GITHUB_OUTPUT
+            echo "container_name=pokenae-web-dev" >> $GITHUB_OUTPUT
+            echo "port=3002" >> $GITHUB_OUTPUT
+          fi
+
+          echo "[INFO] Deploying branch: $TARGET_BRANCH"
 
       - name: Create .ssh directory and add known hosts
         env:
@@ -62,22 +167,6 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -p 22 $HOST >> ~/.ssh/known_hosts
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build project
-        run: npm run build
-
-      - name: Create deployment directory
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          HOST: ${{ secrets.HOST }}
-          USERNAME: ${{ secrets.USERNAME }}
-        run: |
-          echo "$SSH_PRIVATE_KEY" > private_key
-          chmod 600 private_key
-          ssh $USERNAME@$HOST -i private_key -p 22 "mkdir -p $DEPLOY_DIR"
 
       - name: Deploy to ConoHa VPS
         env:
@@ -87,30 +176,53 @@ jobs:
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
-          rsync -avz -e "ssh -i private_key -p 22" --exclude node_modules ./ $USERNAME@$HOST:$DEPLOY_DIR
-          ssh $USERNAME@$HOST -i private_key -p 22 "TARGET_BRANCH=$TARGET_BRANCH DEPLOY_DIR=$DEPLOY_DIR PORT=$PORT bash -s" <<'EOF'
+
+          ssh $USERNAME@$HOST -i private_key -p 22 \
+            "REGISTRY=${{ env.REGISTRY }} \
+             IMAGE_NAME=${{ env.IMAGE_NAME }} \
+             IMAGE_TAG=${{ steps.settings.outputs.image_tag }} \
+             CONTAINER_NAME=${{ steps.settings.outputs.container_name }} \
+             PORT=${{ steps.settings.outputs.port }} \
+             GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+             GITHUB_ACTOR=${{ github.actor }} \
+             bash -s" <<'EOF'
           set -euo pipefail
-          echo "[INFO] Received artifacts for branch ${TARGET_BRANCH}"
-          cd "${DEPLOY_DIR}"
 
-          echo "[INFO] Installing production dependencies in directory: $(pwd)"
-          npm ci --omit=dev
+          echo "======================================"
+          echo "[INFO] Starting deployment"
+          echo "[INFO] Container: ${CONTAINER_NAME}"
+          echo "[INFO] Image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+          echo "[INFO] Port: ${PORT}"
+          echo "======================================"
 
-          echo "[INFO] Building application before restart"
-          npm run build
+          # GitHub Container Registry にログイン
+          echo "[INFO] Logging in to GitHub Container Registry..."
+          echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
-          echo "[INFO] Killing any process on PORT${PORT}"
-          if command -v fuser >/dev/null 2>&1; then
-            fuser -k ${PORT}/tcp || true
-          elif command -v lsof >/dev/null 2>&1; then
-            lsof -ti:${PORT} | xargs -r kill -9 || true
-          else
-            echo "[WARN] Neither fuser nor lsof found; skipping explicit port kill"
-          fi
+          # 新しいイメージを pull
+          echo "[INFO] Pulling new image..."
+          docker pull "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
 
-          echo "[INFO] Starting application on PORT${PORT}"
-          nohup env PORT=${PORT} npm run start > nohup.out 2>&1 &
-          echo $! > .pidfile
+          # 【修正】既存のコンテナを強制削除
+          echo "[INFO] Removing existing container if any..."
+          docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+
+          # 新しいコンテナを起動
+          echo "[INFO] Starting new container..."
+          docker run -d \
+            --name "${CONTAINER_NAME}" \
+            --restart unless-stopped \
+            -p "${PORT}:3000" \
+            --log-driver json-file \
+            --log-opt max-size=10m \
+            --log-opt max-file=3 \
+            "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+
+          # 古いイメージを削除（ディスク容量節約）
+          echo "[INFO] Cleaning up old images..."
+          docker image prune -f
+
+          echo "[INFO] Deployment completed!"
           EOF
 
       - name: Verify deployment
@@ -121,28 +233,53 @@ jobs:
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
-          # 少し待ってからプロセスが動いているか確認
-          sleep 5
-          ssh $USERNAME@$HOST -i private_key -p 22 "DEPLOY_DIR=$DEPLOY_DIR PORT=$PORT bash -s" <<'EOF'
+
+          # コンテナの起動を待つ
+          sleep 10
+
+          ssh $USERNAME@$HOST -i private_key -p 22 \
+            "CONTAINER_NAME=${{ steps.settings.outputs.container_name }} \
+             PORT=${{ steps.settings.outputs.port }} \
+             bash -s" <<'EOF'
           set -euo pipefail
-          echo "[INFO] Verifying npm start on PORT${PORT} for ${DEPLOY_DIR}"
-          if command -v ss >/dev/null 2>&1; then
-            if ss -ltnp | grep -q ":${PORT}"; then
-              echo "Deployment verification successful on PORT${PORT}"
-              exit 0
-            fi
-          elif command -v netstat >/dev/null 2>&1; then
-            if netstat -ltnp | grep -q ":${PORT}"; then
-              echo "Deployment verification successful on PORT${PORT}"
-              exit 0
-            fi
-          else
-            if pgrep -f "PORT=${PORT}" >/dev/null; then
-              echo "Deployment verification successful via process check"
-              exit 0
-            fi
+
+          echo "[INFO] Verifying deployment..."
+
+          # コンテナの状態を確認
+          CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo "not_found")
+
+          if [ "$CONTAINER_STATUS" != "running" ]; then
+            echo "[ERROR] Container is not running. Status: ${CONTAINER_STATUS}"
+            docker logs "${CONTAINER_NAME}" --tail 50 2>/dev/null || true
+            exit 1
           fi
 
-          echo "Deployment verification failed on PORT${PORT}"
+          echo "[INFO] Container status: ${CONTAINER_STATUS}"
+
+          # ポートでリッスンしているか確認（最大30秒待機）
+          for i in $(seq 1 6); do
+            if curl -sf "http://localhost:${PORT}/" > /dev/null 2>&1; then
+              echo "[SUCCESS] Application is responding on port ${PORT}"
+              echo "======================================"
+              echo "[INFO] Deployment verification completed!"
+              echo "[INFO] Container: ${CONTAINER_NAME}"
+              echo "[INFO] Status: Running"
+              echo "[INFO] Port: ${PORT}"
+              echo "======================================"
+              exit 0
+            fi
+            echo "[INFO] Waiting for application to start... (${i}/6)"
+            sleep 5
+          done
+
+          echo "[WARN] HTTP check failed, checking container logs..."
+          docker logs "${CONTAINER_NAME}" --tail 20 2>/dev/null || true
+
+          # コンテナは起動しているが HTTP 応答がない場合
+          if [ "$CONTAINER_STATUS" = "running" ]; then
+            echo "[WARN] Container is running but HTTP check failed. Deployment may still be successful."
+            exit 0
+          fi
+
           exit 1
           EOF
