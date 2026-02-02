@@ -13,12 +13,15 @@ export interface UserData {
   website: string;
 }
 
+// 利用可能なユーザーIDの最大値
+const MAX_USER_ID = 5;
+
 /**
  * ランダムなユーザー情報を取得
  */
 export async function fetchRandomUser(): Promise<ApiResponse<UserData>> {
   try {
-    const randomId = Math.floor(Math.random() * 5) + 1;
+    const randomId = Math.floor(Math.random() * MAX_USER_ID) + 1;
     const response = await fetch(`/api/fetch-user?id=${randomId}`);
     
     if (!response.ok) {

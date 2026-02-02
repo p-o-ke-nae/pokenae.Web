@@ -41,21 +41,16 @@ export function useUserData(): UseUserDataReturn {
   const fetchUser = useCallback(async () => {
     setState({ userData: null, error: null, loading: true });
 
-    try {
-      const response = await fetchRandomUser();
+    const response = await fetchRandomUser();
 
-      if (response.success) {
-        setState({ userData: response.data, error: null, loading: false });
-      } else {
-        setState({
-          userData: null,
-          error: response.error.message,
-          loading: false,
-        });
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '不明なエラーが発生しました';
-      setState({ userData: null, error: errorMessage, loading: false });
+    if (response.success) {
+      setState({ userData: response.data, error: null, loading: false });
+    } else {
+      setState({
+        userData: null,
+        error: response.error.message,
+        loading: false,
+      });
     }
   }, []);
 
