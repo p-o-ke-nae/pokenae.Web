@@ -15,6 +15,9 @@ export type ApiServiceName = 'service1' | 'service2' | 'service3' | 'user-api';
 
 /**
  * 各AppServiceの設定を取得
+ * 
+ * この関数はサーバーサイド（API Routes）で使用されることを想定しています。
+ * クライアントサイドで直接使用しないでください。
  */
 export function getApiConfig(serviceName: ApiServiceName): ApiServiceConfig {
   // 環境変数から取得したベースURLを使用

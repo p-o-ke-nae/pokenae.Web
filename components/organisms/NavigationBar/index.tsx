@@ -3,6 +3,9 @@
 /**
  * NavigationBar - ナビゲーションバーコンポーネント
  * 開発環境の場合は、環境を示すバッジを表示
+ * 
+ * 注意: isDevelopment()はビルド時に評価されます。
+ * これは意図的な動作で、デプロイされた環境に応じて異なるビルドを作成します。
  */
 
 import { isDevelopment } from '@/lib/config/env';
