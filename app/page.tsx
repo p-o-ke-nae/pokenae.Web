@@ -1,42 +1,13 @@
 'use client';
 
-import { useState } from 'react';
 import CustomButton from '../components/atoms/CustomButton';
-
-interface UserData {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  website: string;
-}
+import { useUserData } from '@/lib/hooks/useUserData';
 
 export default function Home() {
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { userData, error, loading, fetchUser } = useUserData();
 
   const handleButtonClick = async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // Next.js API Routeを通じてランダムなユーザー情報を取得
-      const randomId = Math.floor(Math.random() * 5) + 1;
-      const response = await fetch(`/api/fetch-user?id=${randomId}`);
-      
-      if (!response.ok) {
-        throw new Error('APIリクエストに失敗しました');
-      }
-      
-      const data: UserData = await response.json();
-      setUserData(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '不明なエラーが発生しました');
-      setUserData(null);
-    } finally {
-      setIsLoading(false);
-    }
+    await fetchUser();
   };
 
   return (
@@ -57,7 +28,7 @@ export default function Home() {
           <CustomButton 
             variant="accent" 
             onClick={handleButtonClick}
-            isLoading={isLoading}
+            isLoading={loading}
           >
             カスタムボタン
           </CustomButton>
