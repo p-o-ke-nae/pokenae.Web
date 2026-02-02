@@ -22,7 +22,7 @@ export default function Home() {
     
     try {
       // Next.js API Routeを通じてランダムなユーザー情報を取得
-      const randomId = Math.floor(Math.random() * 10) + 1;
+      const randomId = Math.floor(Math.random() * 5) + 1;
       const response = await fetch(`/api/fetch-user?id=${randomId}`);
       
       if (!response.ok) {
