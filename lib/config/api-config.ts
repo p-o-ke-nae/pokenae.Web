@@ -9,7 +9,7 @@ export interface ApiServiceConfig {
   timeout?: number;
 }
 
-export type ApiServiceName = 'service1' | 'service2' | 'service3';
+export type ApiServiceName = 'service1' | 'service2' | 'service3' | 'user-api';
 
 /**
  * 各AppServiceの設定を取得
@@ -31,6 +31,10 @@ export function getApiConfig(serviceName: ApiServiceName): ApiServiceConfig {
       apiKey: process.env.API_SERVICE_3_API_KEY,
       timeout: 30000,
     },
+    'user-api': {
+      baseUrl: process.env.USER_API_BASE_URL || 'http://localhost:3000',
+      timeout: 30000,
+    },
   };
 
   return configs[serviceName];
@@ -40,5 +44,5 @@ export function getApiConfig(serviceName: ApiServiceName): ApiServiceConfig {
  * 利用可能なサービス名一覧を取得
  */
 export function getAvailableServices(): ApiServiceName[] {
-  return ['service1', 'service2', 'service3'];
+  return ['service1', 'service2', 'service3', 'user-api'];
 }
