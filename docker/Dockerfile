@@ -34,10 +34,6 @@ ENV NODE_OPTIONS="--max-old-space-size=256"
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# ファイルディスクリプタ上限設定
-RUN echo "nextjs soft nofile 4096" >> /etc/security/limits.conf
-RUN echo "nextjs hard nofile 8192" >> /etc/security/limits.conf
-
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
