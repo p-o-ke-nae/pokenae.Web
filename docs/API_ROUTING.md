@@ -58,9 +58,10 @@ API_SERVICE_3_API_KEY=your-api-key-here
 import { useApi } from '@/lib/hooks/useApi';
 
 export default function UsersPage() {
+  // 静的なエンドポイントの場合、requestFnをコンポーネント外で定義可能
   const { data, error, loading, execute } = useApi(
     'service1',
-    (client) => client.get('/users')
+    (client) => client.get('/users') // 静的な場合はこれでOK
   );
 
   const handleLoadUsers = async () => {
@@ -71,6 +72,51 @@ export default function UsersPage() {
     <div>
       <button onClick={handleLoadUsers} disabled={loading}>
         ユーザー一覧を取得
+      </button>
+      
+      {loading && <p>読み込み中...</p>}
+      {error && <p>エラー: {error}</p>}
+      {data && <pre>{JSON.stringify(data, null, 2)}</pre>}
+    </div>
+  );
+}
+```
+
+**動的なパラメータを使用する場合:**
+
+```tsx
+'use client';
+
+import { useState, useCallback } from 'react';
+import { useApi } from '@/lib/hooks/useApi';
+
+export default function DynamicUsersPage() {
+  const [userId, setUserId] = useState('1');
+  
+  // 動的なパラメータを含む場合は useCallback でメモ化
+  const requestFn = useCallback(
+    (client) => client.get(`/users/${userId}`),
+    [userId] // userId が変更されたときのみ再作成
+  );
+  
+  const { data, error, loading, execute } = useApi(
+    'service1',
+    requestFn
+  );
+
+  const handleLoadUser = async () => {
+    await execute();
+  };
+
+  return (
+    <div>
+      <input 
+        value={userId} 
+        onChange={(e) => setUserId(e.target.value)}
+        placeholder="User ID"
+      />
+      <button onClick={handleLoadUser} disabled={loading}>
+        ユーザーを取得
       </button>
       
       {loading && <p>読み込み中...</p>}
@@ -261,6 +307,43 @@ const response = await client.get('/endpoint');
 3. **型定義**: レスポンスの型を明示的に定義
 4. **タイムアウト**: 長時間かかる可能性がある処理には適切なタイムアウトを設定
 5. **キャッシング**: 必要に応じてSWRやReact Queryなどと組み合わせる
+
+### ⚠️ 重要: useApi フックの正しい使用方法
+
+`useApi` フックを使用する際は、**requestFn を必ず `useCallback` でメモ化してください**。これを怠ると、無限再レンダリングやスタックオーバーフローが発生する可能性があります。
+
+**❌ 悪い例（スタックオーバーフローの原因）:**
+```tsx
+// endpoint が変更されるたびに新しい関数が作成される
+const { data, error, loading, execute } = useApi(
+  'service1',
+  (client) => client.get(endpoint) // 危険！
+);
+```
+
+**✅ 良い例:**
+```tsx
+import { useCallback } from 'react';
+
+// requestFn を useCallback でメモ化
+const requestFn = useCallback(
+  (client) => client.get(endpoint),
+  [endpoint] // endpoint が変更されたときのみ再作成
+);
+
+const { data, error, loading, execute } = useApi(
+  'service1',
+  requestFn
+);
+```
+
+**詳細な説明:**
+- `useApi` の第2引数（`requestFn`）は、React の `useCallback` の依存配列に含まれています
+- インライン関数を使用すると、コンポーネントが再レンダリングされるたびに新しい関数が作成されます
+- これにより、`useApi` 内部の `useCallback` が毎回再実行され、無限ループが発生します
+- 必ず `useCallback` または `useMemo` でメモ化してください
+
+詳細は [カーネルスタックオーバーフロー調査レポート](./KERNEL_STACK_OVERFLOW_INVESTIGATION.md) を参照してください。
 
 ## サンプルコード
 

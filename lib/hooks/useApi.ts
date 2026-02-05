@@ -77,8 +77,7 @@ export function useApi<T>(
         },
       } as ApiResponse<T>;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serviceName]);
+  }, [serviceName, requestFn]);
 
   const reset = useCallback(() => {
     setState({ data: null, error: null, loading: false });

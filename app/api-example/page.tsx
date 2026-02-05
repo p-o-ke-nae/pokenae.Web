@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useApi } from '@/lib/hooks/useApi';
 import { createFrontendApiClient } from '@/lib/api/frontend-client';
 import type { ApiServiceName } from '@/lib/config/api-config';
@@ -11,9 +11,15 @@ export default function ApiExamplePage() {
   const [manualResult, setManualResult] = useState<string>('');
 
   // useApiフックの使用例
+  // requestFnをuseCallbackでメモ化してスタックオーバーフローを防ぐ
+  const requestFn = useCallback(
+    (client: ReturnType<typeof createFrontendApiClient>) => client.get(endpoint),
+    [endpoint]
+  );
+  
   const { data, error, loading, execute } = useApi(
     selectedService,
-    (client) => client.get(endpoint)
+    requestFn
   );
 
   // 手動でクライアントを使用する例
