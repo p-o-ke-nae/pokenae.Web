@@ -209,12 +209,12 @@ jobs:
           if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
             echo "[INFO] Found existing container ${CONTAINER_NAME}, stopping it..."
             docker stop "${CONTAINER_NAME}" 2>/dev/null || true
-            # Dockerデーモンがコンテナの停止を完全に処理するまで待機
-            sleep 2
+            # Dockerデーモンがコンテナの停止を完全に処理するまで待機（負荷の高い環境でも確実に処理されるよう十分な時間を確保）
+            sleep 3
             echo "[INFO] Removing container ${CONTAINER_NAME}..."
             docker rm "${CONTAINER_NAME}" 2>/dev/null || true
             # Dockerデーモンがコンテナの削除とリソース解放を完全に処理するまで待機
-            sleep 1
+            sleep 2
             echo "[INFO] Existing container removed successfully."
           else
             echo "[INFO] No existing container found."
@@ -222,7 +222,7 @@ jobs:
 
           # コンテナ名が解放されていることを確認
           echo "[INFO] Verifying container name is available..."
-          for i in {1..5}; do
+          for i in $(seq 1 5); do
             if ! docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
               echo "[INFO] Container name is available."
               break
