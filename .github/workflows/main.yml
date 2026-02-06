@@ -81,12 +81,14 @@ jobs:
             echo "image_tag=main" >> $GITHUB_OUTPUT
             echo "container_name=pokenae-web-prod" >> $GITHUB_OUTPUT
             echo "port=3001" >> $GITHUB_OUTPUT
+            echo "environment=production" >> $GITHUB_OUTPUT
             echo "api_url=${{ secrets.PROD_API_URL }}" >> $GITHUB_OUTPUT
             echo "google_redirect_uri=${{ secrets.PROD_GOOGLE_REDIRECT_URI }}" >> $GITHUB_OUTPUT
           elif [ "$TARGET_BRANCH" = "develop" ]; then
             echo "image_tag=develop" >> $GITHUB_OUTPUT
             echo "container_name=pokenae-web-dev" >> $GITHUB_OUTPUT
             echo "port=3002" >> $GITHUB_OUTPUT
+            echo "environment=development" >> $GITHUB_OUTPUT
             echo "api_url=${{ secrets.DEV_API_URL }}" >> $GITHUB_OUTPUT
             echo "google_redirect_uri=${{ secrets.DEV_GOOGLE_REDIRECT_URI }}" >> $GITHUB_OUTPUT
           else
@@ -124,6 +126,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
+            NEXT_PUBLIC_ENVIRONMENT=${{ steps.settings.outputs.environment }}
             NEXT_PUBLIC_API_URL=${{ steps.settings.outputs.api_url }}
             NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
             NEXT_PUBLIC_GOOGLE_REDIRECT_URI=${{ steps.settings.outputs.google_redirect_uri }}
