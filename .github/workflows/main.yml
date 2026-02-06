@@ -209,11 +209,11 @@ jobs:
           if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
             echo "[INFO] Found existing container ${CONTAINER_NAME}, stopping it..."
             docker stop "${CONTAINER_NAME}" 2>/dev/null || true
-            # 停止を確実に待つ
+            # Dockerデーモンがコンテナの停止を完全に処理するまで待機
             sleep 2
             echo "[INFO] Removing container ${CONTAINER_NAME}..."
             docker rm "${CONTAINER_NAME}" 2>/dev/null || true
-            # 削除を確実に待つ
+            # Dockerデーモンがコンテナの削除とリソース解放を完全に処理するまで待機
             sleep 1
             echo "[INFO] Existing container removed successfully."
           else
@@ -230,6 +230,13 @@ jobs:
             echo "[WARN] Container name still in use, waiting... (attempt $i/5)"
             sleep 2
           done
+
+          # 最終確認：コンテナ名がまだ使用中の場合はエラーで終了
+          if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+            echo "[ERROR] Container name ${CONTAINER_NAME} is still in use after multiple attempts."
+            echo "[ERROR] Unable to proceed with deployment."
+            exit 1
+          fi
 
           # 新しいコンテナを起動
           echo "[INFO] Starting new container..."
