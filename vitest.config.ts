@@ -34,6 +34,7 @@ export default defineConfig({
           },
           setupFiles: ['.storybook/vitest.setup.ts'],
           // タイムアウト設定でリソースの長期保持を防ぐ
+          // 注: 長時間実行されるテストがある場合は、個別にtimeoutを指定してください
           testTimeout: 30000,
         },
       },
