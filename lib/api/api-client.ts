@@ -13,7 +13,8 @@ export class ApiClient {
 
   constructor(config: ApiServiceConfig) {
     this.baseUrl = config.baseUrl.replace(/\/$/, ''); // 末尾のスラッシュを除去
-    this.timeout = config.timeout || 30000;
+    // CPU負荷軽減のため、タイムアウトを10秒に短縮（デフォルトは30秒）
+    this.timeout = config.timeout || 10000;
     this.defaultHeaders = {
       'Content-Type': 'application/json',
     };

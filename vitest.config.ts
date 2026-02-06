@@ -26,10 +26,15 @@ export default defineConfig({
           browser: {
             enabled: true,
             headless: true,
-            provider: playwright({}),
+            provider: playwright({
+              // CPU負荷軽減のため、並列実行数を1に制限
+              parallelism: 1,
+            }),
             instances: [{ browser: 'chromium' }],
           },
           setupFiles: ['.storybook/vitest.setup.ts'],
+          // タイムアウト設定でリソースの長期保持を防ぐ
+          testTimeout: 30000,
         },
       },
     ],

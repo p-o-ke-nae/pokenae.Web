@@ -9,10 +9,11 @@ const nextConfig: NextConfig = {
   // ファイル監視とメモリ管理の最適化
   // 注: onDemandEntriesは開発環境専用のオプションで、本番環境では無視されます
   onDemandEntries: {
-    // ページキャッシュの有効期限を延長（デフォルト: 15000ms）
-    maxInactiveAge: 60000,
+    // ページキャッシュの有効期限（デフォルト: 15000ms）
+    // CPU負荷を考慮して30秒に設定
+    maxInactiveAge: 30000,
     // メモリ上に保持するページ数（デフォルト: 2）
-    pagesBufferLength: 5,
+    pagesBufferLength: 3,
   },
 };
 
