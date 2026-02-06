@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   
   // 開発環境でのカーネルスタック問題の軽減
   // ファイル監視とメモリ管理の最適化
+  // 注: onDemandEntriesは開発環境専用のオプションで、本番環境では無視されます
   onDemandEntries: {
     // ページキャッシュの有効期限を延長（デフォルト: 15000ms）
     maxInactiveAge: 60000,
