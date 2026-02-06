@@ -203,9 +203,40 @@ jobs:
           echo "[INFO] Pulling new image..."
           docker pull "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
 
-          # 【修正】既存のコンテナを強制削除
-          echo "[INFO] Removing existing container if any..."
-          docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+          # 【修正】既存のコンテナを停止して削除
+          echo "[INFO] Stopping and removing existing container if any..."
+          # コンテナが存在する場合は停止
+          if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+            echo "[INFO] Found existing container ${CONTAINER_NAME}, stopping it..."
+            docker stop "${CONTAINER_NAME}" 2>/dev/null || true
+            # Dockerデーモンがコンテナの停止を完全に処理するまで待機（負荷の高い環境でも確実に処理されるよう十分な時間を確保）
+            sleep 3
+            echo "[INFO] Removing container ${CONTAINER_NAME}..."
+            docker rm "${CONTAINER_NAME}" 2>/dev/null || true
+            # Dockerデーモンがコンテナの削除とリソース解放を完全に処理するまで待機
+            sleep 2
+            echo "[INFO] Existing container removed successfully."
+          else
+            echo "[INFO] No existing container found."
+          fi
+
+          # コンテナ名が解放されていることを確認
+          echo "[INFO] Verifying container name is available..."
+          for i in $(seq 1 5); do
+            if ! docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+              echo "[INFO] Container name is available."
+              break
+            fi
+            echo "[WARN] Container name still in use, waiting... (attempt $i/5)"
+            sleep 2
+          done
+
+          # 最終確認：コンテナ名がまだ使用中の場合はエラーで終了
+          if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+            echo "[ERROR] Container name ${CONTAINER_NAME} is still in use after multiple attempts."
+            echo "[ERROR] Unable to proceed with deployment."
+            exit 1
+          fi
 
           # 新しいコンテナを起動
           echo "[INFO] Starting new container..."
