@@ -33,7 +33,10 @@ export const authOptions: AuthOptions = {
       // 初回サインイン時にアクセストークンとリフレッシュトークンを保存
       if (account) {
         token.accessToken = account.access_token;
-        token.refreshToken = account.refresh_token;
+        // リフレッシュトークンは初回のみ取得できるため、存在する場合のみ保存
+        if (account.refresh_token) {
+          token.refreshToken = account.refresh_token;
+        }
         token.accessTokenExpires = account.expires_at;
       }
       return token;

@@ -12,7 +12,12 @@ export interface FrontendApiClientOptions {
   body?: unknown;
   headers?: Record<string, string>;
   signal?: AbortSignal;
-  includeAuth?: boolean; // Google認証情報を含めるかどうか
+  /**
+   * Google認証情報を含めるかどうか
+   * デフォルト: true（undefined時もtrueとして扱われる）
+   * バックエンドAPIでスプレッドシートアクセスが必要な場合はtrueのままにしてください
+   */
+  includeAuth?: boolean;
 }
 
 /**
