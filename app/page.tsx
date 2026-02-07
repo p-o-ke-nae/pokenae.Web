@@ -2,7 +2,7 @@
 
 import CustomButton from '../components/atoms/CustomButton';
 import { useUserData } from '@/lib/hooks/useUserData';
-import { useSession, signIn } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 
 export default function Home() {
   const { userData, error, loading, fetchUser } = useUserData();
@@ -10,10 +10,6 @@ export default function Home() {
 
   const handleButtonClick = async () => {
     await fetchUser();
-  };
-
-  const handleSignIn = () => {
-    signIn('google', { callbackUrl: '/' });
   };
 
   return (
@@ -35,17 +31,7 @@ export default function Home() {
         </div>
         
         <div className="flex flex-col gap-4 w-full max-w-md">
-          {/* Google認証ボタン */}
-          {status === 'unauthenticated' && (
-            <CustomButton 
-              variant="accent" 
-              onClick={handleSignIn}
-            >
-              Googleでログイン
-            </CustomButton>
-          )}
-
-          {/* 既存のAPIテストボタン */}
+          {/* 既存のAPIテストボタン（ログイン時のみ表示） */}
           {status === 'authenticated' && (
             <CustomButton 
               variant="accent" 

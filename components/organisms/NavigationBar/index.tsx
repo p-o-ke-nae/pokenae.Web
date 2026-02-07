@@ -3,9 +3,9 @@
 /**
  * NavigationBar - ナビゲーションバーコンポーネント
  * 環境バッジと認証状態を表示
- * - 本番環境かつログイン時: 認証バッジのみ表示
- * - 本番環境かつ未ログイン: 何も表示しない
- * - 開発環境: 環境バッジを表示（ログイン時は認証バッジも表示）
+ * - 本番環境かつログイン時: 認証バッジ（ユーザー情報+ログアウトボタン）のみ表示
+ * - 本番環境かつ未ログイン: 認証バッジ（ログインボタン）のみ表示
+ * - 開発環境: 環境バッジを表示、認証バッジも常に表示
  */
 
 import { useSession } from 'next-auth/react';
@@ -17,6 +17,7 @@ export default function NavigationBar() {
   const { data: session } = useSession();
   const environment = getEnvironment();
   const isProduction = environment === 'production';
+  const isAuthenticated = !!session?.user;
 
   return (
     <nav className="w-full bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
@@ -31,13 +32,12 @@ export default function NavigationBar() {
 
           {/* バッジエリア */}
           <div className="flex items-center gap-3">
-            {/* 認証バッジ（本番環境でログイン時、または開発環境でログイン時） */}
-            {session?.user && (
-              <AuthBadge 
-                userName={session.user.name || 'ユーザー'}
-                userEmail={session.user.email || undefined}
-              />
-            )}
+            {/* 認証バッジ（常に表示：ログイン時はユーザー情報、未ログイン時はログインボタン） */}
+            <AuthBadge 
+              isAuthenticated={isAuthenticated}
+              userName={session?.user?.name || undefined}
+              userEmail={session?.user?.email || undefined}
+            />
 
             {/* 環境バッジ（開発環境のみ） */}
             {!isProduction && <EnvironmentBadge />}
