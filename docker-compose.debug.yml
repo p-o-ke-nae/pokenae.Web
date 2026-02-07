@@ -1,0 +1,28 @@
+# デバッグ環境用オーバーライド（ホットリロード有効・コーディングしながら動作確認する環境）
+# 使い方: docker compose -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml up --build
+version: '3.8'
+
+services:
+  app:
+    build:
+      target: dev  # Dockerfile の dev ステージを使用（next dev でホットリロード）
+      args:
+        NEXT_PUBLIC_ENVIRONMENT: debug
+    container_name: pokenae-web-debug
+    ports:
+      - "${PORT:-5000}:3000"
+    environment:
+      NODE_ENV: development
+      # webpack のファイル監視に polling を使用（Windows Docker 上での互換性向上）
+      # Next.js 16 はデフォルトで Turbopack を使用するが、Turbopack は Docker bind mount の
+      # ファイル変更イベントを検知できない。Dockerfile で --webpack フラグを指定し、
+      # WATCHPACK_POLLING で polling 監視を有効にすることでホットリロードを実現している。
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      # ソースコードをマウントしてホットリロードを有効化
+      - .:/app:cached
+      # node_modules はコンテナ内のものを使用（ホスト側で上書きしない）
+      - /app/node_modules
+      # Next.js のビルドキャッシュをコンテナ内に保持
+      - /app/.next
