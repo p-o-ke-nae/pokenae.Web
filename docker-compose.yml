@@ -1,0 +1,19 @@
+# ベース共通設定（ローカル・CI/CD 共通）
+# 使い方（-p でプロジェクト名を分けることで複数環境を同時起動可能）:
+#   デバッグ環境: docker compose -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml up --build
+#   開発環境:     docker compose -p pokenae-dev   -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+#   本番環境:     docker compose -p pokenae-prod  -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# CI/CD では IMAGE 環境変数で GHCR のイメージを指定し、--no-build で起動する
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.example.com}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+        NEXT_PUBLIC_GOOGLE_REDIRECT_URI: ${NEXT_PUBLIC_GOOGLE_REDIRECT_URI}
+    # PID 1 問題の解決: tini を init プロセスとして使用し、ゾンビプロセスを自動回収する
+    init: true

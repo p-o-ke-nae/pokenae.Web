@@ -81,12 +81,14 @@ jobs:
             echo "image_tag=main" >> $GITHUB_OUTPUT
             echo "container_name=pokenae-web-prod" >> $GITHUB_OUTPUT
             echo "port=3001" >> $GITHUB_OUTPUT
+            echo "environment=production" >> $GITHUB_OUTPUT
             echo "api_url=${{ secrets.PROD_API_URL }}" >> $GITHUB_OUTPUT
             echo "google_redirect_uri=${{ secrets.PROD_GOOGLE_REDIRECT_URI }}" >> $GITHUB_OUTPUT
           elif [ "$TARGET_BRANCH" = "develop" ]; then
             echo "image_tag=develop" >> $GITHUB_OUTPUT
             echo "container_name=pokenae-web-dev" >> $GITHUB_OUTPUT
             echo "port=3002" >> $GITHUB_OUTPUT
+            echo "environment=development" >> $GITHUB_OUTPUT
             echo "api_url=${{ secrets.DEV_API_URL }}" >> $GITHUB_OUTPUT
             echo "google_redirect_uri=${{ secrets.DEV_GOOGLE_REDIRECT_URI }}" >> $GITHUB_OUTPUT
           else
@@ -124,6 +126,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
+            NEXT_PUBLIC_ENVIRONMENT=${{ steps.settings.outputs.environment }}
             NEXT_PUBLIC_API_URL=${{ steps.settings.outputs.api_url }}
             NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
             NEXT_PUBLIC_GOOGLE_REDIRECT_URI=${{ steps.settings.outputs.google_redirect_uri }}
@@ -138,6 +141,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Determine deployment settings
         id: settings
         run: |
@@ -150,12 +156,16 @@ jobs:
           fi
 
           if [ "$TARGET_BRANCH" = "main" ]; then
-            echo "image_tag=main" >> $GITHUB_OUTPUT
+            echo "compose_file=docker-compose.prod.yml" >> $GITHUB_OUTPUT
+            echo "project_name=pokenae-prod" >> $GITHUB_OUTPUT
             echo "container_name=pokenae-web-prod" >> $GITHUB_OUTPUT
+            echo "image_tag=main" >> $GITHUB_OUTPUT
             echo "port=3001" >> $GITHUB_OUTPUT
           elif [ "$TARGET_BRANCH" = "develop" ]; then
-            echo "image_tag=develop" >> $GITHUB_OUTPUT
+            echo "compose_file=docker-compose.dev.yml" >> $GITHUB_OUTPUT
+            echo "project_name=pokenae-dev" >> $GITHUB_OUTPUT
             echo "container_name=pokenae-web-dev" >> $GITHUB_OUTPUT
+            echo "image_tag=develop" >> $GITHUB_OUTPUT
             echo "port=3002" >> $GITHUB_OUTPUT
           fi
 
@@ -168,6 +178,24 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p 22 $HOST >> ~/.ssh/known_hosts
 
+      - name: Transfer compose files to VPS
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.HOST }}
+          USERNAME: ${{ secrets.USERNAME }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > private_key
+          chmod 600 private_key
+
+          # デプロイ先ディレクトリを作成
+          ssh $USERNAME@$HOST -i private_key -p 22 "mkdir -p ~/pokenae-web"
+
+          # compose ファイルを転送（ベース + 環境別）
+          scp -i private_key -P 22 \
+            docker-compose.yml \
+            ${{ steps.settings.outputs.compose_file }} \
+            $USERNAME@$HOST:~/pokenae-web/
+
       - name: Deploy to ConoHa VPS
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -178,76 +206,38 @@ jobs:
           chmod 600 private_key
 
           ssh $USERNAME@$HOST -i private_key -p 22 \
-            "REGISTRY=${{ env.REGISTRY }} \
-             IMAGE_NAME=${{ env.IMAGE_NAME }} \
-             IMAGE_TAG=${{ steps.settings.outputs.image_tag }} \
-             CONTAINER_NAME=${{ steps.settings.outputs.container_name }} \
-             PORT=${{ steps.settings.outputs.port }} \
+            "IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.settings.outputs.image_tag }} \
+             COMPOSE_FILE=${{ steps.settings.outputs.compose_file }} \
+             PROJECT_NAME=${{ steps.settings.outputs.project_name }} \
              GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
              GITHUB_ACTOR=${{ github.actor }} \
              bash -s" <<'EOF'
           set -euo pipefail
 
+          cd ~/pokenae-web
+
           echo "======================================"
           echo "[INFO] Starting deployment"
-          echo "[INFO] Container: ${CONTAINER_NAME}"
-          echo "[INFO] Image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-          echo "[INFO] Port: ${PORT}"
+          echo "[INFO] Project: ${PROJECT_NAME}"
+          echo "[INFO] Image: ${IMAGE}"
+          echo "[INFO] Compose: docker-compose.yml + ${COMPOSE_FILE}"
           echo "======================================"
 
           # GitHub Container Registry にログイン
           echo "[INFO] Logging in to GitHub Container Registry..."
           echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
-          # 新しいイメージを pull
-          echo "[INFO] Pulling new image..."
-          docker pull "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+          # イメージを pull
+          echo "[INFO] Pulling image..."
+          docker pull "${IMAGE}"
 
-          # 【修正】既存のコンテナを停止して削除
-          echo "[INFO] Stopping and removing existing container if any..."
-          # コンテナが存在する場合は停止
-          if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-            echo "[INFO] Found existing container ${CONTAINER_NAME}, stopping it..."
-            docker stop "${CONTAINER_NAME}" 2>/dev/null || true
-            # Dockerデーモンがコンテナの停止を完全に処理するまで待機（負荷の高い環境でも確実に処理されるよう十分な時間を確保）
-            sleep 3
-            echo "[INFO] Removing container ${CONTAINER_NAME}..."
-            docker rm "${CONTAINER_NAME}" 2>/dev/null || true
-            # Dockerデーモンがコンテナの削除とリソース解放を完全に処理するまで待機
-            sleep 2
-            echo "[INFO] Existing container removed successfully."
-          else
-            echo "[INFO] No existing container found."
-          fi
-
-          # コンテナ名が解放されていることを確認
-          echo "[INFO] Verifying container name is available..."
-          for i in $(seq 1 5); do
-            if ! docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-              echo "[INFO] Container name is available."
-              break
-            fi
-            echo "[WARN] Container name still in use, waiting... (attempt $i/5)"
-            sleep 2
-          done
-
-          # 最終確認：コンテナ名がまだ使用中の場合はエラーで終了
-          if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-            echo "[ERROR] Container name ${CONTAINER_NAME} is still in use after multiple attempts."
-            echo "[ERROR] Unable to proceed with deployment."
-            exit 1
-          fi
-
-          # 新しいコンテナを起動
-          echo "[INFO] Starting new container..."
-          docker run -d \
-            --name "${CONTAINER_NAME}" \
-            --restart unless-stopped \
-            -p "${PORT}:3000" \
-            --log-driver json-file \
-            --log-opt max-size=10m \
-            --log-opt max-file=3 \
-            "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+          # docker compose で起動（既存コンテナは自動的に置き換えられる）
+          echo "[INFO] Starting container with docker compose..."
+          IMAGE="${IMAGE}" docker compose \
+            -p "${PROJECT_NAME}" \
+            -f docker-compose.yml \
+            -f "${COMPOSE_FILE}" \
+            up -d --no-build
 
           # 古いイメージを削除（ディスク容量節約）
           echo "[INFO] Cleaning up old images..."

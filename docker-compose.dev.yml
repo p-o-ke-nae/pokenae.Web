@@ -1,0 +1,40 @@
+# 開発環境用オーバーライド（developブランチのリリース前チェック用・コーディングはしない）
+# ローカル: docker compose -p pokenae-dev -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+# CI/CD:    docker compose -p pokenae-dev -f docker-compose.yml -f docker-compose.dev.yml up -d
+version: '3.8'
+
+services:
+  app:
+    # CI/CD では GHCR から pull したイメージを使用（環境変数 IMAGE で指定）
+    # ローカルでは build セクションが優先される
+    image: ${IMAGE:-}
+    build:
+      target: runner
+      args:
+        NEXT_PUBLIC_ENVIRONMENT: development
+    container_name: pokenae-web-dev
+    ports:
+      - "${PORT:-3002}:3000"
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
+    # コンテナのリソース制限（本番より厳しく設定）
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 256M
+        reservations:
+          cpus: '0.01'
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

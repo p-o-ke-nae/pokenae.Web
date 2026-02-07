@@ -1,0 +1,119 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Docker Compose: Debug 起動",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose",
+        "-p",
+        "pokenae-debug",
+        "-f",
+        "docker-compose.yml",
+        "-f",
+        "docker-compose.debug.yml",
+        "up",
+        "--build"
+      ],
+      "problemMatcher": [],
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Docker Compose: Dev 起動",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose",
+        "-p",
+        "pokenae-dev",
+        "-f",
+        "docker-compose.yml",
+        "-f",
+        "docker-compose.dev.yml",
+        "up",
+        "-d",
+        "--build"
+      ],
+      "problemMatcher": [],
+      "group": "none"
+    },
+    {
+      "label": "Docker Compose: Prod 起動",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose",
+        "-p",
+        "pokenae-prod",
+        "-f",
+        "docker-compose.yml",
+        "-f",
+        "docker-compose.prod.yml",
+        "up",
+        "-d",
+        "--build"
+      ],
+      "problemMatcher": [],
+      "group": "none"
+    },
+    {
+      "label": "Docker Compose: Debug 停止",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose",
+        "-p",
+        "pokenae-debug",
+        "-f",
+        "docker-compose.yml",
+        "-f",
+        "docker-compose.debug.yml",
+        "down"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker Compose: Dev 停止",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose",
+        "-p",
+        "pokenae-dev",
+        "-f",
+        "docker-compose.yml",
+        "-f",
+        "docker-compose.dev.yml",
+        "down"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker Compose: Prod 停止",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "compose",
+        "-p",
+        "pokenae-prod",
+        "-f",
+        "docker-compose.yml",
+        "-f",
+        "docker-compose.prod.yml",
+        "down"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker Compose: All 停止",
+      "type": "shell",
+      "command": "docker compose -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml down; docker compose -p pokenae-dev -f docker-compose.yml -f docker-compose.dev.yml down; docker compose -p pokenae-prod -f docker-compose.yml -f docker-compose.prod.yml down",
+      "problemMatcher": []
+    }
+  ]
+}

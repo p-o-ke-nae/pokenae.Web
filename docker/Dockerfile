@@ -6,7 +6,35 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# Stage 2: Builder
+# Stage 2: Dev (デバッグ環境用 - ホットリロードでコーディングしながら動作確認)
+FROM node:20-alpine AS dev
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# NEXT_PUBLIC_ 環境変数はビルド時に埋め込まれるため ARG → ENV で設定
+ARG NEXT_PUBLIC_ENVIRONMENT=debug
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
+ARG NEXT_PUBLIC_GOOGLE_REDIRECT_URI
+
+ENV NODE_ENV=development
+ENV NEXT_PUBLIC_ENVIRONMENT=$NEXT_PUBLIC_ENVIRONMENT
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
+ENV NEXT_PUBLIC_GOOGLE_REDIRECT_URI=$NEXT_PUBLIC_GOOGLE_REDIRECT_URI
+
+EXPOSE 3000
+
+# next dev はコンテナ外からアクセスできるよう 0.0.0.0 でリッスン
+# --webpack: Next.js 16 はデフォルトで Turbopack を使用するが、
+# Turbopack は Docker bind mount のファイル変更を検知できない（Windows/WSL2 環境）。
+# webpack に切り替えることで WATCHPACK_POLLING による polling 監視が有効になり、
+# ホットリロードが正しく動作する。
+CMD ["npx", "next", "dev", "--hostname", "0.0.0.0", "--webpack"]
+
+# Stage 3: Builder (本番ビルド用)
 FROM node:20-alpine AS builder
 WORKDIR /app
 
@@ -16,14 +44,16 @@ COPY . .
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
 ARG NEXT_PUBLIC_GOOGLE_REDIRECT_URI
+ARG NEXT_PUBLIC_ENVIRONMENT=production
 
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 ENV NEXT_PUBLIC_GOOGLE_REDIRECT_URI=$NEXT_PUBLIC_GOOGLE_REDIRECT_URI
+ENV NEXT_PUBLIC_ENVIRONMENT=$NEXT_PUBLIC_ENVIRONMENT
 
 RUN npm run build
 
-# Stage 3: Runner
+# Stage 4: Runner (本番実行用)
 FROM node:20-alpine AS runner
 WORKDIR /app
 
@@ -45,8 +75,7 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# ヘルスチェック
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+# ヘルスチェックは docker-compose.yml で一元管理する
+# Dockerfile 内で定義するとプロセスが二重に生成される可能性があるため
 
 CMD ["node", "server.js"]
