@@ -2,12 +2,18 @@
 
 import CustomButton from '../components/atoms/CustomButton';
 import { useUserData } from '@/lib/hooks/useUserData';
+import { useSession, signIn } from 'next-auth/react';
 
 export default function Home() {
   const { userData, error, loading, fetchUser } = useUserData();
+  const { data: session, status } = useSession();
 
   const handleButtonClick = async () => {
     await fetchUser();
+  };
+
+  const handleSignIn = () => {
+    signIn('google', { callbackUrl: '/' });
   };
 
   return (
@@ -20,18 +26,35 @@ export default function Home() {
           </h1>
           <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
             pokenaeへようこそ。
-            
+            {status === 'authenticated' && (
+              <span className="block mt-2 text-green-600 dark:text-green-400">
+                ログイン済み: {session?.user?.name}
+              </span>
+            )}
           </p>
         </div>
         
         <div className="flex flex-col gap-4 w-full max-w-md">
-          <CustomButton 
-            variant="accent" 
-            onClick={handleButtonClick}
-            isLoading={loading}
-          >
-            カスタムボタン
-          </CustomButton>
+          {/* Google認証ボタン */}
+          {status === 'unauthenticated' && (
+            <CustomButton 
+              variant="accent" 
+              onClick={handleSignIn}
+            >
+              Googleでログイン
+            </CustomButton>
+          )}
+
+          {/* 既存のAPIテストボタン */}
+          {status === 'authenticated' && (
+            <CustomButton 
+              variant="accent" 
+              onClick={handleButtonClick}
+              isLoading={loading}
+            >
+              カスタムボタン
+            </CustomButton>
+          )}
           
           {/* APIレスポンス表示エリア */}
           {error && (

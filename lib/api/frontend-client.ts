@@ -5,12 +5,14 @@
 
 import type { ApiResponse, HttpMethod } from '@/lib/types/api';
 import type { ApiServiceName } from '@/lib/config/api-config';
+import { getSession } from 'next-auth/react';
 
 export interface FrontendApiClientOptions {
   method?: HttpMethod;
   body?: unknown;
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  includeAuth?: boolean; // Google認証情報を含めるかどうか
 }
 
 /**
@@ -35,6 +37,18 @@ export class FrontendApiClient {
       'Content-Type': 'application/json',
       ...options.headers,
     };
+
+    // Google認証情報をヘッダーに追加
+    if (options.includeAuth !== false) { // デフォルトでtrueとして扱う
+      try {
+        const session = await getSession();
+        if (session?.accessToken) {
+          headers['X-Google-Access-Token'] = session.accessToken;
+        }
+      } catch (error) {
+        console.warn('Failed to get session for API request:', error);
+      }
+    }
 
     try {
       const fetchOptions: RequestInit = {
