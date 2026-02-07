@@ -3,6 +3,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 ## Documentation
 
 - **[API Routing Guide](./docs/API_ROUTING.md)** - APIルーティング基盤の使用方法
+- **[Google Auth Setup Guide](./docs/GOOGLE_AUTH_SETUP.md)** - Google OAuth2認証の設定ガイド
 - **[Kernel Stack Overflow Investigation](./docs/KERNEL_STACK_OVERFLOW_INVESTIGATION.md)** - スタックオーバーフロー問題の調査と修正レポート
 
 ## Getting Started
