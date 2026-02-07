@@ -5,6 +5,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 - **[API Routing Guide](./docs/API_ROUTING.md)** - APIルーティング基盤の使用方法
 - **[Google Auth Setup Guide](./docs/GOOGLE_AUTH_SETUP.md)** - Google OAuth2認証の設定ガイド（英語）
 - **[Google OAuth2認証機能について](./docs/GOOGLE_AUTH_SETUP_JA.md)** - Google OAuth2認証の詳細解説（日本語）
+- **[Google認証の後実装について](./docs/GOOGLE_AUTH_POST_IMPLEMENTATION.md)** - フロントエンド/バックエンドの今後の実装ガイド（日本語）
 - **[Kernel Stack Overflow Investigation](./docs/KERNEL_STACK_OVERFLOW_INVESTIGATION.md)** - スタックオーバーフロー問題の調査と修正レポート
 
 ## Getting Started
