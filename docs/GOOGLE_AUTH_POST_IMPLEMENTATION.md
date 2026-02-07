@@ -1,4 +1,4 @@
-# Google認証の後実装について
+# Google認証の追加実装ガイド
 
 このドキュメントでは、現在実装されているGoogle OAuth2認証について、今後フロントエンドプロジェクトとバックエンドプロジェクトでそれぞれ必要な対応事項を詳細に解説します。
 
@@ -81,6 +81,11 @@
  */
 async function refreshAccessToken(token: JWT): Promise<JWT> {
   try {
+    // リフレッシュトークンが存在しない場合はエラー
+    if (!token.refreshToken) {
+      throw new Error("No refresh token available");
+    }
+
     // Google OAuth2のトークンエンドポイント
     const url = "https://oauth2.googleapis.com/token";
     
@@ -132,7 +137,7 @@ async jwt({ token, account, user }) {
     return {
       accessToken: account.access_token,
       refreshToken: account.refresh_token,
-      accessTokenExpires: account.expires_at! * 1000, // ミリ秒に変換
+      accessTokenExpires: (account.expires_at ?? 0) * 1000, // ミリ秒に変換、undefinedの場合は0
       user,
     };
   }
@@ -275,6 +280,8 @@ if (response.status === 401 || response.status === 403) {
 import { useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 
+export const AUTH_ERROR_REDIRECT_DELAY_MS = 3000;
+
 export function AuthErrorProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
@@ -282,10 +289,10 @@ export function AuthErrorProvider({ children }: { children: React.ReactNode }) {
     const handleAuthError = (event: CustomEvent) => {
       setError(event.detail.message);
       
-      // 3秒後に自動でログインページへ
+      // 自動でログインページへ
       setTimeout(() => {
         signIn('google');
-      }, 3000);
+      }, AUTH_ERROR_REDIRECT_DELAY_MS);
     };
 
     window.addEventListener('auth:error', handleAuthError as EventListener);
@@ -306,7 +313,7 @@ export function AuthErrorProvider({ children }: { children: React.ReactNode }) {
             {error}
           </p>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            3秒後に自動的にログインページへ移動します...
+            {AUTH_ERROR_REDIRECT_DELAY_MS / 1000}秒後に自動的にログインページへ移動します...
           </p>
         </div>
       </div>
@@ -481,7 +488,14 @@ public class GoogleAuthMiddleware
     {
         // Googleのトークン情報エンドポイントで検証
         using var httpClient = new HttpClient();
-        var response = await httpClient.GetAsync($"https://www.googleapis.com/oauth2/v1/tokeninfo?access_token={accessToken}");
+        httpClient.DefaultRequestHeaders.Authorization = 
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        
+        // トークン情報をPOSTリクエストで取得（推奨）
+        var response = await httpClient.PostAsync(
+            "https://oauth2.googleapis.com/tokeninfo",
+            new StringContent($"access_token={accessToken}", Encoding.UTF8, "application/x-www-form-urlencoded")
+        );
         
         if (!response.IsSuccessStatusCode)
         {
@@ -510,8 +524,7 @@ public class GoogleTokenInfo
 ```python
 # auth.py
 from fastapi import Header, HTTPException, Depends
-from google.oauth2 import id_token
-from google.auth.transport import requests
+import httpx
 import os
 
 async def get_google_token(
@@ -519,21 +532,32 @@ async def get_google_token(
 ) -> str:
     """
     Google認証トークンを検証
+    アクセストークンの検証にはtokeninfoエンドポイントを使用
     """
     if not x_google_access_token:
         raise HTTPException(status_code=401, detail="認証トークンが必要です")
     
     try:
-        # トークンの検証
-        idinfo = id_token.verify_oauth2_token(
-            x_google_access_token,
-            requests.Request(),
-            os.getenv("GOOGLE_CLIENT_ID")
-        )
+        # アクセストークンの検証（tokeninfoエンドポイント使用）
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://oauth2.googleapis.com/tokeninfo",
+                data={"access_token": x_google_access_token}
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(status_code=401, detail="無効な認証トークンです")
+            
+            token_info = response.json()
+            
+            # トークンの発行元を確認
+            expected_client_id = os.getenv("GOOGLE_CLIENT_ID")
+            if token_info.get("aud") != expected_client_id:
+                raise HTTPException(status_code=401, detail="トークンの発行元が不正です")
         
         return x_google_access_token
-    except ValueError:
-        raise HTTPException(status_code=401, detail="無効な認証トークンです")
+    except httpx.HTTPError:
+        raise HTTPException(status_code=401, detail="トークンの検証に失敗しました")
 
 # エンドポイントでの使用例
 from fastapi import APIRouter, Depends
@@ -742,6 +766,7 @@ CREATE INDEX idx_users_email ON users(email);
 # models.py
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.sql import func
+from datetime import datetime, timezone
 from database import Base
 
 class User(Base):
@@ -758,7 +783,7 @@ class User(Base):
 
 # user_service.py
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 
 class UserService:
     def __init__(self, db: Session):
@@ -780,7 +805,7 @@ class UserService:
         
         if user:
             # 既存ユーザーの場合、最終ログイン日時を更新
-            user.last_login_at = datetime.utcnow()
+            user.last_login_at = datetime.now(timezone.utc)
             user.name = name or user.name
             user.profile_image_url = profile_image_url or user.profile_image_url
         else:
@@ -790,7 +815,7 @@ class UserService:
                 email=email,
                 name=name,
                 profile_image_url=profile_image_url,
-                last_login_at=datetime.utcnow()
+                last_login_at=datetime.now(timezone.utc)
             )
             self.db.add(user)
         
@@ -1164,8 +1189,8 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-              "style-src 'self' 'unsafe-inline'",
+              "script-src 'self'",  // unsafe-eval と unsafe-inline を削除（nonce使用を推奨）
+              "style-src 'self'",   // unsafe-inline を削除（nonce使用を推奨）
               "img-src 'self' data: https:",
               "font-src 'self' data:",
               "connect-src 'self' https://accounts.google.com https://www.googleapis.com",
