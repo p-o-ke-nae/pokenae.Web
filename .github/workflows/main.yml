@@ -231,13 +231,21 @@ jobs:
           echo "[INFO] Pulling image..."
           docker pull "${IMAGE}"
 
-          # docker compose で起動（既存コンテナは自動的に置き換えられる）
+          # 既存の同名コンテナを停止・削除（以前の docker run や別プロジェクト名で作成されたコンテナとの競合を防止）
+          echo "[INFO] Cleaning up existing containers..."
+          IMAGE="${IMAGE}" docker compose \
+            -p "${PROJECT_NAME}" \
+            -f docker-compose.yml \
+            -f "${COMPOSE_FILE}" \
+            down --remove-orphans 2>/dev/null || true
+
+          # docker compose で起動（--force-recreate で確実にコンテナを再作成）
           echo "[INFO] Starting container with docker compose..."
           IMAGE="${IMAGE}" docker compose \
             -p "${PROJECT_NAME}" \
             -f docker-compose.yml \
             -f "${COMPOSE_FILE}" \
-            up -d --no-build
+            up -d --no-build --force-recreate
 
           # 古いイメージを削除（ディスク容量節約）
           echo "[INFO] Cleaning up old images..."
