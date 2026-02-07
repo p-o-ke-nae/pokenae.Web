@@ -2,9 +2,11 @@
 
 import CustomButton from '../components/atoms/CustomButton';
 import { useUserData } from '@/lib/hooks/useUserData';
+import { useSession } from 'next-auth/react';
 
 export default function Home() {
   const { userData, error, loading, fetchUser } = useUserData();
+  const { data: session, status } = useSession();
 
   const handleButtonClick = async () => {
     await fetchUser();
@@ -20,18 +22,25 @@ export default function Home() {
           </h1>
           <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
             pokenaeへようこそ。
-            
+            {status === 'authenticated' && (
+              <span className="block mt-2 text-green-600 dark:text-green-400">
+                ログイン済み: {session?.user?.name}
+              </span>
+            )}
           </p>
         </div>
         
         <div className="flex flex-col gap-4 w-full max-w-md">
-          <CustomButton 
-            variant="accent" 
-            onClick={handleButtonClick}
-            isLoading={loading}
-          >
-            カスタムボタン
-          </CustomButton>
+          {/* 既存のAPIテストボタン（ログイン時のみ表示） */}
+          {status === 'authenticated' && (
+            <CustomButton 
+              variant="accent" 
+              onClick={handleButtonClick}
+              isLoading={loading}
+            >
+              カスタムボタン
+            </CustomButton>
+          )}
           
           {/* APIレスポンス表示エリア */}
           {error && (
