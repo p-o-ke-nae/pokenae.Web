@@ -207,8 +207,9 @@ jobs:
 
           ssh $USERNAME@$HOST -i private_key -p 22 \
             "IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.settings.outputs.image_tag }} \
-             COMPOSE_FILE=${{ steps.settings.outputs.compose_file }} \
+             OVERRIDE_COMPOSE_FILE=${{ steps.settings.outputs.compose_file }} \
              PROJECT_NAME=${{ steps.settings.outputs.project_name }} \
+             CONTAINER_NAME=${{ steps.settings.outputs.container_name }} \
              GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
              GITHUB_ACTOR=${{ github.actor }} \
              bash -s" <<'EOF'
@@ -220,7 +221,7 @@ jobs:
           echo "[INFO] Starting deployment"
           echo "[INFO] Project: ${PROJECT_NAME}"
           echo "[INFO] Image: ${IMAGE}"
-          echo "[INFO] Compose: docker-compose.yml + ${COMPOSE_FILE}"
+          echo "[INFO] Compose: docker-compose.yml + ${OVERRIDE_COMPOSE_FILE}"
           echo "======================================"
 
           # GitHub Container Registry にログイン
@@ -236,15 +237,19 @@ jobs:
           IMAGE="${IMAGE}" docker compose \
             -p "${PROJECT_NAME}" \
             -f docker-compose.yml \
-            -f "${COMPOSE_FILE}" \
+            -f "${OVERRIDE_COMPOSE_FILE}" \
             down --remove-orphans 2>/dev/null || true
+
+          # 名前衝突を防ぐため、同名コンテナが残っていれば強制削除
+          echo "[INFO] Removing stale container if exists..."
+          docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
 
           # docker compose で起動（--force-recreate で確実にコンテナを再作成）
           echo "[INFO] Starting container with docker compose..."
           IMAGE="${IMAGE}" docker compose \
             -p "${PROJECT_NAME}" \
             -f docker-compose.yml \
-            -f "${COMPOSE_FILE}" \
+            -f "${OVERRIDE_COMPOSE_FILE}" \
             up -d --no-build --force-recreate
 
           # 古いイメージを削除（ディスク容量節約）
