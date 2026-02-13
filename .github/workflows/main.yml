@@ -5,11 +5,10 @@ on:
     branches:
       - main
       - develop
-  pull_request:
-    types: [closed]
-    branches:
-      - main
-      - develop
+
+concurrency:
+  group: deploy-${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
@@ -22,7 +21,7 @@ jobs:
   # ==========================================
   test:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    if: github.event_name == 'push'
 
     steps:
       - name: Checkout code
@@ -71,11 +70,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            TARGET_BRANCH="${{ github.event.pull_request.base.ref }}"
-          else
-            TARGET_BRANCH="${{ github.ref_name }}"
-          fi
+          TARGET_BRANCH="${{ github.ref_name }}"
 
           if [ "$TARGET_BRANCH" = "main" ]; then
             echo "image_tag=main" >> $GITHUB_OUTPUT
@@ -149,11 +144,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            TARGET_BRANCH="${{ github.event.pull_request.base.ref }}"
-          else
-            TARGET_BRANCH="${{ github.ref_name }}"
-          fi
+          TARGET_BRANCH="${{ github.ref_name }}"
 
           if [ "$TARGET_BRANCH" = "main" ]; then
             NEXTAUTH_URL_VALUE="${{ secrets.PROD_NEXTAUTH_URL }}"
@@ -253,6 +244,20 @@ jobs:
 
           cd ~/pokenae-web
 
+          LOCK_DIR="/tmp/pokenae-deploy-${PROJECT_NAME}.lock"
+          for i in $(seq 1 60); do
+            if mkdir "${LOCK_DIR}" 2>/dev/null; then
+              break
+            fi
+            echo "[INFO] Waiting for deployment lock... (${i}/60)"
+            sleep 2
+          done
+          if [ ! -d "${LOCK_DIR}" ]; then
+            echo "[ERROR] Failed to acquire deployment lock: ${LOCK_DIR}"
+            exit 1
+          fi
+          trap 'rmdir "${LOCK_DIR}" 2>/dev/null || true' EXIT
+
           echo "======================================"
           echo "[INFO] Starting deployment"
           echo "[INFO] Project: ${PROJECT_NAME}"
@@ -278,7 +283,19 @@ jobs:
 
           # 名前衝突を防ぐため、同名コンテナが残っていれば強制削除
           echo "[INFO] Removing stale container if exists..."
-          docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+          for i in $(seq 1 10); do
+            if docker ps -a --format '{{.Names}}' | grep -qx "${CONTAINER_NAME}"; then
+              docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+              sleep 2
+              continue
+            fi
+            break
+          done
+
+          if docker ps -a --format '{{.Names}}' | grep -qx "${CONTAINER_NAME}"; then
+            echo "[ERROR] Stale container still exists: ${CONTAINER_NAME}"
+            exit 1
+          fi
 
           # docker compose で起動（--force-recreate で確実にコンテナを再作成）
           echo "[INFO] Starting container with docker compose..."
@@ -306,9 +323,6 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
 
-          # コンテナの起動を待つ
-          sleep 10
-
           ssh $USERNAME@$HOST -i private_key -p 22 \
             "CONTAINER_NAME=${{ steps.settings.outputs.container_name }} \
              PORT=${{ steps.settings.outputs.port }} \
@@ -317,41 +331,30 @@ jobs:
 
           echo "[INFO] Verifying deployment..."
 
-          # コンテナの状態を確認
-          CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo "not_found")
+          for i in $(seq 1 24); do
+            CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo "not_found")
+            HEALTH_STATUS=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${CONTAINER_NAME}" 2>/dev/null || echo "none")
 
-          if [ "$CONTAINER_STATUS" != "running" ]; then
-            echo "[ERROR] Container is not running. Status: ${CONTAINER_STATUS}"
-            docker logs "${CONTAINER_NAME}" --tail 50 2>/dev/null || true
-            exit 1
-          fi
-
-          echo "[INFO] Container status: ${CONTAINER_STATUS}"
-
-          # ポートでリッスンしているか確認（最大30秒待機）
-          for i in $(seq 1 6); do
-            if curl -sf "http://localhost:${PORT}/" > /dev/null 2>&1; then
-              echo "[SUCCESS] Application is responding on port ${PORT}"
-              echo "======================================"
-              echo "[INFO] Deployment verification completed!"
-              echo "[INFO] Container: ${CONTAINER_NAME}"
-              echo "[INFO] Status: Running"
-              echo "[INFO] Port: ${PORT}"
-              echo "======================================"
-              exit 0
+            if [ "$CONTAINER_STATUS" = "running" ] && [ "$HEALTH_STATUS" != "unhealthy" ]; then
+              if curl -sf "http://localhost:${PORT}/" > /dev/null 2>&1; then
+                echo "[SUCCESS] Application is responding on port ${PORT}"
+                echo "======================================"
+                echo "[INFO] Deployment verification completed!"
+                echo "[INFO] Container: ${CONTAINER_NAME}"
+                echo "[INFO] Status: ${CONTAINER_STATUS}"
+                echo "[INFO] Health: ${HEALTH_STATUS}"
+                echo "[INFO] Port: ${PORT}"
+                echo "======================================"
+                exit 0
+              fi
             fi
-            echo "[INFO] Waiting for application to start... (${i}/6)"
+
+            echo "[INFO] Waiting for stable startup... (${i}/24) status=${CONTAINER_STATUS}, health=${HEALTH_STATUS}"
             sleep 5
           done
 
-          echo "[WARN] HTTP check failed, checking container logs..."
-          docker logs "${CONTAINER_NAME}" --tail 20 2>/dev/null || true
-
-          # コンテナは起動しているが HTTP 応答がない場合
-          if [ "$CONTAINER_STATUS" = "running" ]; then
-            echo "[WARN] Container is running but HTTP check failed. Deployment may still be successful."
-            exit 0
-          fi
-
+          echo "[ERROR] Deployment verification timed out"
+          docker ps -a --filter "name=${CONTAINER_NAME}" || true
+          docker logs "${CONTAINER_NAME}" --tail 100 2>/dev/null || true
           exit 1
           EOF
