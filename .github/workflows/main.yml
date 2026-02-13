@@ -1,13 +1,19 @@
 name: Build and Deploy Router
+name: Build and Deploy Router
 
 on:
   push:
     branches:
       - main
       - develop
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+      - develop
 
 concurrency:
-  group: deploy-${{ github.workflow }}-${{ github.ref_name }}
+  group: deploy-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref || github.ref_name }}
   cancel-in-progress: true
 
 env:
@@ -16,6 +22,7 @@ env:
 
 jobs:
   test:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -39,8 +46,11 @@ jobs:
         run: npm run test || true
 
   build-main:
-    if: github.ref_name == 'main'
+    if: github.event_name == 'push' && github.ref_name == 'main'
     needs: test
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/reusable-build-push.yml
     with:
       image_tag: main
@@ -51,8 +61,11 @@ jobs:
       google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
 
   build-develop:
-    if: github.ref_name == 'develop'
+    if: github.event_name == 'push' && github.ref_name == 'develop'
     needs: test
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/reusable-build-push.yml
     with:
       image_tag: develop
@@ -63,8 +76,11 @@ jobs:
       google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
 
   deploy-main-vps:
-    if: github.ref_name == 'main'
+    if: github.event_name == 'push' && github.ref_name == 'main'
     needs: build-main
+    permissions:
+      contents: read
+      packages: read
     uses: ./.github/workflows/reusable-deploy-vps.yml
     with:
       compose_file: docker-compose.prod.yml
@@ -82,8 +98,11 @@ jobs:
       google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
 
   deploy-develop-vps:
-    if: github.ref_name == 'develop'
+    if: github.event_name == 'push' && github.ref_name == 'develop'
     needs: build-develop
+    permissions:
+      contents: read
+      packages: read
     # 将来 Azure App Service に切り替える場合は、
     # uses を reusable-deploy-azure-appservice.yml に変更し、
     # app_name / publish profile secret を渡す構成に置き換える。
