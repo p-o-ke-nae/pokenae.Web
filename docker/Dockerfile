@@ -25,8 +25,13 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 ENV NEXT_PUBLIC_GOOGLE_REDIRECT_URI=$NEXT_PUBLIC_GOOGLE_REDIRECT_URI
 
+# secrets を環境変数に展開するエントリポイント
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 EXPOSE 3000
 
+ENTRYPOINT ["entrypoint.sh"]
 # next dev はコンテナ外からアクセスできるよう 0.0.0.0 でリッスン
 # --webpack: Next.js 16 はデフォルトで Turbopack を使用するが、
 # Turbopack は Docker bind mount のファイル変更を検知できない（Windows/WSL2 環境）。
@@ -68,6 +73,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# secrets を環境変数に展開するエントリポイント
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 USER nextjs
 
 EXPOSE 3000
@@ -78,4 +87,5 @@ ENV HOSTNAME="0.0.0.0"
 # ヘルスチェックは docker-compose.yml で一元管理する
 # Dockerfile 内で定義するとプロセスが二重に生成される可能性があるため
 
+ENTRYPOINT ["entrypoint.sh"]
 CMD ["node", "server.js"]

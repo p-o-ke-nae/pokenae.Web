@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { getAuthOptions } from '@/lib/auth/auth-options';
 
 // モックデータ
 const mockUsers = [
@@ -41,6 +43,15 @@ const mockUsers = [
 
 export async function GET(request: Request) {
   try {
+    // セッションによる認証チェック（ミドルウェアに加えた二重防御）
+    const session = await getServerSession(getAuthOptions());
+    if (!session) {
+      return NextResponse.json(
+        { error: '認証が必要です。ログインしてください。' },
+        { status: 401 }
+      );
+    }
+
     // URLからクエリパラメータを取得
     const { searchParams } = new URL(request.url);
     const userIdParam = searchParams.get('id');

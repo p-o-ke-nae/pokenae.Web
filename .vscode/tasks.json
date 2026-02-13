@@ -46,6 +46,11 @@
       "label": "Docker Compose: Prod 起動",
       "type": "shell",
       "command": "docker",
+      "options": {
+        "env": {
+          "NEXTAUTH_URL": "http://localhost:3001"
+        }
+      },
       "args": [
         "compose",
         "-p",

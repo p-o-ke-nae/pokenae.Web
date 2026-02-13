@@ -156,17 +156,29 @@ jobs:
           fi
 
           if [ "$TARGET_BRANCH" = "main" ]; then
+            NEXTAUTH_URL_VALUE="${{ secrets.PROD_NEXTAUTH_URL }}"
+            if [ -z "$NEXTAUTH_URL_VALUE" ]; then
+              echo "[ERROR] PROD_NEXTAUTH_URL is not set"
+              exit 1
+            fi
             echo "compose_file=docker-compose.prod.yml" >> $GITHUB_OUTPUT
             echo "project_name=pokenae-prod" >> $GITHUB_OUTPUT
             echo "container_name=pokenae-web-prod" >> $GITHUB_OUTPUT
             echo "image_tag=main" >> $GITHUB_OUTPUT
             echo "port=3001" >> $GITHUB_OUTPUT
+            echo "nextauth_url=$NEXTAUTH_URL_VALUE" >> $GITHUB_OUTPUT
           elif [ "$TARGET_BRANCH" = "develop" ]; then
+            NEXTAUTH_URL_VALUE="${{ secrets.DEV_NEXTAUTH_URL }}"
+            if [ -z "$NEXTAUTH_URL_VALUE" ]; then
+              echo "[ERROR] DEV_NEXTAUTH_URL is not set"
+              exit 1
+            fi
             echo "compose_file=docker-compose.dev.yml" >> $GITHUB_OUTPUT
             echo "project_name=pokenae-dev" >> $GITHUB_OUTPUT
             echo "container_name=pokenae-web-dev" >> $GITHUB_OUTPUT
             echo "image_tag=develop" >> $GITHUB_OUTPUT
             echo "port=3002" >> $GITHUB_OUTPUT
+            echo "nextauth_url=$NEXTAUTH_URL_VALUE" >> $GITHUB_OUTPUT
           fi
 
           echo "[INFO] Deploying branch: $TARGET_BRANCH"
@@ -188,13 +200,36 @@ jobs:
           chmod 600 private_key
 
           # デプロイ先ディレクトリを作成
-          ssh $USERNAME@$HOST -i private_key -p 22 "mkdir -p ~/pokenae-web"
+          ssh $USERNAME@$HOST -i private_key -p 22 "mkdir -p ~/pokenae-web/secrets ~/pokenae-web/docker"
 
-          # compose ファイルを転送（ベース + 環境別）
+          # compose ファイルとエントリポイントを転送
           scp -i private_key -P 22 \
             docker-compose.yml \
             ${{ steps.settings.outputs.compose_file }} \
             $USERNAME@$HOST:~/pokenae-web/
+
+          scp -i private_key -P 22 \
+            docker/entrypoint.sh \
+            $USERNAME@$HOST:~/pokenae-web/docker/
+
+      - name: Create secrets on VPS
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.HOST }}
+          USERNAME: ${{ secrets.USERNAME }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > private_key
+          chmod 600 private_key
+
+          # VPS 上に secrets ファイルを作成（パーミッション 600 で保護）
+          ssh $USERNAME@$HOST -i private_key -p 22 \
+            "cd ~/pokenae-web && \
+             printf '%s' '${{ secrets.NEXTAUTH_SECRET }}' > secrets/nextauth_secret && \
+             printf '%s' '${{ secrets.GOOGLE_CLIENT_ID }}' > secrets/google_client_id && \
+             printf '%s' '${{ secrets.GOOGLE_CLIENT_SECRET }}' > secrets/google_client_secret && \
+             chmod 600 secrets/*"
+
+          echo "[INFO] Secrets created on VPS"
 
       - name: Deploy to ConoHa VPS
         env:
@@ -207,8 +242,10 @@ jobs:
 
           ssh $USERNAME@$HOST -i private_key -p 22 \
             "IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.settings.outputs.image_tag }} \
-             COMPOSE_FILE=${{ steps.settings.outputs.compose_file }} \
+             OVERRIDE_COMPOSE_FILE=${{ steps.settings.outputs.compose_file }} \
              PROJECT_NAME=${{ steps.settings.outputs.project_name }} \
+             CONTAINER_NAME=${{ steps.settings.outputs.container_name }} \
+             NEXTAUTH_URL=${{ steps.settings.outputs.nextauth_url }} \
              GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
              GITHUB_ACTOR=${{ github.actor }} \
              bash -s" <<'EOF'
@@ -220,7 +257,7 @@ jobs:
           echo "[INFO] Starting deployment"
           echo "[INFO] Project: ${PROJECT_NAME}"
           echo "[INFO] Image: ${IMAGE}"
-          echo "[INFO] Compose: docker-compose.yml + ${COMPOSE_FILE}"
+          echo "[INFO] Compose: docker-compose.yml + ${OVERRIDE_COMPOSE_FILE}"
           echo "======================================"
 
           # GitHub Container Registry にログイン
@@ -236,15 +273,21 @@ jobs:
           IMAGE="${IMAGE}" docker compose \
             -p "${PROJECT_NAME}" \
             -f docker-compose.yml \
-            -f "${COMPOSE_FILE}" \
+            -f "${OVERRIDE_COMPOSE_FILE}" \
             down --remove-orphans 2>/dev/null || true
+
+          # 名前衝突を防ぐため、同名コンテナが残っていれば強制削除
+          echo "[INFO] Removing stale container if exists..."
+          docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
 
           # docker compose で起動（--force-recreate で確実にコンテナを再作成）
           echo "[INFO] Starting container with docker compose..."
-          IMAGE="${IMAGE}" docker compose \
+          IMAGE="${IMAGE}" \
+          NEXTAUTH_URL="${NEXTAUTH_URL}" \
+          docker compose \
             -p "${PROJECT_NAME}" \
             -f docker-compose.yml \
-            -f "${COMPOSE_FILE}" \
+            -f "${OVERRIDE_COMPOSE_FILE}" \
             up -d --no-build --force-recreate
 
           # 古いイメージを削除（ディスク容量節約）

@@ -17,3 +17,19 @@ services:
         NEXT_PUBLIC_GOOGLE_REDIRECT_URI: ${NEXT_PUBLIC_GOOGLE_REDIRECT_URI}
     # PID 1 問題の解決: tini を init プロセスとして使用し、ゾンビプロセスを自動回収する
     init: true
+    # 認証に必要なシークレットをコンテナに注入（/run/secrets/ にマウントされる）
+    # entrypoint.sh がファイルを読み取り環境変数に展開する
+    secrets:
+      - nextauth_secret
+      - google_client_id
+      - google_client_secret
+
+# シークレット定義（secrets/ ディレクトリ内のファイルから読み取り）
+# secrets/ ディレクトリは .gitignore で除外されている
+secrets:
+  nextauth_secret:
+    file: ./secrets/nextauth_secret
+  google_client_id:
+    file: ./secrets/google_client_id
+  google_client_secret:
+    file: ./secrets/google_client_secret
