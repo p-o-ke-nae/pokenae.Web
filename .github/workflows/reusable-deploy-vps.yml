@@ -90,7 +90,7 @@ jobs:
              printf '%s' '${{ secrets.nextauth_secret }}' > secrets/nextauth_secret && \
              printf '%s' '${{ secrets.google_client_id }}' > secrets/google_client_id && \
              printf '%s' '${{ secrets.google_client_secret }}' > secrets/google_client_secret && \
-             chmod 600 secrets/*"
+             chmod 644 secrets/*"
 
       - name: Deploy to VPS
         env:
