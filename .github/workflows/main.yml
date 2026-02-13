@@ -1,5 +1,4 @@
 name: Build and Deploy Router
-name: Build and Deploy Router
 
 on:
   push:
