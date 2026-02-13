@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 !.env.local.example
 
+# docker secrets (シークレットファイルは絶対にコミットしない)
+/secrets/
+
 # vercel
 .vercel
 

@@ -8,7 +8,8 @@
  * - 開発環境: 環境バッジを表示、認証バッジも常に表示
  */
 
-import { useSession } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
+import { useEffect } from 'react';
 import { getEnvironment } from '@/lib/config/env';
 import EnvironmentBadge from '@/components/atoms/EnvironmentBadge';
 import AuthBadge from '@/components/atoms/AuthBadge';
@@ -18,6 +19,14 @@ export default function NavigationBar() {
   const environment = getEnvironment();
   const isProduction = environment === 'production';
   const isAuthenticated = !!session?.user;
+
+  // トークンリフレッシュに失敗した場合、再ログインを促す
+  useEffect(() => {
+    if (session?.error === 'RefreshAccessTokenError') {
+      // セッションが無効になったため再認証を要求
+      signIn('google', { callbackUrl: window.location.href });
+    }
+  }, [session?.error]);
 
   return (
     <nav className="w-full bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">

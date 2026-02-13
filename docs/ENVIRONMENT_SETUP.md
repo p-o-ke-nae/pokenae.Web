@@ -1,6 +1,69 @@
 # 環境モードの設定と区別方法
 
-このドキュメントでは、pokenae.Web プロジェクトの3つの環境モード（debug, development, production）について説明します。
+このドキュメントでは、pokenae.Web プロジェクトの3つの環境モード（debug, development, production）と、シークレット管理の方法について説明します。
+
+## シークレット管理
+
+**重要**: シークレット（秘密鍵・認証情報）は Docker Compose secrets で管理します。  
+Git 管理されるファイルには含めず、`secrets/` ディレクトリ（`.gitignore` で除外済み）にローカル保持します。
+
+### 必要なシークレット
+
+| ファイル名                     | 展開先の環境変数       | 説明                                   | 取得方法                                                                  |
+| ------------------------------ | ---------------------- | -------------------------------------- | ------------------------------------------------------------------------- |
+| `secrets/nextauth_secret`      | `NEXTAUTH_SECRET`      | NextAuth.jsのJWT暗号化キー             | 下記コマンドで生成                                                        |
+| `secrets/google_client_id`     | `GOOGLE_CLIENT_ID`     | Google OAuth2 クライアントID           | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
+| `secrets/google_client_secret` | `GOOGLE_CLIENT_SECRET` | Google OAuth2 クライアントシークレット | 同上                                                                      |
+
+### セットアップ手順
+
+#### 1. シークレットファイルの作成
+
+```powershell
+# secrets/ ディレクトリは .gitignore で除外されているためGitにコミットされません
+
+# NEXTAUTH_SECRET を生成して保存
+node -e "process.stdout.write(require('crypto').randomBytes(32).toString('base64'))" > secrets/nextauth_secret
+
+# Google OAuth2 のクライアント情報を保存（値を置き換えてください）
+Set-Content -NoNewline -Path secrets/google_client_id -Value "あなたのクライアントID"
+Set-Content -NoNewline -Path secrets/google_client_secret -Value "あなたのクライアントシークレット"
+```
+
+#### 2. 動作確認
+
+```powershell
+# ファイルが正しく作成されたか確認
+Get-ChildItem secrets/ -Name
+# → google_client_id, google_client_secret, nextauth_secret, README.md
+```
+
+### 仕組み
+
+1. `docker-compose.yml` のトップレベル `secrets` で `secrets/` ディレクトリのファイルを定義
+2. コンテナ起動時にファイルが `/run/secrets/` にマウントされる
+3. `docker/entrypoint.sh` が `/run/secrets/` 内のファイルを読み取り、ファイル名を大文字に変換して環境変数に展開
+4. アプリケーションが `process.env.NEXTAUTH_SECRET` 等で参照
+
+> **CI/CD 環境**: GitHub Actions では GitHub Secrets から直接環境変数として渡すため、`secrets/` ディレクトリは不要です。
+
+### CI/CD（GitHub Actions）でのシークレット管理
+
+GitHub Actions でのデプロイ時は、GitHub Secrets に登録した値をワークフロー内で VPS の `secrets/` ディレクトリに書き込みます。
+
+#### GitHub リポジトリに登録が必要な Secrets
+
+**Settings → Secrets and variables → Actions → New repository secret** で以下を登録：
+
+| Secret 名              | 説明                                                            |
+| ---------------------- | --------------------------------------------------------------- |
+| `NEXTAUTH_SECRET`      | NextAuth.jsのJWT暗号化キー                                      |
+| `GOOGLE_CLIENT_ID`     | Google OAuth2 クライアントID                                    |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth2 クライアントシークレット                          |
+| `PROD_NEXTAUTH_URL`    | 本番環境のNextAuth URL（例: `https://pokenae.example.com`）     |
+| `DEV_NEXTAUTH_URL`     | 開発環境のNextAuth URL（例: `https://dev.pokenae.example.com`） |
+
+デプロイワークフロー（`.github/workflows/main.yml`）が自動的に VPS 上の `~/pokenae-web/secrets/` にファイルを作成し、Docker Compose secrets として利用します。
 
 ## 環境モードの種類
 

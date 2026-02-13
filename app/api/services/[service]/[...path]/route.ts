@@ -6,6 +6,8 @@
  */
 
 import { NextRequest } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { getAuthOptions } from '@/lib/auth/auth-options';
 import { getApiClient } from '@/lib/api/client-factory';
 import { getAvailableServices, type ApiServiceName } from '@/lib/config/api-config';
 import { createSuccessResponse, createErrorResponse, parseRequestBody } from '@/lib/api/route-helpers';
@@ -62,6 +64,12 @@ async function handleRequest(
 ) {
   try {
     const { service, path } = await context.params;
+
+    // セッションによる認証チェック（ミドルウェアに加えた二重防御）
+    const session = await getServerSession(getAuthOptions());
+    if (!session) {
+      return createErrorResponse('UNAUTHORIZED', '認証が必要です。ログインしてください。', 401);
+    }
 
     // サービス名のバリデーション
     const availableServices = getAvailableServices();
