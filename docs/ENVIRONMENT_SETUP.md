@@ -2,6 +2,14 @@
 
 このドキュメントでは、pokenae.Web プロジェクトの3つの環境モード（debug, development, production）と、シークレット管理の方法について説明します。
 
+## 開発・認証・実装の共通方針
+
+- 本プロジェクトは Docker ベースの開発手順を前提とし、ローカル実行・検証・運用手順は Docker Compose を優先します。
+- 認証は Google OAuth2（NextAuth）を使用します。認証情報は既存の環境変数・シークレット管理に従って扱います。
+- API リクエストには Google 認証のアクセストークンを含める前提です。API クライアント／Route Handler の変更時はトークンの受け渡し・付与・検証を考慮してください。
+- 実装は Next.js の標準機能（App Router / Route Handlers / Server Components）を最大限活用し、独自実装より推奨パターンを優先します。
+- UI はコンポーネント指向を順守し、再利用可能な単位で責務分離します。既存の階層（atoms / molecules / organisms）と命名規則を尊重します。
+
 ## シークレット管理
 
 **重要**: シークレット（秘密鍵・認証情報）は Docker Compose secrets で管理します。  
