@@ -6,6 +6,16 @@
 
 Next.jsのAPI Routesを活用した統一的なAPIアクセス基盤を提供します。
 
+## 開発・認証の前提
+
+- 本プロジェクトの実行・検証手順は Docker Compose ベースを前提とします。
+- 認証は Google OAuth2（NextAuth）を使用し、セッション情報に基づくアクセス制御を行います。
+- API リクエストには Google 認証アクセストークンを含める方針です。
+  - フロントエンド API クライアントは `X-Google-Access-Token` ヘッダーにトークンを付与します。
+  - API クライアントや Route Handler を変更する場合は、トークンの受け渡し・付与・検証の整合性を維持してください。
+- 実装は Next.js の標準機能（App Router / Route Handlers / Server Components）を優先します。
+- UI 実装はコンポーネント指向で行い、既存の階層（atoms / molecules / organisms）と整合させてください。
+
 ### 主な特徴
 
 - 📡 **複数APIサービスへの統一的なアクセス**: サービス名を指定するだけで異なるAPIにアクセス可能
@@ -307,6 +317,7 @@ const response = await client.get('/endpoint');
 3. **型定義**: レスポンスの型を明示的に定義
 4. **タイムアウト**: 長時間かかる可能性がある処理には適切なタイムアウトを設定
 5. **キャッシング**: 必要に応じてSWRやReact Queryなどと組み合わせる
+6. **認証トークン運用**: 認証が必要な通信では Google アクセストークンを付与し、ヘッダー処理の不整合を作らない
 
 ### ⚠️ 重要: useApi フックの正しい使用方法
 
