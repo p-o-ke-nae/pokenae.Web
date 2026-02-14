@@ -63,15 +63,15 @@ API_SERVICE_3_API_KEY=your-api-key-here
 最も簡単な方法は `useApi` フックを使用することです：
 
 ```tsx
-'use client';
+"use client";
 
-import { useApi } from '@/lib/hooks/useApi';
+import { useApi } from "@/lib/hooks/useApi";
 
 export default function UsersPage() {
   // 静的なエンドポイントの場合、requestFnをコンポーネント外で定義可能
   const { data, error, loading, execute } = useApi(
-    'service1',
-    (client) => client.get('/users') // 静的な場合はこれでOK
+    "service1",
+    (client) => client.get("/users"), // 静的な場合はこれでOK
   );
 
   const handleLoadUsers = async () => {
@@ -83,7 +83,7 @@ export default function UsersPage() {
       <button onClick={handleLoadUsers} disabled={loading}>
         ユーザー一覧を取得
       </button>
-      
+
       {loading && <p>読み込み中...</p>}
       {error && <p>エラー: {error}</p>}
       {data && <pre>{JSON.stringify(data, null, 2)}</pre>}
@@ -95,24 +95,21 @@ export default function UsersPage() {
 **動的なパラメータを使用する場合:**
 
 ```tsx
-'use client';
+"use client";
 
-import { useState, useCallback } from 'react';
-import { useApi } from '@/lib/hooks/useApi';
+import { useState, useCallback } from "react";
+import { useApi } from "@/lib/hooks/useApi";
 
 export default function DynamicUsersPage() {
-  const [userId, setUserId] = useState('1');
-  
+  const [userId, setUserId] = useState("1");
+
   // 動的なパラメータを含む場合は useCallback でメモ化
   const requestFn = useCallback(
     (client) => client.get(`/users/${userId}`),
-    [userId] // userId が変更されたときのみ再作成
+    [userId], // userId が変更されたときのみ再作成
   );
-  
-  const { data, error, loading, execute } = useApi(
-    'service1',
-    requestFn
-  );
+
+  const { data, error, loading, execute } = useApi("service1", requestFn);
 
   const handleLoadUser = async () => {
     await execute();
@@ -120,15 +117,15 @@ export default function DynamicUsersPage() {
 
   return (
     <div>
-      <input 
-        value={userId} 
+      <input
+        value={userId}
         onChange={(e) => setUserId(e.target.value)}
         placeholder="User ID"
       />
       <button onClick={handleLoadUser} disabled={loading}>
         ユーザーを取得
       </button>
-      
+
       {loading && <p>読み込み中...</p>}
       {error && <p>エラー: {error}</p>}
       {data && <pre>{JSON.stringify(data, null, 2)}</pre>}
@@ -140,18 +137,18 @@ export default function DynamicUsersPage() {
 ### 2. クライアント側で直接APIクライアントを使用
 
 ```tsx
-'use client';
+"use client";
 
-import { createFrontendApiClient } from '@/lib/api/frontend-client';
+import { createFrontendApiClient } from "@/lib/api/frontend-client";
 
 async function fetchUsers() {
-  const client = createFrontendApiClient('service1');
-  const response = await client.get('/users');
-  
+  const client = createFrontendApiClient("service1");
+  const response = await client.get("/users");
+
   if (response.success) {
-    console.log('Users:', response.data);
+    console.log("Users:", response.data);
   } else {
-    console.error('Error:', response.error);
+    console.error("Error:", response.error);
   }
 }
 ```
@@ -159,19 +156,16 @@ async function fetchUsers() {
 ### 3. サーバーサイド（Server Components/API Routes）での使用
 
 ```tsx
-import { getApiClient } from '@/lib/api/client-factory';
+import { getApiClient } from "@/lib/api/client-factory";
 
 export async function GET() {
-  const client = getApiClient('service1');
-  const response = await client.get('/users');
-  
+  const client = getApiClient("service1");
+  const response = await client.get("/users");
+
   if (response.success) {
     return Response.json(response.data);
   } else {
-    return Response.json(
-      { error: response.error.message },
-      { status: 500 }
-    );
+    return Response.json({ error: response.error.message }, { status: 500 });
   }
 }
 ```
@@ -187,10 +181,12 @@ export async function GET() {
 ```
 
 **パラメータ:**
+
 - `{service}`: サービス名（`service1`, `service2`, `service3`）
 - `{...path}`: AppServiceのエンドポイントパス
 
 **サポートされるHTTPメソッド:**
+
 - GET
 - POST
 - PUT
@@ -227,13 +223,13 @@ API_SERVICE_4_API_KEY=your-api-key-here
 2. **設定ファイルの更新**: `lib/config/api-config.ts` を編集
 
 ```typescript
-export type ApiServiceName = 'service1' | 'service2' | 'service3' | 'service4';
+export type ApiServiceName = "service1" | "service2" | "service3" | "service4";
 
 export function getApiConfig(serviceName: ApiServiceName): ApiServiceConfig {
   const configs: Record<ApiServiceName, ApiServiceConfig> = {
     // ... 既存のサービス
     service4: {
-      baseUrl: process.env.API_SERVICE_4_BASE_URL || 'http://localhost:8004',
+      baseUrl: process.env.API_SERVICE_4_BASE_URL || "http://localhost:8004",
       apiKey: process.env.API_SERVICE_4_API_KEY,
       timeout: 30000,
     },
@@ -243,15 +239,15 @@ export function getApiConfig(serviceName: ApiServiceName): ApiServiceConfig {
 }
 
 export function getAvailableServices(): ApiServiceName[] {
-  return ['service1', 'service2', 'service3', 'service4'];
+  return ["service1", "service2", "service3", "service4"];
 }
 ```
 
 3. **使用**: すぐに新しいサービスが利用可能になります
 
 ```tsx
-const client = createFrontendApiClient('service4');
-const response = await client.get('/endpoint');
+const client = createFrontendApiClient("service4");
+const response = await client.get("/endpoint");
 ```
 
 ## ディレクトリ構造
@@ -324,31 +320,31 @@ const response = await client.get('/endpoint');
 `useApi` フックを使用する際は、**requestFn を必ず `useCallback` でメモ化してください**。これを怠ると、無限再レンダリングやスタックオーバーフローが発生する可能性があります。
 
 **❌ 悪い例（スタックオーバーフローの原因）:**
+
 ```tsx
 // endpoint が変更されるたびに新しい関数が作成される
 const { data, error, loading, execute } = useApi(
-  'service1',
-  (client) => client.get(endpoint) // 危険！
+  "service1",
+  (client) => client.get(endpoint), // 危険！
 );
 ```
 
 **✅ 良い例:**
+
 ```tsx
-import { useCallback } from 'react';
+import { useCallback } from "react";
 
 // requestFn を useCallback でメモ化
 const requestFn = useCallback(
   (client) => client.get(endpoint),
-  [endpoint] // endpoint が変更されたときのみ再作成
+  [endpoint], // endpoint が変更されたときのみ再作成
 );
 
-const { data, error, loading, execute } = useApi(
-  'service1',
-  requestFn
-);
+const { data, error, loading, execute } = useApi("service1", requestFn);
 ```
 
 **詳細な説明:**
+
 - `useApi` の第2引数（`requestFn`）は、React の `useCallback` の依存配列に含まれています
 - インライン関数を使用すると、コンポーネントが再レンダリングされるたびに新しい関数が作成されます
 - これにより、`useApi` 内部の `useCallback` が毎回再実行され、無限ループが発生します
