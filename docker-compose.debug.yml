@@ -1,5 +1,5 @@
 # デバッグ環境用オーバーライド（ホットリロード有効・コーディングしながら動作確認する環境）
-# 使い方: docker compose -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml up --build
+# 使い方: docker compose --env-file .env.docker.debug -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml up --build
 version: '3.8'
 
 services:
@@ -14,6 +14,13 @@ services:
     environment:
       NODE_ENV: development
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:5000}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
+      API_SERVICE_1_BASE_URL: ${API_SERVICE_1_BASE_URL:-}
+      API_SERVICE_2_BASE_URL: ${API_SERVICE_2_BASE_URL:-}
+      API_SERVICE_3_BASE_URL: ${API_SERVICE_3_BASE_URL:-}
+      USER_API_BASE_URL: ${USER_API_BASE_URL:-}
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+      NEXT_PUBLIC_GOOGLE_REDIRECT_URI: ${NEXT_PUBLIC_GOOGLE_REDIRECT_URI:-}
       # webpack のファイル監視に polling を使用（Windows Docker 上での互換性向上）
       # Next.js 16 はデフォルトで Turbopack を使用するが、Turbopack は Docker bind mount の
       # ファイル変更イベントを検知できない。Dockerfile で --webpack フラグを指定し、
