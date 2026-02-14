@@ -48,6 +48,7 @@ export class FrontendApiClient {
       try {
         const session = await getSession();
         if (session?.accessToken) {
+          headers['Authorization'] = `Bearer ${session.accessToken}`;
           headers['X-Google-Access-Token'] = session.accessToken;
         }
       } catch (error) {
