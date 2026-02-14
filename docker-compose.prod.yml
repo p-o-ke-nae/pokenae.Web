@@ -17,6 +17,7 @@ services:
       - "${PORT:-3001}:3000"
     environment:
       NODE_ENV: production
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
     restart: unless-stopped
     # コンテナのリソース制限
     deploy:

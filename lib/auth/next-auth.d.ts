@@ -10,6 +10,8 @@ declare module 'next-auth' {
   interface Session {
     accessToken?: string;
     refreshToken?: string;
+    /** トークンリフレッシュ失敗時のエラー */
+    error?: string;
   }
 }
 
@@ -18,5 +20,7 @@ declare module 'next-auth/jwt' {
     accessToken?: string;
     refreshToken?: string;
     accessTokenExpires?: number;
+    /** トークンリフレッシュ失敗時のエラー */
+    error?: string;
   }
 }

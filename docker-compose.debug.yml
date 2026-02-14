@@ -13,6 +13,7 @@ services:
       - "${PORT:-5000}:3000"
     environment:
       NODE_ENV: development
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:5000}
       # webpack のファイル監視に polling を使用（Windows Docker 上での互換性向上）
       # Next.js 16 はデフォルトで Turbopack を使用するが、Turbopack は Docker bind mount の
       # ファイル変更イベントを検知できない。Dockerfile で --webpack フラグを指定し、
