@@ -7,6 +7,14 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 - **[Google OAuth2認証機能について](./docs/GOOGLE_AUTH_SETUP_JA.md)** - Google OAuth2認証の詳細解説（日本語）
 - **[Kernel Stack Overflow Investigation](./docs/KERNEL_STACK_OVERFLOW_INVESTIGATION.md)** - スタックオーバーフロー問題の調査と修正レポート
 
+## Development & Coding Policy
+
+- Docker Compose ベースの開発手順を前提とします（ローカル実行・検証・説明は Docker フローを優先）。
+- 認証方式は Google OAuth2（NextAuth）を前提とし、認証情報は環境変数・シークレット管理の設計に従います。
+- API リクエストでは Google 認証のアクセストークンを受け渡し・付与・検証する前提で実装します。
+- Next.js の標準機能（App Router / Route Handlers / Server Components）を最大限活用します。
+- UI はコンポーネント指向で設計し、既存の階層（atoms / molecules / organisms）と命名規則を尊重します。
+
 ## Getting Started
 
 First, run the development server:

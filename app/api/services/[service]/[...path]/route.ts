@@ -97,23 +97,40 @@ async function handleRequest(
       body = await parseRequestBody(request);
     }
 
+    // 認証ヘッダーを構築（Googleアクセストークンをバックエンドへ転送）
+    const sessionAccessToken = typeof session.accessToken === 'string'
+      ? session.accessToken
+      : undefined;
+    const authorizationHeader = request.headers.get('authorization');
+    const requestBearerToken = authorizationHeader?.toLowerCase().startsWith('bearer ')
+      ? authorizationHeader.slice(7).trim()
+      : undefined;
+    const requestGoogleToken = request.headers.get('x-google-access-token') ?? undefined;
+    const accessToken = sessionAccessToken || requestBearerToken || requestGoogleToken;
+
+    const proxyHeaders: Record<string, string> = {};
+    if (accessToken) {
+      proxyHeaders.Authorization = `Bearer ${accessToken}`;
+      proxyHeaders['X-Google-Access-Token'] = accessToken;
+    }
+
     // AppServiceにリクエストを転送
     let response;
     switch (method) {
       case 'GET':
-        response = await client.get(fullEndpoint);
+        response = await client.get(fullEndpoint, { headers: proxyHeaders });
         break;
       case 'POST':
-        response = await client.post(fullEndpoint, body);
+        response = await client.post(fullEndpoint, body, { headers: proxyHeaders });
         break;
       case 'PUT':
-        response = await client.put(fullEndpoint, body);
+        response = await client.put(fullEndpoint, body, { headers: proxyHeaders });
         break;
       case 'PATCH':
-        response = await client.patch(fullEndpoint, body);
+        response = await client.patch(fullEndpoint, body, { headers: proxyHeaders });
         break;
       case 'DELETE':
-        response = await client.delete(fullEndpoint);
+        response = await client.delete(fullEndpoint, { headers: proxyHeaders });
         break;
       default:
         return createErrorResponse('METHOD_NOT_ALLOWED', 'Method not allowed', 405);
