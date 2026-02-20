@@ -107,15 +107,16 @@ jobs:
     needs: build-develop
     permissions:
       contents: read
+      packages: read
     uses: ./.github/workflows/reusable-deploy-azure-container-apps.yml
     with:
       container_app_name: pokenae-web-develop
       resource_group: ${{ vars.AZURE_RESOURCE_GROUP }}
       image: ghcr.io/${{ github.repository_owner }}/pokenae-web:develop
       registry_server: ghcr.io
+      registry_username: ${{ github.actor }}
       env_vars: "NODE_ENV=production PORT=3000 NEXTAUTH_URL=${{ vars.DEV_NEXTAUTH_URL_ACA }}"
     secrets:
       azure_credentials: ${{ secrets.AZURE_CREDENTIALS }}
-      registry_username: ${{ secrets.GHCR_USERNAME }}
-      registry_password: ${{ secrets.GHCR_PASSWORD }}
+      registry_password: ${{ secrets.GITHUB_TOKEN }}
       secret_env_vars: "NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }} GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}"
