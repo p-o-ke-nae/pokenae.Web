@@ -156,14 +156,20 @@ jobs:
               ENV_ARGS="${ENV_ARGS} ${SET_SECRET_ENV}"
             fi
 
+            # レジストリ認証情報を設定（update は registry オプション非対応のため別途設定）
+            echo "[INFO] Setting registry credentials for ${{ inputs.registry_server }}..."
+            az containerapp registry set \
+              --name ${{ inputs.container_app_name }} \
+              --resource-group ${{ inputs.resource_group }} \
+              --server ${{ inputs.registry_server }} \
+              --username ${{ secrets.registry_username }} \
+              --password ${{ secrets.registry_password }}
+
             # コンテナイメージの更新
             UPDATE_CMD="az containerapp update \
               --name ${{ inputs.container_app_name }} \
               --resource-group ${{ inputs.resource_group }} \
-              --image ${{ inputs.image }} \
-              --registry-server ${{ inputs.registry_server }} \
-              --registry-username ${{ secrets.registry_username }} \
-              --registry-password ${{ secrets.registry_password }}"
+              --image ${{ inputs.image }}"
 
             if [ -n "${ENV_ARGS}" ]; then
               UPDATE_CMD="${UPDATE_CMD} --set-env-vars ${ENV_ARGS}"
