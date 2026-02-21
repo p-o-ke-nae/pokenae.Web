@@ -22,6 +22,7 @@ export default function Home() {
           </h1>
           <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
             pokenaeへようこそ。
+            完成までもうしばらくお待ちください．
             {status === 'authenticated' && (
               <span className="block mt-2 text-green-600 dark:text-green-400">
                 ログイン済み: {session?.user?.name}
