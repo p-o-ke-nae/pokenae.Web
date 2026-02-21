@@ -107,7 +107,7 @@ Container Apps 環境は、複数の Container App が共有するネットワ�
    | イメージソース | **Docker Hub またはその他のレジストリ** |
    | イメージの種類 | **パブリック** または **プライベート** |
    | レジストリサーバー | `ghcr.io` |
-   | イメージとタグ | `<GitHubユーザー名>/pokenae-web:main` |
+   | イメージとタグ | `<GitHubユーザー名>/pokenae-web:develop` |
 
    **リソース割り当て**:
    | 項目 | 値 |
