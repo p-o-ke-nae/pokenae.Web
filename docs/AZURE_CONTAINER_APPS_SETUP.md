@@ -82,8 +82,8 @@ Container Apps 環境は、複数の Container App が共有するネットワ�
 
 > **CLI 自動化**: `setup-azure-aca.sh` の **ステップ 3** に該当
 
-本番用 (`pokenae-web-prod`) と開発用 (`pokenae-web-dev`) をそれぞれ作成します。  
-以下は本番用の例ですが、開発用も同じ手順で名前を変えて作成してください。
+本番用 (`pokenae-web-prod`)、開発用 (`pokenae-web-develop`)、Copilot 検証用 (`pokenae-web-copilot`) をそれぞれ作成します。  
+以下は本番用の例ですが、開発用・Copilot 用も同じ手順で名前を変えて作成してください。
 
 ### Azure Portal での手順
 
@@ -98,15 +98,16 @@ Container Apps 環境は、複数の Container App が共有するネットワ�
    | Container Apps 環境 | `cae-pokenae`（前ステップで作成） |
    | リージョン | `Japan East` |
 
+   > **開発用**: コンテナアプリ名を `pokenae-web-develop` にして同様に作成してください。  
+   > **Copilot 検証用**: コンテナアプリ名を `pokenae-web-copilot` にして同様に作成してください。
+
 4. **「コンテナー」** タブ:
    | 項目 | 値 |
    |------|-----|
    | イメージソース | **Docker Hub またはその他のレジストリ** |
    | イメージの種類 | **パブリック** または **プライベート** |
    | レジストリサーバー | `ghcr.io` |
-   | イメージとタグ | `<GitHubユーザー名>/pokenae-web:main` |
-   | レジストリユーザー名 | （GHCR 用 GitHub ユーザー名） |
-   | レジストリパスワード | （GitHub PAT: `read:packages` スコープ） |
+   | イメージとタグ | `<GitHubユーザー名>/pokenae-web:develop` |
 
    **リソース割り当て**:
    | 項目 | 値 |
@@ -211,8 +212,6 @@ GitHub Actions のワークフローが参照するシークレットと変数�
 | Secret 名              | 値                                    | 説明                         |
 | ---------------------- | ------------------------------------- | ---------------------------- |
 | `AZURE_CREDENTIALS`    | サービスプリンシパルの JSON 全体      | ステップ 5-1 で取得した JSON |
-| `GHCR_USERNAME`        | GitHub ユーザー名                     | GHCR ログイン用              |
-| `GHCR_PASSWORD`        | GitHub PAT (`read:packages`)          | GHCR プル用のトークン        |
 | `NEXTAUTH_SECRET`      | NextAuth のシークレット               | （既存のシークレットを流用） |
 | `GOOGLE_CLIENT_ID`     | Google OAuth クライアント ID          | （既存のシークレットを流用） |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth クライアントシークレット | （既存のシークレットを流用） |
@@ -223,11 +222,12 @@ GitHub Actions のワークフローが参照するシークレットと変数�
 
 **「Variables」** タブ → **「New repository variable」** で以下を追加:
 
-| Variable 名             | 値の例                                                        | 説明               |
-| ----------------------- | ------------------------------------------------------------- | ------------------ |
-| `AZURE_RESOURCE_GROUP`  | `ASPGroup`                                                    | リソースグループ名 |
-| `PROD_NEXTAUTH_URL_ACA` | `https://pokenae-web-prod.<リージョン>.azurecontainerapps.io` | 本番 ACA の FQDN   |
-| `DEV_NEXTAUTH_URL_ACA`  | `https://pokenae-web-dev.<リージョン>.azurecontainerapps.io`  | 開発 ACA の FQDN   |
+| Variable 名                | 値の例                                                           | 説明                       |
+| -------------------------- | ---------------------------------------------------------------- | -------------------------- |
+| `AZURE_RESOURCE_GROUP`     | `ASPGroup`                                                       | リソースグループ名         |
+| `PROD_NEXTAUTH_URL_ACA`    | `https://pokenae-web-prod.<リージョン>.azurecontainerapps.io`    | 本番 ACA の FQDN           |
+| `DEV_NEXTAUTH_URL_ACA`     | `https://pokenae-web-develop.<リージョン>.azurecontainerapps.io` | 開発 ACA の FQDN           |
+| `COPILOT_NEXTAUTH_URL_ACA` | `https://pokenae-web-copilot.<リージョン>.azurecontainerapps.io` | Copilot 検証用 ACA の FQDN |
 
 > **FQDN の確認方法**: Azure Portal → Container App → **「概要」** → **「アプリケーション URL」** に表示されます。
 
@@ -257,9 +257,9 @@ ACA ではカスタムドメインの設定とマネージド TLS 証明書の�
 
 ### デプロイの実行
 
-1. `main` または `develop` ブランチに push
+1. `main`、`develop`、または `copilot/**` ブランチに push
 2. GitHub Actions の **「Actions」** タブでワークフローの実行を確認
-3. `deploy-main-aca` / `deploy-develop-aca` ジョブが成功することを確認
+3. `deploy-main-aca` / `deploy-develop-aca` / `deploy-copilot-aca` ジョブが成功することを確認
 
 ### アプリケーションの確認
 
@@ -309,7 +309,8 @@ Azure サブスクリプション
 └── ASPGroup（リソースグループ）
     ├── cae-pokenae（Container Apps 環境）
     │   ├── pokenae-web-prod（Container App: 本番）
-    │   └── pokenae-web-dev（Container App: 開発）
+    │   ├── pokenae-web-develop（Container App: 開発）
+    │   └── pokenae-web-copilot（Container App: Copilot 検証用）
     ├── Log Analytics ワークスペース（ログ基盤）
     └── sp-pokenae-github-actions（サービスプリンシパル）
 ```
@@ -317,18 +318,24 @@ Azure サブスクリプション
 ## CI/CD フロー
 
 ```
-GitHub (push to main/develop)
+GitHub (push to main / develop / copilot/**)
   │
   ├── test（lint + テスト）
   │
-  ├── build-main / build-develop
+  ├── build-main / build-develop / build-copilot
   │     └── Docker イメージを GHCR に push
+  │         └── copilot/** ブランチは全て :copilot タグで上書き
   │
   ├── deploy-*-vps（既存の VPS デプロイ）
   │
-  └── deploy-*-aca（Azure Container Apps デプロイ）  ← NEW
+  └── deploy-*-aca（Azure Container Apps デプロイ）
         ├── Azure にログイン（サービスプリンシパル）
         ├── シークレットを ACA に登録
         ├── コンテナイメージを更新
         └── ヘルスチェックで検証
+
+      branch と Container App の対応:
+        main       → pokenae-web-prod    (GHCR タグ: :main)
+        develop    → pokenae-web-develop (GHCR タグ: :develop)
+        copilot/** → pokenae-web-copilot (GHCR タグ: :copilot)
 ```
