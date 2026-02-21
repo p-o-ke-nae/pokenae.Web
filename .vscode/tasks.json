@@ -7,6 +7,8 @@
       "command": "docker",
       "args": [
         "compose",
+        "--env-file",
+        ".env.docker.debug",
         "-p",
         "pokenae-debug",
         "-f",
@@ -29,6 +31,8 @@
       "command": "docker",
       "args": [
         "compose",
+        "--env-file",
+        ".env.docker.development",
         "-p",
         "pokenae-dev",
         "-f",
@@ -46,13 +50,10 @@
       "label": "Docker Compose: Prod 起動",
       "type": "shell",
       "command": "docker",
-      "options": {
-        "env": {
-          "NEXTAUTH_URL": "http://localhost:3001"
-        }
-      },
       "args": [
         "compose",
+        "--env-file",
+        ".env.docker.production",
         "-p",
         "pokenae-prod",
         "-f",
@@ -72,6 +73,8 @@
       "command": "docker",
       "args": [
         "compose",
+        "--env-file",
+        ".env.docker.debug",
         "-p",
         "pokenae-debug",
         "-f",
@@ -88,6 +91,8 @@
       "command": "docker",
       "args": [
         "compose",
+        "--env-file",
+        ".env.docker.development",
         "-p",
         "pokenae-dev",
         "-f",
@@ -104,6 +109,8 @@
       "command": "docker",
       "args": [
         "compose",
+        "--env-file",
+        ".env.docker.production",
         "-p",
         "pokenae-prod",
         "-f",
@@ -117,7 +124,7 @@
     {
       "label": "Docker Compose: All 停止",
       "type": "shell",
-      "command": "docker compose -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml down; docker compose -p pokenae-dev -f docker-compose.yml -f docker-compose.dev.yml down; docker compose -p pokenae-prod -f docker-compose.yml -f docker-compose.prod.yml down",
+      "command": "docker compose --env-file .env.docker.debug -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml down; docker compose --env-file .env.docker.development -p pokenae-dev -f docker-compose.yml -f docker-compose.dev.yml down; docker compose --env-file .env.docker.production -p pokenae-prod -f docker-compose.yml -f docker-compose.prod.yml down",
       "problemMatcher": []
     }
   ]

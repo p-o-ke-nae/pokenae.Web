@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - copilot/**
   pull_request:
     types: [closed]
     branches:
@@ -96,27 +97,66 @@ jobs:
       google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
       google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
 
-  deploy-develop-vps:
+  # =================================================================
+  # Azure Container Apps デプロイ（develop ブランチ → ACA 開発環境）
+  # reusable-deploy-azure-container-apps.yml はアプリ種類に依存しない
+  # 汎用ワークフロー。環境変数は env_vars / secret_env_vars で指定。
+  # =================================================================
+
+  # =================================================================
+  # Azure Container Apps デプロイ（copilot/** ブランチ → ACA Copilot 環境）
+  # Copilot コーディングエージェントが作成するブランチへの push 時にデプロイ
+  # =================================================================
+
+  build-copilot:
+    if: github.event_name == 'push' && startsWith(github.ref_name, 'copilot/')
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      image_tag: copilot
+      environment: development
+    secrets:
+      api_url: ${{ secrets.DEV_API_URL }}
+      google_redirect_uri: ${{ secrets.DEV_GOOGLE_REDIRECT_URI }}
+      google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
+
+  deploy-copilot-aca:
+    if: github.event_name == 'push' && startsWith(github.ref_name, 'copilot/')
+    needs: build-copilot
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/reusable-deploy-azure-container-apps.yml
+    with:
+      container_app_name: pokenae-web-copilot
+      resource_group: ${{ vars.AZURE_RESOURCE_GROUP }}
+      image: ghcr.io/${{ github.repository_owner }}/pokenae-web:copilot
+      registry_server: ghcr.io
+      registry_username: ${{ github.actor }}
+      env_vars: "NODE_ENV=production PORT=3000 NEXTAUTH_URL=${{ vars.COPILOT_NEXTAUTH_URL_ACA }}"
+    secrets:
+      azure_credentials: ${{ secrets.AZURE_CREDENTIALS }}
+      registry_password: ${{ secrets.GITHUB_TOKEN }}
+      secret_env_vars: "NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }} GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}"
+
+  deploy-develop-aca:
     if: github.event_name == 'push' && github.ref_name == 'develop'
     needs: build-develop
     permissions:
       contents: read
       packages: read
-    # 将来 Azure App Service に切り替える場合は、
-    # uses を reusable-deploy-azure-appservice.yml に変更し、
-    # app_name / publish profile secret を渡す構成に置き換える。
-    uses: ./.github/workflows/reusable-deploy-vps.yml
+    uses: ./.github/workflows/reusable-deploy-azure-container-apps.yml
     with:
-      compose_file: docker-compose.dev.yml
-      project_name: pokenae-dev
-      container_name: pokenae-web-dev
-      image_tag: develop
-      port: "3002"
+      container_app_name: pokenae-web-develop
+      resource_group: ${{ vars.AZURE_RESOURCE_GROUP }}
+      image: ghcr.io/${{ github.repository_owner }}/pokenae-web:develop
+      registry_server: ghcr.io
+      registry_username: ${{ github.actor }}
+      env_vars: "NODE_ENV=production PORT=3000 NEXTAUTH_URL=${{ vars.DEV_NEXTAUTH_URL_ACA }}"
     secrets:
-      host: ${{ secrets.HOST }}
-      username: ${{ secrets.USERNAME }}
-      ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
-      nextauth_url: ${{ secrets.DEV_NEXTAUTH_URL }}
-      nextauth_secret: ${{ secrets.NEXTAUTH_SECRET }}
-      google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
-      google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      azure_credentials: ${{ secrets.AZURE_CREDENTIALS }}
+      registry_password: ${{ secrets.GITHUB_TOKEN }}
+      secret_env_vars: "NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }} GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}"
