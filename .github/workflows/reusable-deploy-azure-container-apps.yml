@@ -141,6 +141,16 @@ jobs:
           inlineScript: |
             set -euo pipefail
 
+            # レジストリ認証情報を最初に設定
+            # （secret set が内部でリビジョン作成を試みるため、先に認証情報を登録する必要がある）
+            echo "[INFO] Setting registry credentials for ${{ inputs.registry_server }}..."
+            az containerapp registry set \
+              --name ${{ inputs.container_app_name }} \
+              --resource-group ${{ inputs.resource_group }} \
+              --server ${{ inputs.registry_server }} \
+              --username ${{ inputs.registry_username }} \
+              --password ${{ secrets.registry_password }}
+
             # シークレットの登録（存在する場合）
             if [ -n "${SET_SECRETS}" ]; then
               echo "[INFO] Setting ACA secrets..."
@@ -158,15 +168,6 @@ jobs:
             if [ -n "${SET_SECRET_ENV}" ]; then
               ENV_ARGS="${ENV_ARGS} ${SET_SECRET_ENV}"
             fi
-
-            # レジストリ認証情報を設定（update は registry オプション非対応のため別途設定）
-            echo "[INFO] Setting registry credentials for ${{ inputs.registry_server }}..."
-            az containerapp registry set \
-              --name ${{ inputs.container_app_name }} \
-              --resource-group ${{ inputs.resource_group }} \
-              --server ${{ inputs.registry_server }} \
-              --username ${{ inputs.registry_username }} \
-              --password ${{ secrets.registry_password }}
 
             # コンテナイメージの更新
             UPDATE_CMD="az containerapp update \
