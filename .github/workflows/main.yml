@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - copilot/**
   pull_request:
     types: [closed]
     branches:
@@ -101,6 +102,45 @@ jobs:
   # reusable-deploy-azure-container-apps.yml はアプリ種類に依存しない
   # 汎用ワークフロー。環境変数は env_vars / secret_env_vars で指定。
   # =================================================================
+
+  # =================================================================
+  # Azure Container Apps デプロイ（copilot/** ブランチ → ACA Copilot 環境）
+  # Copilot コーディングエージェントが作成するブランチへの push 時にデプロイ
+  # =================================================================
+
+  build-copilot:
+    if: github.event_name == 'push' && startsWith(github.ref_name, 'copilot/')
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      image_tag: copilot
+      environment: development
+    secrets:
+      api_url: ${{ secrets.DEV_API_URL }}
+      google_redirect_uri: ${{ secrets.DEV_GOOGLE_REDIRECT_URI }}
+      google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
+
+  deploy-copilot-aca:
+    if: github.event_name == 'push' && startsWith(github.ref_name, 'copilot/')
+    needs: build-copilot
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/reusable-deploy-azure-container-apps.yml
+    with:
+      container_app_name: pokenae-web-copilot
+      resource_group: ${{ vars.AZURE_RESOURCE_GROUP }}
+      image: ghcr.io/${{ github.repository_owner }}/pokenae-web:copilot
+      registry_server: ghcr.io
+      registry_username: ${{ github.actor }}
+      env_vars: "NODE_ENV=production PORT=3000 NEXTAUTH_URL=${{ vars.COPILOT_NEXTAUTH_URL_ACA }}"
+    secrets:
+      azure_credentials: ${{ secrets.AZURE_CREDENTIALS }}
+      registry_password: ${{ secrets.GITHUB_TOKEN }}
+      secret_env_vars: "NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }} GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}"
 
   deploy-develop-aca:
     if: github.event_name == 'push' && github.ref_name == 'develop'
