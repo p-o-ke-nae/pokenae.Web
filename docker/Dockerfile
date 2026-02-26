@@ -63,8 +63,11 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-# Node.js のメモリ制限
-ENV NODE_OPTIONS="--max-old-space-size=256"
+# Node.js の V8 ヒープ制限
+# コンテナの memory limit (768M) に対して十分な余裕を確保する。
+# Node.js RSS = V8ヒープ + コードキャッシュ + バッファ + ネイティブ等 のため、
+# ヒープ上限をコンテナ制限の約半分に設定する。
+ENV NODE_OPTIONS="--max-old-space-size=384"
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
