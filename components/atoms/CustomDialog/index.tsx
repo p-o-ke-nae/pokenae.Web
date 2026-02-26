@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useEffect, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useRef } from "react";
 import type { HTMLAttributes, ReactNode } from "react";
 
 export type CustomDialogProps = HTMLAttributes<HTMLDialogElement> & {
@@ -13,25 +13,37 @@ export type CustomDialogProps = HTMLAttributes<HTMLDialogElement> & {
 
 const CustomDialog = forwardRef<HTMLDialogElement, CustomDialogProps>(
 	({ open, onClose, title, children, footer, className = "", ...rest }, ref) => {
-		const internalRef = useRef<HTMLDialogElement>(null);
-		const dialogRef = (ref as React.RefObject<HTMLDialogElement>) ?? internalRef;
+		const localRef = useRef<HTMLDialogElement>(null);
+
+		// forwarded ref (RefObject or callback ref) と localRef を安全にマージ
+		const setRef = useCallback(
+			(node: HTMLDialogElement | null) => {
+				(localRef as React.MutableRefObject<HTMLDialogElement | null>).current = node;
+				if (typeof ref === "function") {
+					ref(node);
+				} else if (ref) {
+					(ref as React.MutableRefObject<HTMLDialogElement | null>).current = node;
+				}
+			},
+			[ref]
+		);
 
 		useEffect(() => {
-			const dialog = dialogRef.current;
+			const dialog = localRef.current;
 			if (!dialog) return;
 			if (open && !dialog.open) {
 				dialog.showModal();
 			} else if (!open && dialog.open) {
 				dialog.close();
 			}
-		}, [open, dialogRef]);
+		}, [open]);
 
 		const classes = ["custom-dialog", className].filter(Boolean).join(" ");
 
 		return (
 			<>
 				<dialog
-					ref={dialogRef}
+					ref={setRef}
 					className={classes}
 					onClose={onClose}
 					{...rest}
@@ -60,52 +72,74 @@ const CustomDialog = forwardRef<HTMLDialogElement, CustomDialogProps>(
 						position: fixed;
 						top: 50%;
 						left: 50%;
-						translate: -50% -50%;
+						transform: translate(-50%, -50%);
 						margin: 0;
 						width: min(90vw, 28rem);
 						border: none;
-						border-radius: 0.75rem;
+						border-radius: 0.875rem;
 						background-color: var(--color-base-70-light);
 						color: var(--color-text-strong);
-						box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+						box-shadow:
+							0 0 0 1px var(--color-base-70-dark),
+							0 24px 64px rgba(31, 31, 42, 0.18);
 						padding: 0;
 						overflow: hidden;
 					}
 
+					.custom-dialog[open] {
+						animation: custom-dialog-enter 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+					}
+
 					.custom-dialog::backdrop {
-						background-color: rgba(0, 0, 0, 0.4);
-						backdrop-filter: blur(2px);
+						background-color: rgba(31, 31, 42, 0.45);
+						backdrop-filter: blur(3px);
+						animation: custom-dialog-backdrop-enter 220ms ease forwards;
 					}
 
 					.custom-dialog__header {
 						display: flex;
 						align-items: center;
 						justify-content: space-between;
-						padding: 1rem 1.25rem 0.75rem;
+						padding: 1rem 1.25rem 0.875rem;
 						border-bottom: 1px solid var(--color-base-70-dark);
+						background: linear-gradient(
+							to bottom,
+							color-mix(in srgb, var(--color-accent-25) 6%, var(--color-base-70-light)),
+							var(--color-base-70-light)
+						);
 					}
 
 					.custom-dialog__title {
-						font-size: 1rem;
+						font-size: 0.9375rem;
 						font-weight: 700;
 						margin: 0;
+						letter-spacing: -0.01em;
 					}
 
 					.custom-dialog__close {
+						display: inline-flex;
+						align-items: center;
+						justify-content: center;
+						width: 1.75rem;
+						height: 1.75rem;
 						background: none;
 						border: none;
 						cursor: pointer;
-						font-size: 1rem;
+						font-size: 0.875rem;
 						color: var(--color-text-strong);
-						opacity: 0.6;
-						padding: 0.25rem;
-						line-height: 1;
-						border-radius: 0.25rem;
-						transition: opacity 120ms ease;
+						opacity: 0.5;
+						border-radius: 0.375rem;
+						transition: opacity 120ms ease, background-color 120ms ease;
 					}
 
 					.custom-dialog__close:hover {
 						opacity: 1;
+						background-color: var(--color-base-70);
+					}
+
+					.custom-dialog__close:focus-visible {
+						outline: 2px solid var(--color-accent-25);
+						outline-offset: 1px;
 					}
 
 					.custom-dialog__body {
@@ -116,8 +150,29 @@ const CustomDialog = forwardRef<HTMLDialogElement, CustomDialogProps>(
 						display: flex;
 						justify-content: flex-end;
 						gap: 0.5rem;
-						padding: 0.75rem 1.25rem 1rem;
+						padding: 0.875rem 1.25rem;
 						border-top: 1px solid var(--color-base-70-dark);
+						background-color: color-mix(in srgb, var(--color-base-70) 40%, var(--color-base-70-light));
+					}
+
+					@keyframes custom-dialog-enter {
+						from {
+							opacity: 0;
+							transform: translate(-50%, calc(-50% + 4px)) scale(0.96);
+						}
+						to {
+							opacity: 1;
+							transform: translate(-50%, -50%) scale(1);
+						}
+					}
+
+					@keyframes custom-dialog-backdrop-enter {
+						from {
+							opacity: 0;
+						}
+						to {
+							opacity: 1;
+						}
 					}
 				`}</style>
 			</>
@@ -128,3 +183,4 @@ const CustomDialog = forwardRef<HTMLDialogElement, CustomDialogProps>(
 CustomDialog.displayName = "CustomDialog";
 
 export default CustomDialog;
+

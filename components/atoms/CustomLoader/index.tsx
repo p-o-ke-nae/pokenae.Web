@@ -25,7 +25,8 @@ const CustomLoader = forwardRef<HTMLSpanElement, CustomLoaderProps>(
 					className={classes}
 					{...rest}
 				>
-					<span className="custom-loader__spinner" aria-hidden="true" />
+					<span className="custom-loader__ring" aria-hidden="true" />
+					<span className="custom-loader__dot" aria-hidden="true" />
 				</span>
 
 				<style jsx>{`
@@ -33,35 +34,74 @@ const CustomLoader = forwardRef<HTMLSpanElement, CustomLoaderProps>(
 						display: inline-flex;
 						align-items: center;
 						justify-content: center;
+						position: relative;
 					}
 
-					.custom-loader__spinner {
+					.custom-loader__ring {
 						display: block;
 						border-radius: 50%;
-						border: 2px solid var(--color-base-70-dark);
+						border-style: solid;
+						border-color: var(--color-base-70-dark);
 						border-top-color: var(--color-accent-25);
-						animation: custom-loader-spin 0.7s linear infinite;
+						border-right-color: color-mix(in srgb, var(--color-accent-25) 50%, var(--color-base-70-dark));
+						animation: custom-loader-spin 0.75s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 					}
 
-					.custom-loader--sm .custom-loader__spinner {
-						width: 1rem;
-						height: 1rem;
+					.custom-loader__dot {
+						display: block;
+						position: absolute;
+						border-radius: 50%;
+						background-color: var(--color-accent-25);
+						animation: custom-loader-pulse 0.75s cubic-bezier(0.4, 0, 0.6, 1) infinite alternate;
 					}
 
-					.custom-loader--md .custom-loader__spinner {
-						width: 1.5rem;
-						height: 1.5rem;
+					.custom-loader--sm .custom-loader__ring {
+						width: 1.125rem;
+						height: 1.125rem;
+						border-width: 2px;
 					}
 
-					.custom-loader--lg .custom-loader__spinner {
-						width: 2.5rem;
-						height: 2.5rem;
+					.custom-loader--sm .custom-loader__dot {
+						width: 0.3rem;
+						height: 0.3rem;
+					}
+
+					.custom-loader--md .custom-loader__ring {
+						width: 1.75rem;
+						height: 1.75rem;
+						border-width: 2.5px;
+					}
+
+					.custom-loader--md .custom-loader__dot {
+						width: 0.4rem;
+						height: 0.4rem;
+					}
+
+					.custom-loader--lg .custom-loader__ring {
+						width: 2.75rem;
+						height: 2.75rem;
 						border-width: 3px;
+					}
+
+					.custom-loader--lg .custom-loader__dot {
+						width: 0.55rem;
+						height: 0.55rem;
 					}
 
 					@keyframes custom-loader-spin {
 						to {
 							transform: rotate(360deg);
+						}
+					}
+
+					@keyframes custom-loader-pulse {
+						from {
+							opacity: 0.4;
+							transform: scale(0.75);
+						}
+						to {
+							opacity: 1;
+							transform: scale(1);
 						}
 					}
 				`}</style>
@@ -73,3 +113,4 @@ const CustomLoader = forwardRef<HTMLSpanElement, CustomLoaderProps>(
 CustomLoader.displayName = "CustomLoader";
 
 export default CustomLoader;
+

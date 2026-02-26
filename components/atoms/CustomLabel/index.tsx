@@ -27,16 +27,19 @@ const CustomLabel = forwardRef<HTMLLabelElement, CustomLabelProps>(
 						display: inline-flex;
 						align-items: center;
 						gap: 0.25rem;
-						font-size: 0.875rem;
-						font-weight: 500;
+						font-size: 0.8125rem;
+						font-weight: 600;
 						color: var(--color-text-strong);
 						line-height: 1.4;
+						letter-spacing: 0.01em;
 					}
 
 					.custom-label__required {
-						color: #e53e3e;
-						font-size: 0.75rem;
-						margin-left: 0.125rem;
+						color: var(--color-accent-25-strong);
+						font-size: 0.875rem;
+						font-weight: 700;
+						margin-left: 0.1rem;
+						line-height: 1;
 					}
 				`}</style>
 			</>
@@ -47,3 +50,4 @@ const CustomLabel = forwardRef<HTMLLabelElement, CustomLabelProps>(
 CustomLabel.displayName = "CustomLabel";
 
 export default CustomLabel;
+

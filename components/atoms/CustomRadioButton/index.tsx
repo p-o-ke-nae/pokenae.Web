@@ -15,14 +15,26 @@ const CustomRadioButton = forwardRef<HTMLInputElement, CustomRadioButtonProps>(
 
 				<style jsx>{`
 					.custom-radio {
-						width: 1rem;
-						height: 1rem;
+						appearance: none;
+						-webkit-appearance: none;
+						display: inline-block;
+						width: 1.125rem;
+						height: 1.125rem;
+						flex-shrink: 0;
 						border-radius: 50%;
 						border: 1.5px solid var(--color-base-70-dark);
 						background-color: var(--color-base-70-light);
-						accent-color: var(--color-accent-25);
 						cursor: pointer;
-						transition: border-color 120ms ease, box-shadow 120ms ease;
+						transition:
+							border-color 120ms ease,
+							background-color 120ms ease,
+							box-shadow 120ms ease;
+						vertical-align: middle;
+					}
+
+					.custom-radio:hover:not(:disabled) {
+						border-color: var(--color-accent-25);
+						box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-25) 15%, transparent);
 					}
 
 					.custom-radio:focus-visible {
@@ -30,8 +42,18 @@ const CustomRadioButton = forwardRef<HTMLInputElement, CustomRadioButtonProps>(
 						outline-offset: 2px;
 					}
 
+					.custom-radio:checked {
+						border-color: var(--color-accent-25-strong);
+						border-width: 2px;
+						background-image: radial-gradient(
+							circle,
+							var(--color-accent-25) 42%,
+							transparent 42%
+						);
+					}
+
 					.custom-radio:disabled {
-						opacity: 0.65;
+						opacity: 0.5;
 						cursor: not-allowed;
 					}
 				`}</style>
@@ -43,3 +65,4 @@ const CustomRadioButton = forwardRef<HTMLInputElement, CustomRadioButtonProps>(
 CustomRadioButton.displayName = "CustomRadioButton";
 
 export default CustomRadioButton;
+
