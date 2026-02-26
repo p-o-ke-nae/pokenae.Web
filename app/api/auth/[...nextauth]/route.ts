@@ -1,21 +1,15 @@
 /**
  * NextAuth.js APIルート
  * すべての認証リクエストを処理
+ *
+ * ハンドラーはモジュールレベルで一度だけ生成する。
+ * リクエストごとに NextAuth() を呼ぶと内部状態・イベントリスナーが
+ * 蓄積してメモリリークが発生するため、シングルトンパターンを採用する。
  */
 
 import NextAuth from 'next-auth';
 import { getAuthOptions } from '@/lib/auth/auth-options';
 
-type NextAuthRouteContext = {
-  params: Promise<{ nextauth: string[] }>;
-};
+const handler = NextAuth(getAuthOptions());
 
-export async function GET(request: Request, context: NextAuthRouteContext) {
-	const handler = NextAuth(getAuthOptions());
-	return handler(request, context);
-}
-
-export async function POST(request: Request, context: NextAuthRouteContext) {
-	const handler = NextAuth(getAuthOptions());
-	return handler(request, context);
-}
+export { handler as GET, handler as POST };
