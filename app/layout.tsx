@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import NavigationBar from "@/components/organisms/NavigationBar";
 import SessionProvider from "@/components/organisms/SessionProvider";
+import Footer from "@/components/organisms/Footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,6 +34,7 @@ export default function RootLayout({
         <SessionProvider>
           <NavigationBar />
           {children}
+          <Footer />
         </SessionProvider>
       </body>
     </html>
