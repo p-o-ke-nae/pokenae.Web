@@ -11,6 +11,12 @@ export default function Footer() {
           >
             プライバシーポリシー
           </Link>
+          <Link
+            href="/terms-of-service"
+            className="hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+          >
+            利用規約
+          </Link>
         </div>
       </div>
     </footer>
