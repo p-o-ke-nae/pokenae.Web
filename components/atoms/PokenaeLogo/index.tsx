@@ -7,13 +7,13 @@ export type PokenaeLogo = {
 	replay: () => void;
 };
 
-export type PokenadLogoProps = HTMLAttributes<SVGSVGElement> & {
+export type PokenaeLogoProps = HTMLAttributes<SVGSVGElement> & {
 	width?: number;
 	height?: number;
 	autoPlay?: boolean;
 };
 
-const PokenaeLogo = forwardRef<PokenaeLogo, PokenadLogoProps>(
+const PokenaeLogo = forwardRef<PokenaeLogo, PokenaeLogoProps>(
 	({ width = 200, height = 60, autoPlay = true, className = "", ...rest }, ref) => {
 		const pathRef = useRef<SVGTextElement>(null);
 

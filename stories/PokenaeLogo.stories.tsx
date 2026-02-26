@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import React from 'react';
 import PokenaeLogo, { type PokenaeLogo as PokenaeLogoRef } from '../components/atoms/PokenaeLogo';
 import CustomButton from '../components/atoms/CustomButton';
 import { useRef } from 'react';
@@ -27,7 +28,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-const WithReplayDemo = (args: typeof meta['args']) => {
+const WithReplayDemo = (args: React.ComponentProps<typeof PokenaeLogo>) => {
   const logoRef = useRef<PokenaeLogoRef>(null);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
