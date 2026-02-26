@@ -3,21 +3,21 @@
 import { forwardRef } from "react";
 import type { InputHTMLAttributes } from "react";
 
-export type CustomCheckBoxProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type">;
+export type CustomRadioButtonProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type">;
 
-const CustomCheckBox = forwardRef<HTMLInputElement, CustomCheckBoxProps>(
+const CustomRadioButton = forwardRef<HTMLInputElement, CustomRadioButtonProps>(
 	({ className = "", ...rest }, ref) => {
-		const classes = ["custom-checkbox", className].filter(Boolean).join(" ");
+		const classes = ["custom-radio", className].filter(Boolean).join(" ");
 
 		return (
 			<>
-				<input ref={ref} type="checkbox" className={classes} {...rest} />
+				<input ref={ref} type="radio" className={classes} {...rest} />
 
 				<style jsx>{`
-					.custom-checkbox {
+					.custom-radio {
 						width: 1rem;
 						height: 1rem;
-						border-radius: 0.25rem;
+						border-radius: 50%;
 						border: 1.5px solid var(--color-base-70-dark);
 						background-color: var(--color-base-70-light);
 						accent-color: var(--color-accent-25);
@@ -25,12 +25,12 @@ const CustomCheckBox = forwardRef<HTMLInputElement, CustomCheckBoxProps>(
 						transition: border-color 120ms ease, box-shadow 120ms ease;
 					}
 
-					.custom-checkbox:focus-visible {
+					.custom-radio:focus-visible {
 						outline: 2px solid var(--color-accent-25);
 						outline-offset: 2px;
 					}
 
-					.custom-checkbox:disabled {
+					.custom-radio:disabled {
 						opacity: 0.65;
 						cursor: not-allowed;
 					}
@@ -40,6 +40,6 @@ const CustomCheckBox = forwardRef<HTMLInputElement, CustomCheckBoxProps>(
 	}
 );
 
-CustomCheckBox.displayName = "CustomCheckBox";
+CustomRadioButton.displayName = "CustomRadioButton";
 
-export default CustomCheckBox;
+export default CustomRadioButton;
