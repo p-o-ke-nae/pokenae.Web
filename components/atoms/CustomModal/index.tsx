@@ -59,6 +59,7 @@ const CustomModal = forwardRef<HTMLDialogElement, CustomModalProps>(
 							0 24px 64px rgba(31, 31, 42, 0.18);
 						padding: 0;
 						overflow: hidden;
+						outline: none;
 					}
 
 					.custom-modal[open] {

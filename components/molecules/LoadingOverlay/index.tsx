@@ -15,19 +15,24 @@ const LoadingOverlay = ({ open, message = resources.loadingOverlay.message }: Lo
 			<CustomModal
 				open={open}
 				aria-label={message}
-				style={{
-					background: "white",
-					boxShadow: "none",
-					border: "2px solid var(--color-accent-25)",
-					overflow: "visible",
-					borderRadius: "1rem",
-				}}
+				className="loading-overlay-modal"
 			>
 				<div className="loading-overlay">
 					<CustomLoader size="lg" variant="bold" />
 					<p className="loading-overlay__message">{message}</p>
 				</div>
 			</CustomModal>
+
+			<style jsx global>{`
+				dialog.loading-overlay-modal {
+					background: white;
+					box-shadow: none;
+					border: 2px solid var(--color-accent-25);
+					overflow: visible;
+					border-radius: 1rem;
+					outline: none;
+				}
+			`}</style>
 
 			<style jsx>{`
 				.loading-overlay {
