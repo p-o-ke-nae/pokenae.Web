@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import CustomDialog from '../components/atoms/CustomDialog';
+import CustomDialog from '../components/molecules/CustomDialog';
 import CustomButton from '../components/atoms/CustomButton';
 import { useState } from 'react';
 
 const meta = {
-  title: 'Atoms/CustomDialog',
+  title: 'Molecules/CustomDialog',
   component: CustomDialog,
   parameters: {
     layout: 'centered',

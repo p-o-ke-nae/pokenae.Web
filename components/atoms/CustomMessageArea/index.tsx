@@ -1,17 +1,34 @@
 'use client';
 
 import { forwardRef } from "react";
-import type { TextareaHTMLAttributes } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
-export type CustomMessageAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
-	isError?: boolean;
+type Variant = "info" | "success" | "warning" | "error";
+
+export type CustomMessageAreaProps = HTMLAttributes<HTMLDivElement> & {
+	variant?: Variant;
+	children?: ReactNode;
 };
 
-const CustomMessageArea = forwardRef<HTMLTextAreaElement, CustomMessageAreaProps>(
-	({ isError = false, className = "", ...rest }, ref) => {
+const ICONS: Record<Variant, string> = {
+	info: "ℹ",
+	success: "✓",
+	warning: "⚠",
+	error: "✕",
+};
+
+const ARIA_ROLES: Record<Variant, "status" | "alert"> = {
+	info: "status",
+	success: "status",
+	warning: "alert",
+	error: "alert",
+};
+
+const CustomMessageArea = forwardRef<HTMLDivElement, CustomMessageAreaProps>(
+	({ variant = "info", className = "", children, ...rest }, ref) => {
 		const classes = [
 			"custom-message-area",
-			isError ? "custom-message-area--error" : "",
+			`custom-message-area--${variant}`,
 			className,
 		]
 			.filter(Boolean)
@@ -19,56 +36,65 @@ const CustomMessageArea = forwardRef<HTMLTextAreaElement, CustomMessageAreaProps
 
 		return (
 			<>
-				<textarea ref={ref} className={classes} aria-invalid={isError} {...rest} />
+				<div
+					ref={ref}
+					role={ARIA_ROLES[variant]}
+					aria-live={ARIA_ROLES[variant] === "alert" ? "assertive" : "polite"}
+					className={classes}
+					{...rest}
+				>
+					<span className="custom-message-area__icon" aria-hidden="true">
+						{ICONS[variant]}
+					</span>
+					<span className="custom-message-area__content">{children}</span>
+				</div>
 
 				<style jsx>{`
 					.custom-message-area {
-						display: block;
-						width: 100%;
-						padding: 0.5625rem 0.875rem;
+						display: flex;
+						align-items: flex-start;
+						gap: 0.625rem;
+						padding: 0.75rem 1rem;
 						border-radius: 0.5rem;
-						border: 1.5px solid var(--color-base-70-dark);
-						background-color: var(--color-base-70-light);
-						color: var(--color-text-strong);
+						border: 1px solid transparent;
 						font-size: 0.875rem;
-						line-height: 1.65;
-						resize: vertical;
-						min-height: 6rem;
-						transition:
-							border-color 140ms ease,
-							box-shadow 140ms ease,
-							background-color 140ms ease;
+						line-height: 1.55;
 					}
 
-					.custom-message-area::placeholder {
-						color: color-mix(in srgb, var(--color-text-strong) 35%, transparent);
+					.custom-message-area__icon {
+						flex-shrink: 0;
+						font-size: 0.9375rem;
+						line-height: 1.55;
+						font-weight: 700;
 					}
 
-					.custom-message-area:hover:not(:disabled):not(:focus-visible) {
-						border-color: color-mix(in srgb, var(--color-accent-25) 50%, var(--color-base-70-dark));
+					.custom-message-area__content {
+						flex: 1;
+						min-width: 0;
 					}
 
-					.custom-message-area:focus-visible {
-						outline: none;
-						border-color: var(--color-accent-25);
-						background-color: color-mix(in srgb, var(--color-accent-25) 4%, var(--color-base-70-light));
-						box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-25) 20%, transparent);
+					.custom-message-area--info {
+						background-color: color-mix(in srgb, #3b82f6 10%, transparent);
+						border-color: color-mix(in srgb, #3b82f6 35%, transparent);
+						color: #1d4ed8;
+					}
+
+					.custom-message-area--success {
+						background-color: color-mix(in srgb, #22c55e 10%, transparent);
+						border-color: color-mix(in srgb, #22c55e 35%, transparent);
+						color: #15803d;
+					}
+
+					.custom-message-area--warning {
+						background-color: color-mix(in srgb, #f59e0b 10%, transparent);
+						border-color: color-mix(in srgb, #f59e0b 35%, transparent);
+						color: #92400e;
 					}
 
 					.custom-message-area--error {
-						border-color: #c0392b;
-						background-color: color-mix(in srgb, #e74c3c 5%, var(--color-base-70-light));
-					}
-
-					.custom-message-area--error:focus-visible {
-						border-color: #c0392b;
-						box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.2);
-					}
-
-					.custom-message-area:disabled {
-						opacity: 0.55;
-						cursor: not-allowed;
-						background-color: var(--color-base-70);
+						background-color: color-mix(in srgb, #ef4444 10%, transparent);
+						border-color: color-mix(in srgb, #ef4444 35%, transparent);
+						color: #b91c1c;
 					}
 				`}</style>
 			</>
@@ -79,4 +105,5 @@ const CustomMessageArea = forwardRef<HTMLTextAreaElement, CustomMessageAreaProps
 CustomMessageArea.displayName = "CustomMessageArea";
 
 export default CustomMessageArea;
+
 

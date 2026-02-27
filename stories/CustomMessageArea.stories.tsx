@@ -9,31 +9,37 @@ const meta = {
   },
   tags: ['autodocs'],
   args: {
-    placeholder: 'メッセージを入力してください',
+    children: 'メッセージの内容がここに表示されます。',
   },
 } satisfies Meta<typeof CustomMessageArea>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
-
-export const WithValue: Story = {
+export const Info: Story = {
   args: {
-    defaultValue: '入力済みメッセージ\n複数行のテキストです。',
+    variant: 'info',
+    children: '情報: この操作は元に戻せます。',
+  },
+};
+
+export const Success: Story = {
+  args: {
+    variant: 'success',
+    children: '保存が完了しました。',
+  },
+};
+
+export const Warning: Story = {
+  args: {
+    variant: 'warning',
+    children: '警告: この操作は取り消しできない場合があります。',
   },
 };
 
 export const Error: Story = {
   args: {
-    isError: true,
-    placeholder: 'エラー状態',
-  },
-};
-
-export const Disabled: Story = {
-  args: {
-    disabled: true,
-    placeholder: '無効状態',
+    variant: 'error',
+    children: 'エラー: 入力内容に問題があります。',
   },
 };

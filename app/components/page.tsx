@@ -6,16 +6,28 @@ import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomHeader from '@/components/atoms/CustomHeader';
 import CustomCheckBox from '@/components/atoms/CustomCheckBox';
 import CustomTextBox from '@/components/atoms/CustomTextBox';
+import CustomTextArea from '@/components/atoms/CustomTextArea';
 import CustomRadioButton from '@/components/atoms/CustomRadioButton';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
-import CustomDialog from '@/components/atoms/CustomDialog';
+import CustomModal from '@/components/atoms/CustomModal';
+import CustomComboBox from '@/components/atoms/CustomComboBox';
 import CustomLoader from '@/components/atoms/CustomLoader';
 import PokenaeLogo, { type PokenaeLogo as PokenaeLogoRef } from '@/components/atoms/PokenaeLogo';
 import CustomCheckBoxWithLabel from '@/components/molecules/CustomCheckBox';
+import CustomDialog from '@/components/molecules/CustomDialog';
+import CustomRadioButtonWithLabel from '@/components/molecules/CustomRadioButton';
+import LoadingOverlay from '@/components/molecules/LoadingOverlay';
 
 export default function ComponentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [loadingOpen, setLoadingOpen] = useState(false);
   const logoRef = useRef<PokenaeLogoRef>(null);
+
+  const simulateLoading = () => {
+    setLoadingOpen(true);
+    setTimeout(() => setLoadingOpen(false), 3000);
+  };
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black p-8">
@@ -94,22 +106,23 @@ export default function ComponentsPage() {
           </div>
         </section>
 
-        {/* CustomRadioButton */}
+        {/* CustomRadioButton (Atom) */}
         <section className="space-y-4">
-          <CustomHeader level={2}>CustomRadioButton</CustomHeader>
+          <CustomHeader level={2}>CustomRadioButton（原始粒度・Atom）</CustomHeader>
+          <div className="flex flex-wrap gap-4 items-center p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+            <CustomRadioButton name="radio-atom" value="a" defaultChecked aria-label="選択肢A" />
+            <CustomRadioButton name="radio-atom" value="b" aria-label="選択肢B" />
+            <CustomRadioButton name="radio-atom" value="c" disabled aria-label="無効" />
+          </div>
+        </section>
+
+        {/* CustomRadioButtonWithLabel (Molecule) */}
+        <section className="space-y-4">
+          <CustomHeader level={2}>CustomRadioButtonWithLabel（分子粒度・Molecule）</CustomHeader>
           <div className="flex flex-col gap-3 p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
-            <div className="flex items-center gap-2">
-              <CustomRadioButton id="r1" name="demo" value="a" defaultChecked />
-              <CustomLabel htmlFor="r1">選択肢 A</CustomLabel>
-            </div>
-            <div className="flex items-center gap-2">
-              <CustomRadioButton id="r2" name="demo" value="b" />
-              <CustomLabel htmlFor="r2">選択肢 B</CustomLabel>
-            </div>
-            <div className="flex items-center gap-2">
-              <CustomRadioButton id="r3" name="demo" value="c" disabled />
-              <CustomLabel htmlFor="r3">選択肢 C（無効）</CustomLabel>
-            </div>
+            <CustomRadioButtonWithLabel name="radio-mol" value="a" label="選択肢 A" defaultChecked />
+            <CustomRadioButtonWithLabel name="radio-mol" value="b" label="選択肢 B" />
+            <CustomRadioButtonWithLabel name="radio-mol" value="c" label="選択肢 C（無効）" disabled />
           </div>
         </section>
 
@@ -132,24 +145,68 @@ export default function ComponentsPage() {
           </div>
         </section>
 
+        {/* CustomTextArea */}
+        <section className="space-y-4">
+          <CustomHeader level={2}>CustomTextArea</CustomHeader>
+          <div className="flex flex-col gap-3 max-w-sm p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+            <div>
+              <CustomLabel htmlFor="textarea1">テキストエリア</CustomLabel>
+              <CustomTextArea id="textarea1" placeholder="複数行のテキストを入力" className="mt-1" rows={4} />
+            </div>
+            <div>
+              <CustomLabel htmlFor="textarea2" required>エラー状態</CustomLabel>
+              <CustomTextArea id="textarea2" isError placeholder="エラーがあります" className="mt-1" rows={3} />
+            </div>
+          </div>
+        </section>
+
+        {/* CustomComboBox */}
+        <section className="space-y-4">
+          <CustomHeader level={2}>CustomComboBox</CustomHeader>
+          <div className="flex flex-col gap-3 max-w-sm p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+            <div>
+              <CustomLabel htmlFor="combo1">通常コンボボックス</CustomLabel>
+              <CustomComboBox id="combo1" placeholder="選択してください" className="mt-1">
+                <option value="1">選択肢 1</option>
+                <option value="2">選択肢 2</option>
+                <option value="3">選択肢 3</option>
+              </CustomComboBox>
+            </div>
+            <div>
+              <CustomLabel htmlFor="combo2" required>エラー状態</CustomLabel>
+              <CustomComboBox id="combo2" isError placeholder="選択してください" className="mt-1">
+                <option value="1">選択肢 1</option>
+                <option value="2">選択肢 2</option>
+              </CustomComboBox>
+            </div>
+            <div>
+              <CustomLabel htmlFor="combo3">無効状態</CustomLabel>
+              <CustomComboBox id="combo3" disabled defaultValue="1" className="mt-1">
+                <option value="1">選択肢 1</option>
+                <option value="2">選択肢 2</option>
+              </CustomComboBox>
+            </div>
+          </div>
+        </section>
+
         {/* CustomMessageArea */}
         <section className="space-y-4">
           <CustomHeader level={2}>CustomMessageArea</CustomHeader>
-          <div className="flex flex-col gap-3 max-w-sm p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
-            <div>
-              <CustomLabel htmlFor="msg1">メッセージエリア</CustomLabel>
-              <CustomMessageArea id="msg1" placeholder="メッセージを入力してください" className="mt-1" rows={4} />
-            </div>
-            <div>
-              <CustomLabel htmlFor="msg2" required>エラー状態</CustomLabel>
-              <CustomMessageArea id="msg2" isError placeholder="エラーがあります" className="mt-1" rows={3} />
-            </div>
+          <div className="flex flex-col gap-3 max-w-lg p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+            <CustomMessageArea variant="info">情報: この操作は元に戻せます。</CustomMessageArea>
+            <CustomMessageArea variant="success">保存が完了しました。</CustomMessageArea>
+            <CustomMessageArea variant="warning">
+              警告: この操作は取り消しできない場合があります。
+            </CustomMessageArea>
+            <CustomMessageArea variant="error">
+              エラー: 入力内容に問題があります。必須項目を確認してください。
+            </CustomMessageArea>
           </div>
         </section>
 
         {/* CustomLoader */}
         <section className="space-y-4">
-          <CustomHeader level={2}>CustomLoader</CustomHeader>
+          <CustomHeader level={2}>CustomLoader（原始粒度・Atom）</CustomHeader>
           <div className="flex flex-wrap gap-6 items-center p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
             <div className="flex flex-col items-center gap-2">
               <CustomLoader size="sm" />
@@ -166,9 +223,45 @@ export default function ComponentsPage() {
           </div>
         </section>
 
-        {/* CustomDialog */}
+        {/* LoadingOverlay (Molecule) */}
         <section className="space-y-4">
-          <CustomHeader level={2}>CustomDialog</CustomHeader>
+          <CustomHeader level={2}>LoadingOverlay（分子粒度・Molecule）</CustomHeader>
+          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+            <CustomButton variant="accent" onClick={simulateLoading}>
+              通信を開始（3秒後に完了）
+            </CustomButton>
+            <LoadingOverlay open={loadingOpen} message="サーバと通信中..." />
+          </div>
+        </section>
+
+        {/* CustomModal (Atom) */}
+        <section className="space-y-4">
+          <CustomHeader level={2}>CustomModal（原始粒度・Atom）</CustomHeader>
+          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+            <CustomButton variant="neutral" onClick={() => setModalOpen(true)}>
+              モーダルを開く
+            </CustomButton>
+            <CustomModal
+              open={modalOpen}
+              onClose={() => setModalOpen(false)}
+              style={{ width: 'min(90vw, 24rem)', padding: '1.5rem' }}
+            >
+              <p style={{ margin: 0, fontSize: '0.875rem' }}>
+                これはCustomModalの原始粒度コンポーネントです。<br />
+                header/footerなどの構造を持たないベースのモーダルです。
+              </p>
+              <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+                <CustomButton variant="accent" onClick={() => setModalOpen(false)}>
+                  閉じる
+                </CustomButton>
+              </div>
+            </CustomModal>
+          </div>
+        </section>
+
+        {/* CustomDialog (Molecule) */}
+        <section className="space-y-4">
+          <CustomHeader level={2}>CustomDialog（分子粒度・Molecule）</CustomHeader>
           <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
             <CustomButton variant="accent" onClick={() => setDialogOpen(true)}>
               ダイアログを開く
