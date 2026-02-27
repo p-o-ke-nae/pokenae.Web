@@ -1,42 +1,45 @@
 'use client';
 
-import { forwardRef, useId } from "react";
+import { useId } from "react";
 import CustomCheckBox, {
-	type CustomCheckBoxProps,
+type CustomCheckBoxProps,
 } from "@/components/atoms/CustomCheckBox";
 import CustomLabel from "@/components/atoms/CustomLabel";
 
 export type CustomCheckBoxWithLabelProps = CustomCheckBoxProps & {
-	label: string;
-	required?: boolean;
+label: string;
+required?: boolean;
 };
 
-const CustomCheckBoxWithLabel = forwardRef<
-	HTMLInputElement,
-	CustomCheckBoxWithLabelProps
->(({ label, required = false, id, className = "", ...rest }, ref) => {
-	const generatedId = useId();
-	const inputId = id ?? generatedId;
+const CustomCheckBoxWithLabel = ({
+label,
+required = false,
+id,
+className = "",
+...rest
+}: CustomCheckBoxWithLabelProps) => {
+const generatedId = useId();
+const inputId = id ?? generatedId;
 
-	return (
-		<>
-			<div className={`custom-checkbox-field ${className}`}>
-				<CustomCheckBox ref={ref} id={inputId} {...rest} />
-				<CustomLabel htmlFor={inputId} required={required}>
-					{label}
-				</CustomLabel>
-			</div>
+return (
+<>
+<div className={`custom-checkbox-field ${className}`}>
+<CustomCheckBox id={inputId} {...rest} />
+<CustomLabel htmlFor={inputId} required={required}>
+{label}
+</CustomLabel>
+</div>
 
-			<style jsx>{`
-				.custom-checkbox-field {
-					display: inline-flex;
-					align-items: center;
-					gap: 0.5rem;
-				}
-			`}</style>
-		</>
-	);
-});
+<style jsx>{`
+.custom-checkbox-field {
+display: inline-flex;
+align-items: center;
+gap: 0.5rem;
+}
+`}</style>
+</>
+);
+};
 
 CustomCheckBoxWithLabel.displayName = "CustomCheckBoxWithLabel";
 
