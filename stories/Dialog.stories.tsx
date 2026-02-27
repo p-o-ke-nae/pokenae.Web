@@ -1,16 +1,16 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import CustomDialog from '../components/molecules/CustomDialog';
+import Dialog from '../components/molecules/Dialog';
 import CustomButton from '../components/atoms/CustomButton';
 import { useState } from 'react';
 
 const meta = {
-  title: 'Molecules/CustomDialog',
-  component: CustomDialog,
+  title: 'Molecules/Dialog',
+  component: Dialog,
   parameters: {
     layout: 'centered',
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof CustomDialog>;
+} satisfies Meta<typeof Dialog>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -22,7 +22,7 @@ const DialogDemo = () => {
       <CustomButton variant="accent" onClick={() => setOpen(true)}>
         ダイアログを開く
       </CustomButton>
-      <CustomDialog
+      <Dialog
         open={open}
         onClose={() => setOpen(false)}
         title="確認"
@@ -38,7 +38,7 @@ const DialogDemo = () => {
         }
       >
         <p>ダイアログのコンテンツがここに表示されます。</p>
-      </CustomDialog>
+      </Dialog>
     </div>
   );
 };

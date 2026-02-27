@@ -3,13 +3,13 @@
 import type { CSSProperties, ReactNode } from "react";
 import CustomModal, { type CustomModalProps } from "@/components/atoms/CustomModal";
 
-export type CustomDialogProps = Omit<CustomModalProps, "children"> & {
+export type DialogProps = Omit<CustomModalProps, "children"> & {
 	title?: string;
 	children?: ReactNode;
 	footer?: ReactNode;
 };
 
-const CustomDialog = ({
+const Dialog = ({
 	open,
 	onClose,
 	title,
@@ -17,7 +17,7 @@ const CustomDialog = ({
 	footer,
 	style,
 	...rest
-}: CustomDialogProps) => {
+}: DialogProps) => {
 	const dialogStyle: CSSProperties = {
 		width: "min(90vw, 28rem)",
 		...style,
@@ -27,12 +27,12 @@ const CustomDialog = ({
 		<>
 			<CustomModal open={open} onClose={onClose} style={dialogStyle} {...rest}>
 				{title && (
-					<header className="custom-dialog__header">
-						<h2 className="custom-dialog__title">{title}</h2>
+					<header className="dialog__header">
+						<h2 className="dialog__title">{title}</h2>
 						{onClose && (
 							<button
 								type="button"
-								className="custom-dialog__close"
+								className="dialog__close"
 								onClick={onClose}
 								aria-label="閉じる"
 							>
@@ -41,12 +41,12 @@ const CustomDialog = ({
 						)}
 					</header>
 				)}
-				<div className="custom-dialog__body">{children}</div>
-				{footer && <footer className="custom-dialog__footer">{footer}</footer>}
+				<div className="dialog__body">{children}</div>
+				{footer && <footer className="dialog__footer">{footer}</footer>}
 			</CustomModal>
 
 			<style jsx>{`
-				.custom-dialog__header {
+				.dialog__header {
 					display: flex;
 					align-items: center;
 					justify-content: space-between;
@@ -59,7 +59,7 @@ const CustomDialog = ({
 					);
 				}
 
-				.custom-dialog__title {
+				.dialog__title {
 					font-size: 0.9375rem;
 					font-weight: 700;
 					margin: 0;
@@ -67,7 +67,7 @@ const CustomDialog = ({
 					color: var(--color-text-strong);
 				}
 
-				.custom-dialog__close {
+				.dialog__close {
 					display: inline-flex;
 					align-items: center;
 					justify-content: center;
@@ -83,22 +83,22 @@ const CustomDialog = ({
 					transition: opacity 120ms ease, background-color 120ms ease;
 				}
 
-				.custom-dialog__close:hover {
+				.dialog__close:hover {
 					opacity: 1;
 					background-color: var(--color-base-70);
 				}
 
-				.custom-dialog__close:focus-visible {
+				.dialog__close:focus-visible {
 					outline: 2px solid var(--color-accent-25);
 					outline-offset: 1px;
 					opacity: 1;
 				}
 
-				.custom-dialog__body {
+				.dialog__body {
 					padding: 1.25rem;
 				}
 
-				.custom-dialog__footer {
+				.dialog__footer {
 					display: flex;
 					justify-content: flex-end;
 					gap: 0.5rem;
@@ -111,6 +111,6 @@ const CustomDialog = ({
 	);
 };
 
-CustomDialog.displayName = "CustomDialog";
+Dialog.displayName = "Dialog";
 
-export default CustomDialog;
+export default Dialog;

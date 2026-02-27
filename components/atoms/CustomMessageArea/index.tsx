@@ -8,6 +8,7 @@ type Variant = "info" | "success" | "warning" | "error";
 export type CustomMessageAreaProps = HTMLAttributes<HTMLDivElement> & {
 	variant?: Variant;
 	children?: ReactNode;
+	banner?: boolean;
 };
 
 const ICONS: Record<Variant, string> = {
@@ -25,10 +26,11 @@ const ARIA_ROLES: Record<Variant, "status" | "alert"> = {
 };
 
 const CustomMessageArea = forwardRef<HTMLDivElement, CustomMessageAreaProps>(
-	({ variant = "info", className = "", children, ...rest }, ref) => {
+	({ variant = "info", banner = false, className = "", children, ...rest }, ref) => {
 		const classes = [
 			"custom-message-area",
 			`custom-message-area--${variant}`,
+			banner ? "custom-message-area--banner" : "",
 			className,
 		]
 			.filter(Boolean)
@@ -71,6 +73,17 @@ const CustomMessageArea = forwardRef<HTMLDivElement, CustomMessageAreaProps>(
 					.custom-message-area__content {
 						flex: 1;
 						min-width: 0;
+					}
+
+					.custom-message-area--banner {
+						position: sticky;
+						top: 0;
+						z-index: 50;
+						width: 100%;
+						border-radius: 0;
+						border-left: none;
+						border-right: none;
+						border-top: none;
 					}
 
 					.custom-message-area--info {

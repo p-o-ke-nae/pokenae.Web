@@ -1,37 +1,37 @@
 'use client';
 
 import { useId } from "react";
-import CustomRadioButton, {
-	type CustomRadioButtonProps,
-} from "@/components/atoms/CustomRadioButton";
+import CustomCheckBox, {
+	type CustomCheckBoxProps,
+} from "@/components/atoms/CustomCheckBox";
 import CustomLabel from "@/components/atoms/CustomLabel";
 
-export type CustomRadioButtonWithLabelProps = CustomRadioButtonProps & {
+export type CheckboxFieldProps = CustomCheckBoxProps & {
 	label: string;
 	required?: boolean;
 };
 
-const CustomRadioButtonWithLabel = ({
+const CheckboxField = ({
 	label,
 	required = false,
 	id,
 	className = "",
 	...rest
-}: CustomRadioButtonWithLabelProps) => {
+}: CheckboxFieldProps) => {
 	const generatedId = useId();
 	const inputId = id ?? generatedId;
 
 	return (
 		<>
-			<div className={`custom-radio-field ${className}`}>
-				<CustomRadioButton id={inputId} {...rest} />
+			<div className={`checkbox-field ${className}`}>
+				<CustomCheckBox id={inputId} {...rest} />
 				<CustomLabel htmlFor={inputId} required={required}>
 					{label}
 				</CustomLabel>
 			</div>
 
 			<style jsx>{`
-				.custom-radio-field {
+				.checkbox-field {
 					display: inline-flex;
 					align-items: center;
 					gap: 0.5rem;
@@ -41,6 +41,6 @@ const CustomRadioButtonWithLabel = ({
 	);
 };
 
-CustomRadioButtonWithLabel.displayName = "CustomRadioButtonWithLabel";
+CheckboxField.displayName = "CheckboxField";
 
-export default CustomRadioButtonWithLabel;
+export default CheckboxField;

@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import CustomRadioButtonWithLabel from '../components/molecules/CustomRadioButton';
+import CheckboxField from '../components/molecules/CheckboxField';
 
 const meta = {
-  title: 'Molecules/CustomRadioButtonWithLabel',
-  component: CustomRadioButtonWithLabel,
+  title: 'Molecules/CheckboxField',
+  component: CheckboxField,
   parameters: {
     layout: 'centered',
   },
@@ -12,11 +12,9 @@ const meta = {
     onChange: { action: 'changed' },
   },
   args: {
-    label: 'ラジオボタン',
-    name: 'radio-group',
-    value: 'option1',
+    label: 'チェックボックスラベル',
   },
-} satisfies Meta<typeof CustomRadioButtonWithLabel>;
+} satisfies Meta<typeof CheckboxField>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -26,7 +24,7 @@ export const Default: Story = {};
 export const Required: Story = {
   args: {
     required: true,
-    label: '必須選択肢',
+    label: '必須項目',
   },
 };
 
@@ -39,6 +37,5 @@ export const Checked: Story = {
 export const Disabled: Story = {
   args: {
     disabled: true,
-    label: '無効ラジオボタン',
   },
 };

@@ -4,15 +4,17 @@ import { forwardRef } from "react";
 import type { HTMLAttributes } from "react";
 
 type Size = "sm" | "md" | "lg";
+type Variant = "normal" | "bold";
 
 export type CustomLoaderProps = HTMLAttributes<HTMLSpanElement> & {
 	size?: Size;
+	variant?: Variant;
 	label?: string;
 };
 
 const CustomLoader = forwardRef<HTMLSpanElement, CustomLoaderProps>(
-	({ size = "md", label = "読み込み中...", className = "", ...rest }, ref) => {
-		const classes = ["custom-loader", `custom-loader--${size}`, className]
+	({ size = "md", variant = "normal", label = "読み込み中...", className = "", ...rest }, ref) => {
+		const classes = ["custom-loader", `custom-loader--${size}`, `custom-loader--${variant}`, className]
 			.filter(Boolean)
 			.join(" ");
 
@@ -86,6 +88,30 @@ const CustomLoader = forwardRef<HTMLSpanElement, CustomLoaderProps>(
 					.custom-loader--lg .custom-loader__dot {
 						width: 0.55rem;
 						height: 0.55rem;
+					}
+
+					/* Bold variant — thicker ring, stronger accent */
+					.custom-loader--bold .custom-loader__ring {
+						border-color: color-mix(in srgb, var(--color-accent-25) 20%, transparent);
+						border-top-color: var(--color-accent-25-strong);
+						border-right-color: var(--color-accent-25);
+					}
+
+					.custom-loader--bold.custom-loader--sm .custom-loader__ring {
+						border-width: 3px;
+					}
+
+					.custom-loader--bold.custom-loader--md .custom-loader__ring {
+						border-width: 4px;
+					}
+
+					.custom-loader--bold.custom-loader--lg .custom-loader__ring {
+						border-width: 5px;
+					}
+
+					.custom-loader--bold .custom-loader__dot {
+						background-color: var(--color-accent-25-strong);
+						box-shadow: 0 0 6px var(--color-accent-25);
 					}
 
 					@keyframes custom-loader-spin {

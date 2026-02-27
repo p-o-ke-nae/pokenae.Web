@@ -13,9 +13,9 @@ import CustomModal from '@/components/atoms/CustomModal';
 import CustomComboBox from '@/components/atoms/CustomComboBox';
 import CustomLoader from '@/components/atoms/CustomLoader';
 import PokenaeLogo, { type PokenaeLogo as PokenaeLogoRef } from '@/components/atoms/PokenaeLogo';
-import CustomCheckBoxWithLabel from '@/components/molecules/CustomCheckBox';
-import CustomDialog from '@/components/molecules/CustomDialog';
-import CustomRadioButtonWithLabel from '@/components/molecules/CustomRadioButton';
+import CheckboxField from '@/components/molecules/CheckboxField';
+import Dialog from '@/components/molecules/Dialog';
+import RadioField from '@/components/molecules/RadioField';
 import LoadingOverlay from '@/components/molecules/LoadingOverlay';
 
 export default function ComponentsPage() {
@@ -95,14 +95,14 @@ export default function ComponentsPage() {
           </div>
         </section>
 
-        {/* CustomCheckBoxWithLabel (Molecule) */}
+        {/* CheckboxField (Molecule) */}
         <section className="space-y-4">
-          <CustomHeader level={2}>CustomCheckBoxWithLabel（分子粒度・Molecule）</CustomHeader>
+          <CustomHeader level={2}>CheckboxField（分子粒度・Molecule）</CustomHeader>
           <div className="flex flex-col gap-3 p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
-            <CustomCheckBoxWithLabel label="通常チェックボックス" />
-            <CustomCheckBoxWithLabel label="デフォルトチェック済み" defaultChecked />
-            <CustomCheckBoxWithLabel label="必須項目" required />
-            <CustomCheckBoxWithLabel label="無効チェックボックス" disabled />
+            <CheckboxField label="通常チェックボックス" />
+            <CheckboxField label="デフォルトチェック済み" defaultChecked />
+            <CheckboxField label="必須項目" required />
+            <CheckboxField label="無効チェックボックス" disabled />
           </div>
         </section>
 
@@ -116,13 +116,13 @@ export default function ComponentsPage() {
           </div>
         </section>
 
-        {/* CustomRadioButtonWithLabel (Molecule) */}
+        {/* RadioField (Molecule) */}
         <section className="space-y-4">
-          <CustomHeader level={2}>CustomRadioButtonWithLabel（分子粒度・Molecule）</CustomHeader>
+          <CustomHeader level={2}>RadioField（分子粒度・Molecule）</CustomHeader>
           <div className="flex flex-col gap-3 p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
-            <CustomRadioButtonWithLabel name="radio-mol" value="a" label="選択肢 A" defaultChecked />
-            <CustomRadioButtonWithLabel name="radio-mol" value="b" label="選択肢 B" />
-            <CustomRadioButtonWithLabel name="radio-mol" value="c" label="選択肢 C（無効）" disabled />
+            <RadioField name="radio-mol" value="a" label="選択肢 A" defaultChecked />
+            <RadioField name="radio-mol" value="b" label="選択肢 B" />
+            <RadioField name="radio-mol" value="c" label="選択肢 C（無効）" disabled />
           </div>
         </section>
 
@@ -192,15 +192,23 @@ export default function ComponentsPage() {
         {/* CustomMessageArea */}
         <section className="space-y-4">
           <CustomHeader level={2}>CustomMessageArea</CustomHeader>
-          <div className="flex flex-col gap-3 max-w-lg p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
-            <CustomMessageArea variant="info">情報: この操作は元に戻せます。</CustomMessageArea>
-            <CustomMessageArea variant="success">保存が完了しました。</CustomMessageArea>
-            <CustomMessageArea variant="warning">
-              警告: この操作は取り消しできない場合があります。
-            </CustomMessageArea>
-            <CustomMessageArea variant="error">
-              エラー: 入力内容に問題があります。必須項目を確認してください。
-            </CustomMessageArea>
+          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm overflow-hidden">
+            <p className="text-xs text-zinc-500 mb-3">banner=true: 上部に固定表示</p>
+            <div className="relative overflow-hidden rounded border border-zinc-200 dark:border-zinc-700" style={{ height: '8rem' }}>
+              <CustomMessageArea variant="error" banner>エラー: バナー表示（上部スティッキー）</CustomMessageArea>
+              <div className="p-4 text-sm text-zinc-600 dark:text-zinc-400">コンテンツ領域</div>
+            </div>
+            <p className="text-xs text-zinc-500 mt-4 mb-3">inline（デフォルト）</p>
+            <div className="flex flex-col gap-3 max-w-lg">
+              <CustomMessageArea variant="info">情報: この操作は元に戻せます。</CustomMessageArea>
+              <CustomMessageArea variant="success">保存が完了しました。</CustomMessageArea>
+              <CustomMessageArea variant="warning">
+                警告: この操作は取り消しできない場合があります。
+              </CustomMessageArea>
+              <CustomMessageArea variant="error">
+                エラー: 入力内容に問題があります。必須項目を確認してください。
+              </CustomMessageArea>
+            </div>
           </div>
         </section>
 
@@ -219,6 +227,19 @@ export default function ComponentsPage() {
             <div className="flex flex-col items-center gap-2">
               <CustomLoader size="lg" />
               <span className="text-xs text-zinc-500">Large</span>
+            </div>
+            <div className="w-px h-12 bg-zinc-200 dark:bg-zinc-700" />
+            <div className="flex flex-col items-center gap-2">
+              <CustomLoader size="sm" variant="bold" />
+              <span className="text-xs text-zinc-500">Small Bold</span>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <CustomLoader size="md" variant="bold" />
+              <span className="text-xs text-zinc-500">Medium Bold</span>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <CustomLoader size="lg" variant="bold" />
+              <span className="text-xs text-zinc-500">Large Bold</span>
             </div>
           </div>
         </section>
@@ -259,14 +280,14 @@ export default function ComponentsPage() {
           </div>
         </section>
 
-        {/* CustomDialog (Molecule) */}
+        {/* Dialog (Molecule) */}
         <section className="space-y-4">
-          <CustomHeader level={2}>CustomDialog（分子粒度・Molecule）</CustomHeader>
+          <CustomHeader level={2}>Dialog（分子粒度・Molecule）</CustomHeader>
           <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
             <CustomButton variant="accent" onClick={() => setDialogOpen(true)}>
               ダイアログを開く
             </CustomButton>
-            <CustomDialog
+            <Dialog
               open={dialogOpen}
               onClose={() => setDialogOpen(false)}
               title="確認ダイアログ"
@@ -285,7 +306,7 @@ export default function ComponentsPage() {
                 ダイアログのコンテンツがここに表示されます。<br />
                 任意の内容を含めることができます。
               </p>
-            </CustomDialog>
+            </Dialog>
           </div>
         </section>
       </div>
