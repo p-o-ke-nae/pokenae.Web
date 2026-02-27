@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useId } from "react";
+import { useState, useId, useEffect } from "react";
 import CustomTextBox from "@/components/atoms/CustomTextBox";
 import CustomButton from "@/components/atoms/CustomButton";
 import Dialog from "@/components/molecules/Dialog";
@@ -16,6 +16,7 @@ export type SearchFieldProps = {
 	value?: string;
 	onChange?: (value: string) => void;
 	placeholder?: string;
+	labelPlaceholder?: string;
 	dialogTitle?: string;
 	disabled?: boolean;
 	isError?: boolean;
@@ -27,6 +28,7 @@ const SearchField = ({
 	value = "",
 	onChange,
 	placeholder,
+	labelPlaceholder,
 	dialogTitle,
 	disabled = false,
 	isError = false,
@@ -34,25 +36,51 @@ const SearchField = ({
 }: SearchFieldProps) => {
 	const [dialogOpen, setDialogOpen] = useState(false);
 	const [filter, setFilter] = useState("");
+	const [inputText, setInputText] = useState(value);
 	const inputId = useId();
 
+	// 外部からの value 変更（ダイアログ選択後など）に inputText を同期
+	useEffect(() => {
+		setInputText(value);
+	}, [value]);
+
+	const matchedOption = options.find((o) => o.value === value);
+	const selectedLabel = matchedOption?.label ?? "";
+
+	const hasMatch = value !== "" && matchedOption !== undefined;
+	const hasNoMatch = value !== "" && matchedOption === undefined;
+
+	const displayLabelValue = (() => {
+		if (hasMatch) return selectedLabel;
+		if (hasNoMatch) return resources.searchField.noMatch;
+		return "";
+	})();
+
 	const filtered = filter
-		? options.filter((o) =>
-				o.label.toLowerCase().includes(filter.toLowerCase())
+		? options.filter(
+				(o) =>
+					o.label.toLowerCase().includes(filter.toLowerCase()) ||
+					o.value.toLowerCase().includes(filter.toLowerCase())
 		  )
 		: options;
 
-	const selectedLabel =
-		options.find((o) => o.value === value)?.label ?? value;
-
 	const handleSelect = (option: SearchOption) => {
+		setInputText(option.value);
 		onChange?.(option.value);
 		setDialogOpen(false);
 		setFilter("");
 	};
 
 	const handleClear = () => {
+		setInputText("");
 		onChange?.("");
+	};
+
+	const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const text = e.target.value;
+		setInputText(text);
+		// 入力中にリアルタイムで value を更新（親への通知）
+		onChange?.(text);
 	};
 
 	const handleOpenDialog = () => {
@@ -69,16 +97,18 @@ const SearchField = ({
 		<>
 			<div className={`search-field ${className}`.trim()}>
 				<div className="search-field__input-row">
+					{/* メイン: ID 入力テキストボックス */}
 					<CustomTextBox
 						id={inputId}
-						value={selectedLabel}
-						readOnly
-						placeholder={placeholder}
-						isError={isError}
+						value={inputText}
+						onChange={handleInputChange}
+						placeholder={placeholder ?? resources.searchField.valuePlaceholder}
+						isError={isError || hasNoMatch}
 						disabled={disabled}
 						className="search-field__textbox"
 						aria-haspopup="dialog"
 					/>
+					{/* クリアボタン */}
 					{value && !disabled && (
 						<CustomButton
 							type="button"
@@ -90,6 +120,7 @@ const SearchField = ({
 							✕
 						</CustomButton>
 					)}
+					{/* 検索ダイアログ起動ボタン */}
 					<CustomButton
 						type="button"
 						variant="neutral"
@@ -116,6 +147,20 @@ const SearchField = ({
 							<line x1="21" y1="21" x2="16.65" y2="16.65" />
 						</svg>
 					</CustomButton>
+				</div>
+
+				{/* サブ: 名称表示テキストボックス */}
+				<div className="search-field__label-row">
+					<CustomTextBox
+						value={displayLabelValue}
+						readOnly
+						placeholder={labelPlaceholder ?? resources.searchField.labelPlaceholder}
+						isError={hasNoMatch}
+						disabled={disabled}
+						tabIndex={-1}
+						className="search-field__label-textbox"
+						aria-label={labelPlaceholder ?? resources.searchField.labelPlaceholder}
+					/>
 				</div>
 
 				<Dialog
@@ -147,7 +192,8 @@ const SearchField = ({
 										}}
 										tabIndex={0}
 									>
-										{option.label}
+										<span className="search-field__list-value">{option.value}</span>
+										<span className="search-field__list-label">{option.label}</span>
 									</li>
 								))
 							) : (
@@ -174,9 +220,21 @@ const SearchField = ({
 					gap: 0.375rem;
 				}
 
+				.search-field__label-row {
+					display: flex;
+					align-items: stretch;
+				}
+
 				.search-field__textbox {
 					flex: 1;
 					min-width: 0;
+				}
+
+				.search-field__label-textbox {
+					flex: 1;
+					min-width: 0;
+					font-size: 0.8125rem;
+					opacity: 0.85;
 				}
 
 				.search-field__clear :global(.custom-button) {
@@ -209,6 +267,9 @@ const SearchField = ({
 				}
 
 				.search-field__list-item {
+					display: flex;
+					align-items: baseline;
+					gap: 0.75rem;
 					padding: 0.625rem 0.875rem;
 					cursor: pointer;
 					font-size: 0.875rem;
@@ -249,6 +310,21 @@ const SearchField = ({
 						var(--color-accent-25) 20%,
 						var(--color-base-70-light)
 					);
+				}
+
+				.search-field__list-value {
+					font-family: ui-monospace, monospace;
+					font-size: 0.8125rem;
+					min-width: 3rem;
+					color: color-mix(in srgb, var(--color-text-strong) 70%, transparent);
+				}
+
+				.search-field__list-item--selected .search-field__list-value {
+					color: color-mix(in srgb, var(--color-accent-25-strong) 80%, transparent);
+				}
+
+				.search-field__list-label {
+					flex: 1;
 				}
 
 				.search-field__no-results {

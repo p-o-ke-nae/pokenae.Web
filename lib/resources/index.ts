@@ -19,6 +19,9 @@ const resources = {
     noResults: "該当する項目がありません",
     searchButtonLabel: "検索ダイアログを開く",
     clearButtonLabel: "クリア",
+    valuePlaceholder: "IDを入力",
+    labelPlaceholder: "名称",
+    noMatch: "一致なし",
   },
 } as const;
 
