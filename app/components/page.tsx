@@ -16,18 +16,16 @@ import PokenaeLogo, { type PokenaeLogo as PokenaeLogoRef } from '@/components/at
 import CheckboxField from '@/components/molecules/CheckboxField';
 import Dialog from '@/components/molecules/Dialog';
 import RadioField from '@/components/molecules/RadioField';
-import LoadingOverlay from '@/components/molecules/LoadingOverlay';
-import resources from '@/lib/resources';
+import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 
 export default function ComponentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [loadingOpen, setLoadingOpen] = useState(false);
   const logoRef = useRef<PokenaeLogoRef>(null);
+  const { startLoading } = useLoadingOverlay();
 
   const simulateLoading = () => {
-    setLoadingOpen(true);
-    setTimeout(() => setLoadingOpen(false), 3000);
+    startLoading(() => new Promise((resolve) => setTimeout(resolve, 3000)));
   };
 
   return (
@@ -252,7 +250,6 @@ export default function ComponentsPage() {
             <CustomButton variant="accent" onClick={simulateLoading}>
               通信を開始（3秒後に完了）
             </CustomButton>
-            <LoadingOverlay open={loadingOpen} message={resources.loadingOverlay.message} />
           </div>
         </section>
 
