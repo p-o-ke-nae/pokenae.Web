@@ -13,6 +13,13 @@ const resources = {
   loadingOverlay: {
     message: "Loading...",
   },
+  searchField: {
+    dialogTitle: "検索",
+    searchPlaceholder: "絞り込み...",
+    noResults: "該当する項目がありません",
+    searchButtonLabel: "検索ダイアログを開く",
+    clearButtonLabel: "クリア",
+  },
 } as const;
 
 export default resources;

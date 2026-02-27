@@ -16,17 +16,36 @@ import PokenaeLogo, { type PokenaeLogo as PokenaeLogoRef } from '@/components/at
 import CheckboxField from '@/components/molecules/CheckboxField';
 import Dialog from '@/components/molecules/Dialog';
 import RadioField from '@/components/molecules/RadioField';
+import SearchField, { type SearchOption } from '@/components/molecules/SearchField';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 
 export default function ComponentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState('');
   const logoRef = useRef<PokenaeLogoRef>(null);
   const { startLoading } = useLoadingOverlay();
 
   const simulateLoading = () => {
     startLoading(() => new Promise((resolve) => setTimeout(resolve, 3000)));
   };
+
+  const searchOptions: SearchOption[] = [
+    { value: '001', label: 'フシギダネ' },
+    { value: '002', label: 'フシギソウ' },
+    { value: '003', label: 'フシギバナ' },
+    { value: '004', label: 'ヒトカゲ' },
+    { value: '005', label: 'リザード' },
+    { value: '006', label: 'リザードン' },
+    { value: '007', label: 'ゼニガメ' },
+    { value: '008', label: 'カメール' },
+    { value: '009', label: 'カメックス' },
+    { value: '025', label: 'ピカチュウ' },
+    { value: '133', label: 'イーブイ' },
+    { value: '152', label: 'チコリータ' },
+    { value: '155', label: 'ヒノアラシ' },
+    { value: '158', label: 'ワニノコ' },
+  ];
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black p-8">
@@ -305,6 +324,28 @@ export default function ComponentsPage() {
                 任意の内容を含めることができます。
               </p>
             </Dialog>
+          </div>
+        </section>
+
+        {/* SearchField (Molecule) */}
+        <section className="space-y-4">
+          <CustomHeader level={2}>SearchField（分子粒度・Molecule）</CustomHeader>
+          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm space-y-4">
+            <div className="max-w-sm">
+              <CustomLabel htmlFor="search-demo" required>ポケモン選択</CustomLabel>
+              <SearchField
+                options={searchOptions}
+                value={searchValue}
+                onChange={setSearchValue}
+                placeholder="ポケモンを選択..."
+                dialogTitle="ポケモン検索"
+              />
+            </div>
+            {searchValue && (
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                選択値: <code className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">{searchValue}</code>
+              </p>
+            )}
           </div>
         </section>
       </div>
