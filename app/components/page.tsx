@@ -17,6 +17,7 @@ import CheckboxField from '@/components/molecules/CheckboxField';
 import Dialog from '@/components/molecules/Dialog';
 import RadioField from '@/components/molecules/RadioField';
 import LoadingOverlay from '@/components/molecules/LoadingOverlay';
+import resources from '@/lib/resources';
 
 export default function ComponentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -251,7 +252,7 @@ export default function ComponentsPage() {
             <CustomButton variant="accent" onClick={simulateLoading}>
               通信を開始（3秒後に完了）
             </CustomButton>
-            <LoadingOverlay open={loadingOpen} message="サーバと通信中..." />
+            <LoadingOverlay open={loadingOpen} message={resources.loadingOverlay.message} />
           </div>
         </section>
 

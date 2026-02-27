@@ -38,6 +38,7 @@ const PokenaeLogo = forwardRef<PokenaeLogo, PokenaeLogoProps>(
 					width={width}
 					height={height}
 					viewBox={`0 0 ${width} ${height}`}
+					overflow="visible"
 					className={classes}
 					aria-label="pokenae"
 					role="img"
@@ -46,7 +47,7 @@ const PokenaeLogo = forwardRef<PokenaeLogo, PokenaeLogoProps>(
 					<text
 						ref={pathRef}
 						x="50%"
-						y="75%"
+						y="68%"
 						dominantBaseline="middle"
 						textAnchor="middle"
 						className={`pokenae-logo__text ${animClass}`}

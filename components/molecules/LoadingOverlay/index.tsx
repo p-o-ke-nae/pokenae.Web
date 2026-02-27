@@ -2,13 +2,14 @@
 
 import CustomModal from "@/components/atoms/CustomModal";
 import CustomLoader from "@/components/atoms/CustomLoader";
+import resources from "@/lib/resources";
 
 export type LoadingOverlayProps = {
 	open: boolean;
 	message?: string;
 };
 
-const LoadingOverlay = ({ open, message = "読み込み中..." }: LoadingOverlayProps) => {
+const LoadingOverlay = ({ open, message = resources.loadingOverlay.message }: LoadingOverlayProps) => {
 	return (
 		<>
 			<CustomModal
@@ -16,9 +17,10 @@ const LoadingOverlay = ({ open, message = "読み込み中..." }: LoadingOverlay
 				aria-label={message}
 				style={{
 					background: "white",
-					boxShadow: "0 8px 40px rgba(0,0,0,0.15)",
-					border: "1px solid rgba(0,0,0,0.08)",
+					boxShadow: "none",
+					border: "2px solid var(--color-accent-25)",
 					overflow: "visible",
+					borderRadius: "1rem",
 				}}
 			>
 				<div className="loading-overlay">
@@ -39,7 +41,7 @@ const LoadingOverlay = ({ open, message = "読み込み中..." }: LoadingOverlay
 
 				.loading-overlay__message {
 					font-size: 0.875rem;
-					color: var(--color-text-strong);
+					color: #374151;
 					font-weight: 500;
 					margin: 0;
 					letter-spacing: 0.01em;

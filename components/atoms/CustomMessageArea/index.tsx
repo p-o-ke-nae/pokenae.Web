@@ -11,13 +11,6 @@ export type CustomMessageAreaProps = HTMLAttributes<HTMLDivElement> & {
 	banner?: boolean;
 };
 
-const ICONS: Record<Variant, string> = {
-	info: "ℹ",
-	success: "✓",
-	warning: "⚠",
-	error: "✕",
-};
-
 const ARIA_ROLES: Record<Variant, "status" | "alert"> = {
 	info: "status",
 	success: "status",
@@ -45,34 +38,18 @@ const CustomMessageArea = forwardRef<HTMLDivElement, CustomMessageAreaProps>(
 					className={classes}
 					{...rest}
 				>
-					<span className="custom-message-area__icon" aria-hidden="true">
-						{ICONS[variant]}
-					</span>
-					<span className="custom-message-area__content">{children}</span>
+					{children}
 				</div>
 
 				<style jsx>{`
 					.custom-message-area {
 						display: flex;
 						align-items: flex-start;
-						gap: 0.625rem;
 						padding: 0.75rem 1rem;
 						border-radius: 0.5rem;
 						border: 1px solid transparent;
 						font-size: 0.875rem;
 						line-height: 1.55;
-					}
-
-					.custom-message-area__icon {
-						flex-shrink: 0;
-						font-size: 0.9375rem;
-						line-height: 1.55;
-						font-weight: 700;
-					}
-
-					.custom-message-area__content {
-						flex: 1;
-						min-width: 0;
 					}
 
 					.custom-message-area--banner {

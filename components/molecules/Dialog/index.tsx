@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import CustomModal, { type CustomModalProps } from "@/components/atoms/CustomModal";
+import resources from "@/lib/resources";
 
 export type DialogProps = Omit<CustomModalProps, "children"> & {
 	title?: string;
@@ -34,7 +35,7 @@ const Dialog = ({
 								type="button"
 								className="dialog__close"
 								onClick={onClose}
-								aria-label="閉じる"
+								aria-label={resources.common.close}
 							>
 								✕
 							</button>

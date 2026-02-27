@@ -2,8 +2,7 @@
 
 import { forwardRef } from "react";
 import type { HTMLAttributes } from "react";
-
-type Size = "sm" | "md" | "lg";
+import resources from "@/lib/resources";type Size = "sm" | "md" | "lg";
 type Variant = "normal" | "bold";
 
 export type CustomLoaderProps = HTMLAttributes<HTMLSpanElement> & {
@@ -13,7 +12,7 @@ export type CustomLoaderProps = HTMLAttributes<HTMLSpanElement> & {
 };
 
 const CustomLoader = forwardRef<HTMLSpanElement, CustomLoaderProps>(
-	({ size = "md", variant = "normal", label = "読み込み中...", className = "", ...rest }, ref) => {
+	({ size = "md", variant = "normal", label = resources.loader.label, className = "", ...rest }, ref) => {
 		const classes = ["custom-loader", `custom-loader--${size}`, `custom-loader--${variant}`, className]
 			.filter(Boolean)
 			.join(" ");
@@ -98,15 +97,15 @@ const CustomLoader = forwardRef<HTMLSpanElement, CustomLoaderProps>(
 					}
 
 					.custom-loader--bold.custom-loader--sm .custom-loader__ring {
-						border-width: 3px;
-					}
-
-					.custom-loader--bold.custom-loader--md .custom-loader__ring {
 						border-width: 4px;
 					}
 
+					.custom-loader--bold.custom-loader--md .custom-loader__ring {
+						border-width: 6px;
+					}
+
 					.custom-loader--bold.custom-loader--lg .custom-loader__ring {
-						border-width: 5px;
+						border-width: 8px;
 					}
 
 					.custom-loader--bold .custom-loader__dot {
