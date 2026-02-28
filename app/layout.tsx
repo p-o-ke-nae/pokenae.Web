@@ -4,15 +4,20 @@ import "./globals.css";
 import NavigationBar from "@/components/organisms/NavigationBar";
 import SessionProvider from "@/components/organisms/SessionProvider";
 import Footer from "@/components/organisms/Footer";
+import { LoadingOverlayProvider } from "@/contexts/LoadingOverlayContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
+  preload: false,
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -32,9 +37,11 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <SessionProvider>
-          <NavigationBar />
-          {children}
-          <Footer />
+          <LoadingOverlayProvider>
+            <NavigationBar />
+            {children}
+            <Footer />
+          </LoadingOverlayProvider>
         </SessionProvider>
       </body>
     </html>
