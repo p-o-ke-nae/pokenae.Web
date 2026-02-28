@@ -1,23 +1,41 @@
 'use client';
 
-import { useState, useId, useEffect } from "react";
+import { useState, useId, useEffect, useMemo } from "react";
 import CustomTextBox from "@/components/atoms/CustomTextBox";
 import CustomButton from "@/components/atoms/CustomButton";
 import Dialog from "@/components/molecules/Dialog";
 import resources from "@/lib/resources";
 
 export type SearchOption = {
-	label: string;
 	value: string;
+	label: string;
+	[key: string]: string;
 };
+
+export type SearchFieldColumn = {
+	/** SearchOption のどのキーを表示するか */
+	key: string;
+	/** テーブルヘッダーに表示する名称（省略時はヘッダーなし） */
+	header?: string;
+	/** 絞り込み検索の対象にするか（デフォルト: true） */
+	searchable?: boolean;
+	/** 列幅（CSS 値、省略時は auto） */
+	width?: string;
+};
+
+const DEFAULT_COLUMNS: SearchFieldColumn[] = [
+	{ key: "value", searchable: true },
+	{ key: "label", searchable: true },
+];
 
 export type SearchFieldProps = {
 	options: SearchOption[];
 	value?: string;
 	onChange?: (value: string) => void;
 	placeholder?: string;
-	labelPlaceholder?: string;
 	dialogTitle?: string;
+	/** ダイアログの表示列と検索対象列を定義（省略時は value + label の2列） */
+	columns?: SearchFieldColumn[];
 	disabled?: boolean;
 	isError?: boolean;
 	className?: string;
@@ -28,8 +46,8 @@ const SearchField = ({
 	value = "",
 	onChange,
 	placeholder,
-	labelPlaceholder,
 	dialogTitle,
+	columns = DEFAULT_COLUMNS,
 	disabled = false,
 	isError = false,
 	className = "",
@@ -44,23 +62,23 @@ const SearchField = ({
 		setInputText(value);
 	}, [value]);
 
-	const matchedOption = options.find((o) => o.value === value);
-	const selectedLabel = matchedOption?.label ?? "";
+	const searchableKeys = useMemo(
+		() => columns.filter((c) => c.searchable !== false).map((c) => c.key),
+		[columns]
+	);
 
-	const hasMatch = value !== "" && matchedOption !== undefined;
-	const hasNoMatch = value !== "" && matchedOption === undefined;
-
-	const displayLabelValue = (() => {
-		if (hasMatch) return selectedLabel;
-		if (hasNoMatch) return resources.searchField.noMatch;
-		return "";
-	})();
+	const hasHeaders = useMemo(
+		() => columns.some((c) => c.header !== undefined),
+		[columns]
+	);
 
 	const filtered = filter
-		? options.filter(
-				(o) =>
-					o.label.toLowerCase().includes(filter.toLowerCase()) ||
-					o.value.toLowerCase().includes(filter.toLowerCase())
+		? options.filter((o) =>
+				searchableKeys.some((key) =>
+					String(o[key] ?? "")
+						.toLowerCase()
+						.includes(filter.toLowerCase())
+				)
 		  )
 		: options;
 
@@ -103,7 +121,7 @@ const SearchField = ({
 						value={inputText}
 						onChange={handleInputChange}
 						placeholder={placeholder ?? resources.searchField.valuePlaceholder}
-						isError={isError || hasNoMatch}
+						isError={isError}
 						disabled={disabled}
 						className="search-field__textbox"
 						aria-haspopup="dialog"
@@ -149,59 +167,78 @@ const SearchField = ({
 					</CustomButton>
 				</div>
 
-				{/* サブ: 名称表示テキストボックス */}
-				<div className="search-field__label-row">
-					<CustomTextBox
-						value={displayLabelValue}
-						readOnly
-						placeholder={labelPlaceholder ?? resources.searchField.labelPlaceholder}
-						isError={hasNoMatch}
-						disabled={disabled}
-						tabIndex={-1}
-						className="search-field__label-textbox"
-						aria-label={labelPlaceholder ?? resources.searchField.labelPlaceholder}
-					/>
-				</div>
-
 				<Dialog
 					open={dialogOpen}
 					onClose={handleCloseDialog}
 					title={dialogTitle ?? resources.searchField.dialogTitle}
 				>
 					<div className="search-field__dialog-content">
+						{/* 絞り込み検索入力 */}
 						<CustomTextBox
 							value={filter}
 							onChange={(e) => setFilter(e.target.value)}
 							placeholder={resources.searchField.searchPlaceholder}
 							autoFocus
 						/>
-						<ul className="search-field__list" role="listbox">
-							{filtered.length > 0 ? (
-								filtered.map((option) => (
-									<li
-										key={option.value}
-										role="option"
-										aria-selected={option.value === value}
-										className={`search-field__list-item${option.value === value ? " search-field__list-item--selected" : ""}`}
-										onClick={() => handleSelect(option)}
-										onKeyDown={(e) => {
-											if (e.key === "Enter" || e.key === " ") {
-												e.preventDefault();
-												handleSelect(option);
-											}
-										}}
-										tabIndex={0}
-									>
-										<span className="search-field__list-value">{option.value}</span>
-										<span className="search-field__list-label">{option.label}</span>
-									</li>
-								))
-							) : (
-								<li className="search-field__no-results">
-									{resources.searchField.noResults}
-								</li>
-							)}
-						</ul>
+						{/* カスタマイズ可能なテーブル形式一覧 */}
+						<div className="search-field__table-wrapper">
+							<table className="search-field__table">
+								{hasHeaders && (
+									<thead>
+										<tr>
+											{columns.map((col) => (
+												<th
+													key={col.key}
+													className="search-field__th"
+													style={col.width ? { width: col.width } : undefined}
+												>
+													{col.header}
+												</th>
+											))}
+										</tr>
+									</thead>
+								)}
+								<tbody role="listbox">
+									{filtered.length > 0 ? (
+										filtered.map((option) => (
+											<tr
+												key={option.value}
+												role="option"
+												aria-selected={option.value === value}
+												className={`search-field__row${option.value === value ? " search-field__row--selected" : ""}`}
+												onClick={() => handleSelect(option)}
+												onKeyDown={(e) => {
+													if (e.key === "Enter" || e.key === " ") {
+														e.preventDefault();
+														handleSelect(option);
+													}
+												}}
+												tabIndex={0}
+											>
+												{columns.map((col) => (
+													<td
+														key={col.key}
+														className="search-field__td"
+														style={col.width ? { width: col.width } : undefined}
+													>
+														{String(option[col.key] ?? "")}
+													</td>
+												))}
+											</tr>
+										))
+									) : (
+										<tr>
+											<td
+												colSpan={columns.length}
+												className="search-field__no-results"
+											>
+												{resources.searchField.noResults}
+											</td>
+										</tr>
+									)}
+								</tbody>
+							</table>
+						</div>
 					</div>
 				</Dialog>
 			</div>
@@ -220,21 +257,9 @@ const SearchField = ({
 					gap: 0.375rem;
 				}
 
-				.search-field__label-row {
-					display: flex;
-					align-items: stretch;
-				}
-
 				.search-field__textbox {
 					flex: 1;
 					min-width: 0;
-				}
-
-				.search-field__label-textbox {
-					flex: 1;
-					min-width: 0;
-					font-size: 0.8125rem;
-					opacity: 0.85;
 				}
 
 				.search-field__clear :global(.custom-button) {
@@ -255,29 +280,45 @@ const SearchField = ({
 					gap: 0.75rem;
 				}
 
-				.search-field__list {
-					list-style: none;
-					margin: 0;
-					padding: 0;
-					max-height: 16rem;
-					overflow-y: auto;
+				.search-field__table-wrapper {
 					border: 1.5px solid var(--color-base-70-dark);
 					border-radius: 0.5rem;
+					overflow: hidden;
+					overflow-y: auto;
+					max-height: 18rem;
 					background-color: var(--color-base-70-light);
 				}
 
-				.search-field__list-item {
-					display: flex;
-					align-items: baseline;
-					gap: 0.75rem;
-					padding: 0.625rem 0.875rem;
+				.search-field__table {
+					width: 100%;
+					border-collapse: collapse;
+				}
+
+				.search-field__th {
+					text-align: left;
+					padding: 0.5rem 0.875rem;
+					font-size: 0.75rem;
+					font-weight: 600;
+					color: color-mix(in srgb, var(--color-text-strong) 70%, transparent);
+					background-color: color-mix(
+						in srgb,
+						var(--color-accent-25) 6%,
+						var(--color-base-70-light)
+					);
+					border-bottom: 1.5px solid var(--color-base-70-dark);
+					white-space: nowrap;
+					position: sticky;
+					top: 0;
+				}
+
+				.search-field__row {
 					cursor: pointer;
 					font-size: 0.875rem;
 					color: var(--color-text-strong);
 					transition: background-color 100ms ease;
 				}
 
-				.search-field__list-item:hover {
+				.search-field__row:hover {
 					background-color: color-mix(
 						in srgb,
 						var(--color-accent-25) 8%,
@@ -285,7 +326,7 @@ const SearchField = ({
 					);
 				}
 
-				.search-field__list-item:focus-visible {
+				.search-field__row:focus-visible {
 					outline: none;
 					background-color: color-mix(
 						in srgb,
@@ -294,7 +335,7 @@ const SearchField = ({
 					);
 				}
 
-				.search-field__list-item--selected {
+				.search-field__row--selected {
 					background-color: color-mix(
 						in srgb,
 						var(--color-accent-25) 15%,
@@ -304,7 +345,7 @@ const SearchField = ({
 					color: var(--color-accent-25-strong);
 				}
 
-				.search-field__list-item--selected:hover {
+				.search-field__row--selected:hover {
 					background-color: color-mix(
 						in srgb,
 						var(--color-accent-25) 20%,
@@ -312,19 +353,9 @@ const SearchField = ({
 					);
 				}
 
-				.search-field__list-value {
-					font-family: ui-monospace, monospace;
-					font-size: 0.8125rem;
-					min-width: 3rem;
-					color: color-mix(in srgb, var(--color-text-strong) 70%, transparent);
-				}
-
-				.search-field__list-item--selected .search-field__list-value {
-					color: color-mix(in srgb, var(--color-accent-25-strong) 80%, transparent);
-				}
-
-				.search-field__list-label {
-					flex: 1;
+				.search-field__td {
+					padding: 0.625rem 0.875rem;
+					vertical-align: middle;
 				}
 
 				.search-field__no-results {

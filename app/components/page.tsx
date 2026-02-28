@@ -16,7 +16,7 @@ import PokenaeLogo, { type PokenaeLogo as PokenaeLogoRef } from '@/components/at
 import CheckboxField from '@/components/molecules/CheckboxField';
 import Dialog from '@/components/molecules/Dialog';
 import RadioField from '@/components/molecules/RadioField';
-import SearchField, { type SearchOption } from '@/components/molecules/SearchField';
+import SearchField, { type SearchOption, type SearchFieldColumn } from '@/components/molecules/SearchField';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 
 export default function ComponentsPage() {
@@ -31,20 +31,27 @@ export default function ComponentsPage() {
   };
 
   const searchOptions: SearchOption[] = [
-    { value: '001', label: 'フシギダネ' },
-    { value: '002', label: 'フシギソウ' },
-    { value: '003', label: 'フシギバナ' },
-    { value: '004', label: 'ヒトカゲ' },
-    { value: '005', label: 'リザード' },
-    { value: '006', label: 'リザードン' },
-    { value: '007', label: 'ゼニガメ' },
-    { value: '008', label: 'カメール' },
-    { value: '009', label: 'カメックス' },
-    { value: '025', label: 'ピカチュウ' },
-    { value: '133', label: 'イーブイ' },
-    { value: '152', label: 'チコリータ' },
-    { value: '155', label: 'ヒノアラシ' },
-    { value: '158', label: 'ワニノコ' },
+    { value: '001', label: 'フシギダネ', type: '草/毒' },
+    { value: '002', label: 'フシギソウ', type: '草/毒' },
+    { value: '003', label: 'フシギバナ', type: '草/毒' },
+    { value: '004', label: 'ヒトカゲ', type: '炎' },
+    { value: '005', label: 'リザード', type: '炎' },
+    { value: '006', label: 'リザードン', type: '炎/飛行' },
+    { value: '007', label: 'ゼニガメ', type: '水' },
+    { value: '008', label: 'カメール', type: '水' },
+    { value: '009', label: 'カメックス', type: '水' },
+    { value: '025', label: 'ピカチュウ', type: '電気' },
+    { value: '133', label: 'イーブイ', type: 'ノーマル' },
+    { value: '152', label: 'チコリータ', type: '草' },
+    { value: '155', label: 'ヒノアラシ', type: '炎' },
+    { value: '158', label: 'ワニノコ', type: '水' },
+  ];
+
+  // columns で検索対象列・表示列・ヘッダーをカスタマイズ
+  const searchColumns: SearchFieldColumn[] = [
+    { key: 'value', header: 'No.', width: '4rem', searchable: true },
+    { key: 'label', header: '名前', searchable: true },
+    { key: 'type', header: 'タイプ', width: '6rem', searchable: true },
   ];
 
   return (
@@ -337,6 +344,7 @@ export default function ComponentsPage() {
                 options={searchOptions}
                 value={searchValue}
                 onChange={setSearchValue}
+                columns={searchColumns}
                 placeholder="ポケモンを選択..."
                 dialogTitle="ポケモン検索"
               />
