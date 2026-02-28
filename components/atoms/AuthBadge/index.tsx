@@ -20,7 +20,7 @@ export default function AuthBadge({ isAuthenticated, userName, userEmail, classN
   };
 
   const handleSignIn = () => {
-    signIn('google', { callbackUrl: '/' });
+    signIn('google', { callbackUrl: window.location.href });
   };
 
   // 未ログイン時：ログインボタンを表示
