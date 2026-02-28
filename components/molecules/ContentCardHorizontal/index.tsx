@@ -47,10 +47,11 @@ export default function ContentCardHorizontal({
 					gap: 1.25rem;
 					padding: 1.25rem;
 					background: var(--background);
-					border: 1px solid var(--color-base-70);
-					border-left: 4px solid var(--color-accent-25);
+					border: 2px solid var(--color-base-70-dark);
+					border-left: 5px solid var(--color-accent-25);
 					border-radius: 0.5rem;
 					text-decoration: none;
+					overflow: hidden;
 					transition:
 						box-shadow 0.2s ease,
 						transform 0.2s ease;
@@ -69,6 +70,7 @@ export default function ContentCardHorizontal({
 					border-radius: 0.375rem;
 					overflow: hidden;
 					background: var(--color-base-70);
+					flex-shrink: 0;
 				}
 
 				.card-h__body {
@@ -76,13 +78,19 @@ export default function ContentCardHorizontal({
 					display: flex;
 					flex-direction: column;
 					gap: 0.5rem;
+					min-width: 0;
+					overflow: hidden;
 				}
 
 				.card-h__title {
-					font-size: 1.25rem;
+					font-size: 1.125rem;
 					font-weight: 700;
 					color: var(--color-text-strong);
 					line-height: 1.4;
+					display: -webkit-box;
+					-webkit-line-clamp: 2;
+					-webkit-box-orient: vertical;
+					overflow: hidden;
 				}
 
 				.card-h__description {
@@ -90,6 +98,10 @@ export default function ContentCardHorizontal({
 					color: var(--foreground);
 					opacity: 0.8;
 					line-height: 1.6;
+					display: -webkit-box;
+					-webkit-line-clamp: 2;
+					-webkit-box-orient: vertical;
+					overflow: hidden;
 				}
 
 				.card-h__date {
@@ -97,6 +109,7 @@ export default function ContentCardHorizontal({
 					color: var(--foreground);
 					opacity: 0.5;
 					margin-top: auto;
+					white-space: nowrap;
 				}
 			`}</style>
 		</>

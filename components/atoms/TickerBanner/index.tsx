@@ -78,15 +78,15 @@ export default function TickerBanner({
 					background: #1a1a2e;
 					color: #f0f0f0;
 					overflow: hidden;
-					border-top: 2px solid var(--color-accent-25);
-					border-bottom: 2px solid var(--color-accent-25);
+					border-top: 3px solid var(--color-accent-25);
+					border-bottom: 3px solid var(--color-accent-25);
 				}
 
 				.ticker__track {
 					display: inline-flex;
 					white-space: nowrap;
-					gap: 4rem;
-					padding: 0.6rem 0;
+					gap: 5rem;
+					padding: 1rem 0;
 					animation: ticker-scroll linear infinite;
 				}
 
@@ -100,7 +100,8 @@ export default function TickerBanner({
 				}
 
 				.ticker__item {
-					font-size: 0.875rem;
+					font-size: 1rem;
+					font-weight: 700;
 					flex-shrink: 0;
 				}
 
@@ -110,7 +111,7 @@ export default function TickerBanner({
 					background: #f5c300;
 					color: #1a1a2e;
 					font-weight: 700;
-					padding: 0.15rem 0.6rem;
+					padding: 0.2rem 0.75rem;
 					border-radius: 0.2rem;
 				}
 
