@@ -66,7 +66,7 @@ const SearchField = ({
 	const hasMatch = value !== "" && matchedOption !== undefined;
 	const hasNoMatch = value !== "" && matchedOption === undefined;
 	const displayLabelValue = (() => {
-		if (hasMatch) return matchedOption!.label;
+		if (hasMatch) return matchedOption?.label ?? "";
 		if (hasNoMatch) return resources.searchField.noMatch;
 		return "";
 	})();
