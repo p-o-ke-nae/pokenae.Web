@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="400" fill="url(#g2)"/>
+  <circle cx="1000" cy="100" r="200" fill="rgba(170,133,167,0.15)"/>
+  <circle cx="200" cy="300" r="150" fill="rgba(170,133,167,0.1)"/>
+  <text x="120" y="160" fill="#aa85a7" font-size="56" font-family="Arial, sans-serif" font-weight="bold">個体値特定ツール</text>
+  <text x="120" y="230" fill="rgba(255,255,255,0.85)" font-size="32" font-family="Arial, sans-serif">自動認識で瞬時に判定</text>
+  <text x="120" y="290" fill="rgba(255,255,255,0.55)" font-size="20" font-family="Arial, sans-serif">ver3シリーズで認識精度がさらに向上</text>
+</svg>
