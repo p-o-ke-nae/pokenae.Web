@@ -27,10 +27,14 @@ export function LoadingOverlayProvider({ children }: { children: ReactNode }) {
 	const startLoading = useCallback<StartLoadingFn>(async (asyncFn, msg) => {
 		if (msg) setMessage(msg);
 		else setMessage(resources.loadingOverlay.message);
-		await new Promise<void>((resolve) => {
+		await new Promise<void>((resolve, reject) => {
 			startTransition(async () => {
-				await asyncFn();
-				resolve();
+				try {
+					await asyncFn();
+					resolve();
+				} catch (e) {
+					reject(e);
+				}
 			});
 		});
 	}, []);
