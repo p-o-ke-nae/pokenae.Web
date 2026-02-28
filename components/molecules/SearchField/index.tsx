@@ -62,6 +62,15 @@ const SearchField = ({
 		setInputText(value);
 	}, [value]);
 
+	const matchedOption = options.find((o) => o.value === value);
+	const hasMatch = value !== "" && matchedOption !== undefined;
+	const hasNoMatch = value !== "" && matchedOption === undefined;
+	const displayLabelValue = (() => {
+		if (hasMatch) return matchedOption!.label;
+		if (hasNoMatch) return resources.searchField.noMatch;
+		return "";
+	})();
+
 	const searchableKeys = useMemo(
 		() => columns.filter((c) => c.searchable !== false).map((c) => c.key),
 		[columns]
@@ -167,6 +176,20 @@ const SearchField = ({
 					</CustomButton>
 				</div>
 
+				{/* サブ: 名称表示テキストボックス */}
+				<div className="search-field__label-row">
+					<CustomTextBox
+						value={displayLabelValue}
+						readOnly
+						placeholder={resources.searchField.labelPlaceholder}
+						isError={hasNoMatch}
+						disabled={disabled}
+						tabIndex={-1}
+						className="search-field__label-textbox"
+						aria-label={resources.searchField.labelPlaceholder}
+					/>
+				</div>
+
 				<Dialog
 					open={dialogOpen}
 					onClose={handleCloseDialog}
@@ -255,6 +278,18 @@ const SearchField = ({
 					display: flex;
 					align-items: stretch;
 					gap: 0.375rem;
+				}
+
+				.search-field__label-row {
+					display: flex;
+					align-items: stretch;
+				}
+
+				.search-field__label-textbox {
+					flex: 1;
+					min-width: 0;
+					font-size: 0.8125rem;
+					opacity: 0.85;
 				}
 
 				.search-field__textbox {

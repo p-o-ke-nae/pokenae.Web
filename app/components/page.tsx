@@ -349,11 +349,7 @@ export default function ComponentsPage() {
                 dialogTitle="ポケモン検索"
               />
             </div>
-            {searchValue && (
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                選択値: <code className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">{searchValue}</code>
-              </p>
-            )}
+
           </div>
         </section>
       </div>
