@@ -78,8 +78,8 @@ export default function TickerBanner({
 					background: #1a1a2e;
 					color: #f0f0f0;
 					overflow: hidden;
-					border-top: 3px solid var(--color-accent-25);
-					border-bottom: 3px solid var(--color-accent-25);
+					border-top: 8px solid var(--color-accent-25);
+					border-bottom: 8px solid var(--color-accent-25);
 				}
 
 				.ticker__track {

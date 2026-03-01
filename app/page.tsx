@@ -175,9 +175,15 @@ export default function Home() {
         }
 
         .top-page__card-list {
-          display: flex;
-          flex-direction: column;
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
           gap: 1rem;
+        }
+
+        @media (max-width: 640px) {
+          .top-page__card-list {
+            grid-template-columns: 1fr;
+          }
         }
 
         .top-page__card-grid {
