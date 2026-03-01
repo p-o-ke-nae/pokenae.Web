@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="cg2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2d1b69"/>
+      <stop offset="100%" stop-color="#1a0f42"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#cg2)"/>
+  <circle cx="200" cy="120" r="70" fill="rgba(255,255,255,0.1)"/>
+  <text x="200" y="130" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="48" font-family="Arial, sans-serif">♪</text>
+  <text x="200" y="200" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="20" font-family="Arial, sans-serif" font-weight="bold">SVサントラ</text>
+  <text x="200" y="230" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="14" font-family="Arial, sans-serif">スカーレット・バイオレット</text>
+</svg>
