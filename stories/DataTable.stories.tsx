@@ -227,3 +227,44 @@ const ExternalSortDemo = () => {
 export const WithExternalSort: Story = {
   render: () => <ExternalSortDemo />,
 };
+
+// 行追加・変更追跡（useTableData フック）
+import { useTableData, omitTrackedFields } from '../lib/hooks/useTableData';
+
+const WithAddRowDemo = () => {
+  const tableData = useTableData<SampleRow>({
+    data: sampleData,
+    rowKey: 'id',
+    newRowTemplate: { name: '', category: '', active: false, score: '0' },
+  });
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <DataTable<SampleRow>
+        columns={sampleColumns}
+        data={tableData.rows as SampleRow[]}
+        rowKey="id"
+        onAddRow={tableData.addRow}
+      />
+      <p style={{ fontSize: '0.875rem' }}>
+        追加行: {tableData.addedRows.length} 件　変更行: {tableData.modifiedRows.length} 件
+      </p>
+      {tableData.addedRows.length > 0 && (
+        <details>
+          <summary style={{ fontSize: '0.75rem', cursor: 'pointer' }}>追加行データ (JSON)</summary>
+          <pre style={{ fontSize: '0.75rem', background: '#f5f5f5', padding: '0.5rem', borderRadius: '0.25rem' }}>
+            {JSON.stringify(tableData.addedRows.map(omitTrackedFields), null, 2)}
+          </pre>
+        </details>
+      )}
+      {(tableData.addedRows.length > 0) && (
+        <button type="button" onClick={tableData.resetAll} style={{ fontSize: '0.75rem' }}>
+          変更をリセット
+        </button>
+      )}
+    </div>
+  );
+};
+
+export const WithAddRow: Story = {
+  render: () => <WithAddRowDemo />,
+};

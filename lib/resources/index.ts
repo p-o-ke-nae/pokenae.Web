@@ -21,6 +21,7 @@ const resources = {
     collapse: "折りたたむ",
     filter: "フィルタ",
     filterPlaceholder: "絞り込み",
+    addRow: "行を追加",
   },
   searchField: {
     dialogTitle: "検索",

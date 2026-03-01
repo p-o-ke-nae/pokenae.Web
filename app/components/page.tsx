@@ -18,6 +18,7 @@ import Dialog from '@/components/molecules/Dialog';
 import RadioField from '@/components/molecules/RadioField';
 import SearchField, { type SearchOption, type SearchFieldColumn } from '@/components/molecules/SearchField';
 import DataTable, { type DataTableColumn, type SortState } from '@/components/molecules/DataTable';
+import { useTableData, omitTrackedFields } from '@/lib/hooks/useTableData';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 
 export default function ComponentsPage() {
@@ -27,6 +28,18 @@ export default function ComponentsPage() {
   const [dataTableSelectedKeys, setDataTableSelectedKeys] = useState<string[]>([]);
   const [dataTableSortState, setDataTableSortState] = useState<SortState | null>(null);
   const [dataTableFilteredCount, setDataTableFilteredCount] = useState<number>(5);
+
+  type PokemonRow = { id: string; name: string; type: string; active: boolean; score: string };
+  const initialPokemons: PokemonRow[] = [
+    { id: '001', name: 'フシギダネ', type: '草/毒', active: true, score: '91' },
+    { id: '004', name: 'ヒトカゲ', type: '炎', active: true, score: '85' },
+    { id: '007', name: 'ゼニガメ', type: '水', active: false, score: '68' },
+  ];
+  const tableData = useTableData<PokemonRow>({
+    data: initialPokemons,
+    rowKey: 'id',
+    newRowTemplate: { name: '', type: '', active: false, score: '0' },
+  });
   const logoRef = useRef<PokenaeLogoRef>(null);
   const { startLoading } = useLoadingOverlay();
 
@@ -457,6 +470,47 @@ export default function ComponentsPage() {
                 rowKey="id"
                 childrenKey="children"
               />
+            </div>
+
+            {/* 4. useTableData による行追加・変更追跡 */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-zinc-500">
+                ④ 行追加・変更追跡（useTableData フック）
+              </p>
+              <DataTable<PokemonRow>
+                columns={[
+                  { key: 'id', header: 'No.', width: '4rem' },
+                  { key: 'name', header: '名前' },
+                  { key: 'type', header: 'タイプ', width: '8rem' },
+                  { key: 'score', header: 'スコア', width: '6rem' },
+                  { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
+                ] as DataTableColumn<PokemonRow>[]}
+                data={tableData.rows as PokemonRow[]}
+                rowKey="id"
+                onAddRow={tableData.addRow}
+              />
+              <div className="flex gap-2 flex-wrap">
+                <p className="text-xs text-zinc-500">
+                  追加行: {tableData.addedRows.length} 件　変更行: {tableData.modifiedRows.length} 件
+                </p>
+                {(tableData.addedRows.length > 0 || tableData.modifiedRows.length > 0) && (
+                  <button
+                    type="button"
+                    className="text-xs text-red-500 underline"
+                    onClick={tableData.resetAll}
+                  >
+                    変更を全て取り消す
+                  </button>
+                )}
+              </div>
+              {tableData.addedRows.length > 0 && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-zinc-500">追加行データ (JSON)</summary>
+                  <pre className="mt-1 p-2 bg-zinc-100 dark:bg-zinc-800 rounded text-xs overflow-auto">
+                    {JSON.stringify(tableData.addedRows.map(omitTrackedFields), null, 2)}
+                  </pre>
+                </details>
+              )}
             </div>
 
           </div>

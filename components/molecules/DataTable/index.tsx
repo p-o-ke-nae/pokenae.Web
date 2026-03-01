@@ -109,6 +109,12 @@ onFilteredDataChange?: (data: T[]) => void;
 sortState?: SortState | null;
 /** ソート状態変更コールバック */
 onSortChange?: (sort: SortState | null) => void;
+/**
+ * 「行を追加」ボタンを押したときのコールバック
+ * 指定するとテーブル上部にボタンが表示されます。
+ * データの追加ロジックは `useTableData` フック側で実装してください。
+ */
+onAddRow?: () => void;
 className?: string;
 };
 
@@ -133,6 +139,7 @@ resizable = false,
 onFilteredDataChange,
 sortState: sortStateProp,
 onSortChange,
+onAddRow,
 className = "",
 }: DataTableProps<T>) {
 // 列順序（ユーザーが並べ替えた場合のみオーバーライドとして保持）
@@ -497,6 +504,17 @@ return effectiveSortState.direction === 'asc' ? '↑' : '↓';
 
 return (
 <>
+{onAddRow && (
+<div className="data-table-toolbar">
+<button
+type="button"
+className="data-table-toolbar__add-btn"
+onClick={onAddRow}
+>
++ {resources.dataTable.addRow}
+</button>
+</div>
+)}
 <div className={`data-table-wrapper ${className}`.trim()}>
 <table className="data-table">
 {hasHeaders && (
@@ -844,6 +862,40 @@ transparent
 display: inline-block;
 width: 1.25rem;
 flex-shrink: 0;
+}
+
+.data-table-toolbar {
+display: flex;
+align-items: center;
+gap: 0.5rem;
+margin-bottom: 0.5rem;
+}
+
+.data-table-toolbar__add-btn {
+display: inline-flex;
+align-items: center;
+gap: 0.25rem;
+padding: 0.375rem 0.875rem;
+border: 1.5px solid var(--color-accent-25);
+border-radius: 0.375rem;
+background-color: transparent;
+color: var(--color-accent-25-strong);
+font-size: 0.8125rem;
+cursor: pointer;
+transition: background-color 100ms ease, color 100ms ease;
+}
+
+.data-table-toolbar__add-btn:hover {
+background-color: color-mix(
+in srgb,
+var(--color-accent-25) 8%,
+transparent
+);
+}
+
+.data-table-toolbar__add-btn:focus-visible {
+outline: 2px solid var(--color-accent-25);
+outline-offset: 2px;
 }
 `}</style>
 </>
