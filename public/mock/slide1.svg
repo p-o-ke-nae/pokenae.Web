@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#aa85a7"/>
+      <stop offset="100%" stop-color="#6b4568"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="400" fill="url(#g1)"/>
+  <circle cx="900" cy="200" r="280" fill="rgba(255,255,255,0.05)"/>
+  <circle cx="300" cy="350" r="180" fill="rgba(255,255,255,0.05)"/>
+  <text x="120" y="160" fill="rgba(255,255,255,0.95)" font-size="56" font-family="Arial, sans-serif" font-weight="bold">pokenae</text>
+  <text x="120" y="230" fill="rgba(255,255,255,0.85)" font-size="32" font-family="Arial, sans-serif">ポケモン攻略ツール集</text>
+  <text x="120" y="290" fill="rgba(255,255,255,0.65)" font-size="20" font-family="Arial, sans-serif">個体値・捕獲・育成をサポートする総合ツールサイト</text>
+</svg>

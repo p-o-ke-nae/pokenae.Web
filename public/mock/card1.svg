@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">
+  <rect width="400" height="300" fill="#f5f0f8"/>
+  <!-- pokenae logo style -->
+  <circle cx="200" cy="120" r="90" fill="#aa85a7"/>
+  <circle cx="200" cy="130" r="65" fill="#f5f0f8"/>
+  <rect x="170" y="60" width="30" height="130" fill="#aa85a7"/>
+  <text x="200" y="250" text-anchor="middle" fill="#93688e" font-size="36" font-family="Arial, sans-serif" font-weight="bold" letter-spacing="2">pokenae</text>
+</svg>
