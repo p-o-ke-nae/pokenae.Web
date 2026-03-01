@@ -17,12 +17,14 @@ import CheckboxField from '@/components/molecules/CheckboxField';
 import Dialog from '@/components/molecules/Dialog';
 import RadioField from '@/components/molecules/RadioField';
 import SearchField, { type SearchOption, type SearchFieldColumn } from '@/components/molecules/SearchField';
+import DataTable, { type DataTableColumn } from '@/components/molecules/DataTable';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 
 export default function ComponentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
+  const [dataTableSelectedKeys, setDataTableSelectedKeys] = useState<string[]>([]);
   const logoRef = useRef<PokenaeLogoRef>(null);
   const { startLoading } = useLoadingOverlay();
 
@@ -350,6 +352,37 @@ export default function ComponentsPage() {
               />
             </div>
 
+          </div>
+        </section>
+
+        {/* DataTable (Molecule) */}
+        <section className="space-y-4">
+          <CustomHeader level={2}>DataTable（分子粒度・Molecule）</CustomHeader>
+          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm space-y-4">
+            <p className="text-xs text-zinc-500">行選択チェックボックス付きテーブル</p>
+            <DataTable<{ id: string; name: string; type: string; active: boolean; score: string }>
+              columns={[
+                { key: 'id', header: 'No.', width: '4rem' },
+                { key: 'name', header: '名前' },
+                { key: 'type', header: 'タイプ', width: '8rem' },
+                { key: 'score', header: 'スコア', width: '6rem' },
+                { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
+              ] as DataTableColumn<{ id: string; name: string; type: string; active: boolean; score: string }>[]}
+              data={[
+                { id: '001', name: 'フシギダネ', type: '草/毒', active: true, score: '91' },
+                { id: '004', name: 'ヒトカゲ', type: '炎', active: true, score: '85' },
+                { id: '007', name: 'ゼニガメ', type: '水', active: false, score: '68' },
+                { id: '025', name: 'ピカチュウ', type: '電気', active: true, score: '78' },
+                { id: '133', name: 'イーブイ', type: 'ノーマル', active: false, score: '60' },
+              ]}
+              rowKey="id"
+              selectable
+              selectedKeys={dataTableSelectedKeys}
+              onSelectionChange={setDataTableSelectedKeys}
+            />
+            <p className="text-xs text-zinc-500">
+              選択中: {dataTableSelectedKeys.length > 0 ? dataTableSelectedKeys.join(', ') : 'なし'}
+            </p>
           </div>
         </section>
       </div>
