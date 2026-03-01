@@ -509,7 +509,7 @@ return (
 <button
 type="button"
 className="data-table-toolbar__add-btn"
-onClick={onAddRow}
+onClick={() => onAddRow()}
 >
 + {resources.dataTable.addRow}
 </button>
