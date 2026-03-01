@@ -17,7 +17,7 @@ import CheckboxField from '@/components/molecules/CheckboxField';
 import Dialog from '@/components/molecules/Dialog';
 import RadioField from '@/components/molecules/RadioField';
 import SearchField, { type SearchOption, type SearchFieldColumn } from '@/components/molecules/SearchField';
-import DataTable, { type DataTableColumn } from '@/components/molecules/DataTable';
+import DataTable, { type DataTableColumn, type SortState } from '@/components/molecules/DataTable';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 
 export default function ComponentsPage() {
@@ -25,6 +25,8 @@ export default function ComponentsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [dataTableSelectedKeys, setDataTableSelectedKeys] = useState<string[]>([]);
+  const [dataTableSortState, setDataTableSortState] = useState<SortState | null>(null);
+  const [dataTableFilteredCount, setDataTableFilteredCount] = useState<number>(5);
   const logoRef = useRef<PokenaeLogoRef>(null);
   const { startLoading } = useLoadingOverlay();
 
@@ -358,59 +360,105 @@ export default function ComponentsPage() {
         {/* DataTable (Molecule) */}
         <section className="space-y-4">
           <CustomHeader level={2}>DataTable（分子粒度・Molecule）</CustomHeader>
-          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm space-y-4">
-            <p className="text-xs text-zinc-500">行選択チェックボックス付きテーブル</p>
-            <DataTable<{ id: string; name: string; type: string; active: boolean; score: string }>
-              columns={[
-                { key: 'id', header: 'No.', width: '4rem' },
-                { key: 'name', header: '名前' },
-                { key: 'type', header: 'タイプ', width: '8rem' },
-                { key: 'score', header: 'スコア', width: '6rem' },
-                { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
-              ] as DataTableColumn<{ id: string; name: string; type: string; active: boolean; score: string }>[]}
-              data={[
-                { id: '001', name: 'フシギダネ', type: '草/毒', active: true, score: '91' },
-                { id: '004', name: 'ヒトカゲ', type: '炎', active: true, score: '85' },
-                { id: '007', name: 'ゼニガメ', type: '水', active: false, score: '68' },
-                { id: '025', name: 'ピカチュウ', type: '電気', active: true, score: '78' },
-                { id: '133', name: 'イーブイ', type: 'ノーマル', active: false, score: '60' },
-              ]}
-              rowKey="id"
-              selectable
-              selectedKeys={dataTableSelectedKeys}
-              onSelectionChange={setDataTableSelectedKeys}
-            />
-            <p className="text-xs text-zinc-500">
-              選択中: {dataTableSelectedKeys.length > 0 ? dataTableSelectedKeys.join(', ') : 'なし'}
-            </p>
+          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm space-y-6">
 
-            <p className="text-xs text-zinc-500 pt-2">親子階層データ（childrenKey=&quot;children&quot;）</p>
-            <DataTable<Record<string, unknown>>
-              columns={[
-                { key: 'name', header: 'カテゴリ / ポケモン' },
-                { key: 'type', header: 'タイプ', width: '8rem' },
-                { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
-              ]}
-              data={[
-                {
-                  id: 'cat-grass', name: '草タイプ', type: '草系', active: true,
-                  children: [
-                    { id: 'cat-grass-1', name: 'フシギダネ', type: '草/毒', active: true },
-                    { id: 'cat-grass-2', name: 'フシギソウ', type: '草/毒', active: false },
-                  ],
-                },
-                {
-                  id: 'cat-fire', name: '炎タイプ', type: '炎系', active: true,
-                  children: [
-                    { id: 'cat-fire-1', name: 'ヒトカゲ', type: '炎', active: true },
-                    { id: 'cat-fire-2', name: 'リザードン', type: '炎/飛行', active: true },
-                  ],
-                },
-                { id: 'cat-electric', name: '電気タイプ（子なし）', type: '電気系', active: false },
-              ]}
-              rowKey="id"
-              childrenKey="children"
-            />
+            {/* 1. 行選択チェックボックス */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-zinc-500">① 行選択チェックボックス付きテーブル</p>
+              <DataTable<{ id: string; name: string; type: string; active: boolean; score: string }>
+                columns={[
+                  { key: 'id', header: 'No.', width: '4rem' },
+                  { key: 'name', header: '名前' },
+                  { key: 'type', header: 'タイプ', width: '8rem' },
+                  { key: 'score', header: 'スコア', width: '6rem' },
+                  { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
+                ] as DataTableColumn<{ id: string; name: string; type: string; active: boolean; score: string }>[]}
+                data={[
+                  { id: '001', name: 'フシギダネ', type: '草/毒', active: true, score: '91' },
+                  { id: '004', name: 'ヒトカゲ', type: '炎', active: true, score: '85' },
+                  { id: '007', name: 'ゼニガメ', type: '水', active: false, score: '68' },
+                  { id: '025', name: 'ピカチュウ', type: '電気', active: true, score: '78' },
+                  { id: '133', name: 'イーブイ', type: 'ノーマル', active: false, score: '60' },
+                ]}
+                rowKey="id"
+                selectable
+                selectedKeys={dataTableSelectedKeys}
+                onSelectionChange={setDataTableSelectedKeys}
+              />
+              <p className="text-xs text-zinc-500">
+                選択中: {dataTableSelectedKeys.length > 0 ? dataTableSelectedKeys.join(', ') : 'なし'}
+              </p>
+            </div>
+
+            {/* 2. ソート＋フィルタ＋列順変更＋列幅リサイズ */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-zinc-500">
+                ② ソート（ヘッダークリック）・フィルタ（入力欄）・列順変更（ヘッダードラッグ）・列幅リサイズ（右端ドラッグ）
+              </p>
+              <DataTable<{ id: string; name: string; type: string; score: string; active: boolean }>
+                columns={[
+                  { key: 'id', header: 'No.', width: '4rem', sortable: true },
+                  { key: 'name', header: '名前', sortable: true, filterable: true },
+                  { key: 'type', header: 'タイプ', width: '8rem', sortable: true, filterable: true },
+                  {
+                    key: 'score',
+                    header: 'スコア',
+                    width: '6rem',
+                    sortable: true,
+                    sortValue: (v) => Number(v),
+                  },
+                  { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
+                ] as DataTableColumn<{ id: string; name: string; type: string; score: string; active: boolean }>[]}
+                data={[
+                  { id: '001', name: 'フシギダネ', type: '草/毒', active: true, score: '91' },
+                  { id: '004', name: 'ヒトカゲ', type: '炎', active: true, score: '85' },
+                  { id: '007', name: 'ゼニガメ', type: '水', active: false, score: '68' },
+                  { id: '025', name: 'ピカチュウ', type: '電気', active: true, score: '78' },
+                  { id: '133', name: 'イーブイ', type: 'ノーマル', active: false, score: '60' },
+                ]}
+                rowKey="id"
+                resizable
+                sortState={dataTableSortState}
+                onSortChange={setDataTableSortState}
+                onFilteredDataChange={(d) => setDataTableFilteredCount(d.length)}
+              />
+              <p className="text-xs text-zinc-500">
+                ソート: {dataTableSortState ? `${dataTableSortState.key} ${dataTableSortState.direction}` : 'なし'}
+                　表示件数: {dataTableFilteredCount} 件
+              </p>
+            </div>
+
+            {/* 3. 親子階層データ */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-zinc-500">③ 親子階層データ（childrenKey=&quot;children&quot;）</p>
+              <DataTable<Record<string, unknown>>
+                columns={[
+                  { key: 'name', header: 'カテゴリ / ポケモン' },
+                  { key: 'type', header: 'タイプ', width: '8rem' },
+                  { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
+                ]}
+                data={[
+                  {
+                    id: 'cat-grass', name: '草タイプ', type: '草系', active: true,
+                    children: [
+                      { id: 'cat-grass-1', name: 'フシギダネ', type: '草/毒', active: true },
+                      { id: 'cat-grass-2', name: 'フシギソウ', type: '草/毒', active: false },
+                    ],
+                  },
+                  {
+                    id: 'cat-fire', name: '炎タイプ', type: '炎系', active: true,
+                    children: [
+                      { id: 'cat-fire-1', name: 'ヒトカゲ', type: '炎', active: true },
+                      { id: 'cat-fire-2', name: 'リザードン', type: '炎/飛行', active: true },
+                    ],
+                  },
+                  { id: 'cat-electric', name: '電気タイプ（子なし）', type: '電気系', active: false },
+                ]}
+                rowKey="id"
+                childrenKey="children"
+              />
+            </div>
+
           </div>
         </section>
       </div>

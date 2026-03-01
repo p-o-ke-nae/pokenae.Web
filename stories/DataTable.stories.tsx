@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
-import DataTable, { type DataTableColumn, type DataTableProps } from '../components/molecules/DataTable';
+import DataTable, { type DataTableColumn, type DataTableProps, type SortState } from '../components/molecules/DataTable';
 
 type SampleRow = Record<string, unknown> & {
   id: string;
@@ -144,3 +144,86 @@ export const TreeData: Story = {
   },
 };
 
+// ソート＋フィルタ
+const sortableFilterableColumns: DataTableColumn<SampleRow>[] = [
+  { key: 'id', header: 'ID', width: '5rem', sortable: true },
+  { key: 'name', header: '名前', sortable: true, filterable: true },
+  { key: 'category', header: 'カテゴリ', sortable: true, filterable: true },
+  {
+    key: 'score',
+    header: 'スコア',
+    width: '6rem',
+    sortable: true,
+    sortValue: (v) => Number(v),
+  },
+  { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
+];
+
+export const WithSortAndFilter: Story = {
+  args: {
+    columns: sortableFilterableColumns,
+    data: sampleData,
+    rowKey: 'id',
+  },
+};
+
+// フィルタ後データ取得コールバック
+const FilteredDataCallbackDemo = () => {
+  const [filteredData, setFilteredData] = useState<SampleRow[]>(sampleData);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <DataTable<SampleRow>
+        columns={sortableFilterableColumns}
+        data={sampleData}
+        rowKey="id"
+        onFilteredDataChange={setFilteredData}
+      />
+      <div>
+        <p style={{ fontSize: '0.75rem', marginBottom: '0.25rem', opacity: 0.6 }}>
+          フィルタ後データ（onFilteredDataChange）:
+        </p>
+        <pre style={{ fontSize: '0.75rem', background: '#f5f5f5', padding: '0.5rem', borderRadius: '0.25rem' }}>
+          {JSON.stringify(filteredData.map(r => ({ id: r.id, name: r.name })), null, 2)}
+        </pre>
+      </div>
+    </div>
+  );
+};
+
+export const WithFilteredDataCallback: Story = {
+  render: () => <FilteredDataCallbackDemo />,
+};
+
+// 列の並べ替え＋列幅リサイズ
+export const WithColumnManagement: Story = {
+  args: {
+    columns: sampleColumns,
+    data: sampleData,
+    rowKey: 'id',
+    resizable: true,
+  },
+};
+
+// 外部ソート管理
+const ExternalSortDemo = () => {
+  const [sortState, setSortState] = useState<SortState | null>(null);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <DataTable<SampleRow>
+        columns={sortableFilterableColumns}
+        data={sampleData}
+        rowKey="id"
+        sortState={sortState}
+        onSortChange={setSortState}
+      />
+      <p style={{ fontSize: '0.875rem' }}>
+        ソート状態:{' '}
+        {sortState ? `${sortState.key} ${sortState.direction}` : 'なし'}
+      </p>
+    </div>
+  );
+};
+
+export const WithExternalSort: Story = {
+  render: () => <ExternalSortDemo />,
+};

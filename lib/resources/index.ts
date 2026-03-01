@@ -19,6 +19,8 @@ const resources = {
     selectRow: "行",
     expand: "展開",
     collapse: "折りたたむ",
+    filter: "フィルタ",
+    filterPlaceholder: "絞り込み",
   },
   searchField: {
     dialogTitle: "検索",
