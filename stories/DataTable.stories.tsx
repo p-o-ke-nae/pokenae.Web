@@ -105,3 +105,42 @@ export const CustomEmptyMessage: Story = {
   },
 };
 
+type TreeRow = Record<string, unknown> & {
+  id: string;
+  name: string;
+  category: string;
+  active: boolean;
+  children?: TreeRow[];
+};
+
+const treeData: TreeRow[] = [
+  {
+    id: 'cat-1', name: '草タイプ', category: '草系', active: true,
+    children: [
+      { id: 'cat-1-1', name: 'フシギダネ', category: '草/毒', active: true },
+      { id: 'cat-1-2', name: 'フシギソウ', category: '草/毒', active: false },
+    ],
+  },
+  {
+    id: 'cat-2', name: '炎タイプ', category: '炎系', active: true,
+    children: [
+      { id: 'cat-2-1', name: 'ヒトカゲ', category: '炎', active: true },
+      { id: 'cat-2-2', name: 'リザードン', category: '炎/飛行', active: true },
+    ],
+  },
+  { id: 'cat-3', name: '電気タイプ', category: '電気系', active: false },
+];
+
+export const TreeData: Story = {
+  args: {
+    columns: [
+      { key: 'name', header: 'カテゴリ / 名前' },
+      { key: 'category', header: 'タイプ' },
+      { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
+    ],
+    data: treeData as SampleRow[],
+    rowKey: 'id',
+    childrenKey: 'children',
+  },
+};
+

@@ -17,6 +17,8 @@ const resources = {
     emptyMessage: "データがありません",
     selectAll: "全て選択",
     selectRow: "行",
+    expand: "展開",
+    collapse: "折りたたむ",
   },
   searchField: {
     dialogTitle: "検索",

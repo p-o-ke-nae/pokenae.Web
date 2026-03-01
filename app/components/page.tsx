@@ -383,6 +383,34 @@ export default function ComponentsPage() {
             <p className="text-xs text-zinc-500">
               選択中: {dataTableSelectedKeys.length > 0 ? dataTableSelectedKeys.join(', ') : 'なし'}
             </p>
+
+            <p className="text-xs text-zinc-500 pt-2">親子階層データ（childrenKey=&quot;children&quot;）</p>
+            <DataTable<Record<string, unknown>>
+              columns={[
+                { key: 'name', header: 'カテゴリ / ポケモン' },
+                { key: 'type', header: 'タイプ', width: '8rem' },
+                { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
+              ]}
+              data={[
+                {
+                  id: 'cat-grass', name: '草タイプ', type: '草系', active: true,
+                  children: [
+                    { id: 'cat-grass-1', name: 'フシギダネ', type: '草/毒', active: true },
+                    { id: 'cat-grass-2', name: 'フシギソウ', type: '草/毒', active: false },
+                  ],
+                },
+                {
+                  id: 'cat-fire', name: '炎タイプ', type: '炎系', active: true,
+                  children: [
+                    { id: 'cat-fire-1', name: 'ヒトカゲ', type: '炎', active: true },
+                    { id: 'cat-fire-2', name: 'リザードン', type: '炎/飛行', active: true },
+                  ],
+                },
+                { id: 'cat-electric', name: '電気タイプ（子なし）', type: '電気系', active: false },
+              ]}
+              rowKey="id"
+              childrenKey="children"
+            />
           </div>
         </section>
       </div>
