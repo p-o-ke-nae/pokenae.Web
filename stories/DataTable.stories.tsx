@@ -46,46 +46,50 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+const WithRowClickDemo = () => {
+  const [lastClicked, setLastClicked] = useState<string>('');
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <DataTable<SampleRow>
+        columns={sampleColumns}
+        data={sampleData}
+        rowKey="id"
+        onRowClick={(row) => setLastClicked(`${row.id}: ${row.name}`)}
+      />
+      {lastClicked && (
+        <p style={{ fontSize: '0.875rem' }}>
+          クリックされた行: <strong>{lastClicked}</strong>
+        </p>
+      )}
+    </div>
+  );
+};
+
 export const WithRowClick: Story = {
-  render: () => {
-    const [lastClicked, setLastClicked] = useState<string>('');
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <DataTable<SampleRow>
-          columns={sampleColumns}
-          data={sampleData}
-          rowKey="id"
-          onRowClick={(row) => setLastClicked(`${row.id}: ${row.name}`)}
-        />
-        {lastClicked && (
-          <p style={{ fontSize: '0.875rem' }}>
-            クリックされた行: <strong>{lastClicked}</strong>
-          </p>
-        )}
-      </div>
-    );
-  },
+  render: () => <WithRowClickDemo />,
+};
+
+const SelectableDemo = () => {
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <DataTable<SampleRow>
+        columns={sampleColumns}
+        data={sampleData}
+        rowKey="id"
+        selectable
+        selectedKeys={selectedKeys}
+        onSelectionChange={setSelectedKeys}
+      />
+      <p style={{ fontSize: '0.875rem' }}>
+        選択中: {selectedKeys.length > 0 ? selectedKeys.join(', ') : 'なし'}
+      </p>
+    </div>
+  );
 };
 
 export const Selectable: Story = {
-  render: () => {
-    const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <DataTable<SampleRow>
-          columns={sampleColumns}
-          data={sampleData}
-          rowKey="id"
-          selectable
-          selectedKeys={selectedKeys}
-          onSelectionChange={setSelectedKeys}
-        />
-        <p style={{ fontSize: '0.875rem' }}>
-          選択中: {selectedKeys.length > 0 ? selectedKeys.join(', ') : 'なし'}
-        </p>
-      </div>
-    );
-  },
+  render: () => <SelectableDemo />,
 };
 
 export const Empty: Story = {
