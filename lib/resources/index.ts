@@ -13,6 +13,16 @@ const resources = {
   loadingOverlay: {
     message: "Loading...",
   },
+  dataTable: {
+    emptyMessage: "データがありません",
+    selectAll: "全て選択",
+    selectRow: "行",
+    expand: "展開",
+    collapse: "折りたたむ",
+    filter: "フィルタ",
+    filterPlaceholder: "絞り込み",
+    addRow: "行を追加",
+  },
   searchField: {
     dialogTitle: "検索",
     searchPlaceholder: "絞り込み...",
