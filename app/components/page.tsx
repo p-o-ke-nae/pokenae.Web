@@ -22,6 +22,7 @@ import { useTableData, omitTrackedFields } from '@/lib/hooks/useTableData';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 
 type AddRowPokemon = { id: string; name: string; type: string; active: boolean; score: string };
+type EditablePokemon = { id: string; name: string; type: string; active: boolean; score: string };
 
 const ADD_ROW_INITIAL_DATA: AddRowPokemon[] = [
   { id: '001', name: 'フシギダネ', type: '草/毒', active: true, score: '91' },
@@ -40,6 +41,17 @@ const ADD_ROW_COLUMNS: DataTableColumn<AddRowPokemon>[] = [
   { key: 'score', header: 'スコア', width: '6rem' },
   { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
 ];
+
+const EDITABLE_INITIAL_DATA: EditablePokemon[] = [
+  { id: '001', name: 'フシギダネ', type: '草/毒', active: true, score: '91' },
+  { id: '004', name: 'ヒトカゲ', type: '炎', active: true, score: '85' },
+  { id: '007', name: 'ゼニガメ', type: '水', active: false, score: '68' },
+  { id: '025', name: 'ピカチュウ', type: '電気', active: true, score: '78' },
+];
+
+const EDITABLE_NEW_TEMPLATE: Partial<EditablePokemon> = {
+  name: '', type: '', active: false, score: '0',
+};
 
 function AddRowDemo() {
   const tableData = useTableData<AddRowPokemon>({
@@ -77,6 +89,103 @@ function AddRowDemo() {
           </pre>
         </details>
       )}
+    </div>
+  );
+}
+
+function EditableDemo() {
+  const tableData = useTableData<EditablePokemon>({
+    data: EDITABLE_INITIAL_DATA,
+    rowKey: 'id',
+    newRowTemplate: EDITABLE_NEW_TEMPLATE,
+  });
+
+  const columns: DataTableColumn<EditablePokemon>[] = [
+    { key: 'id', header: 'No.', width: '4rem' },
+    {
+      key: 'name',
+      header: '名前',
+      render: (value, row) => (
+        <CustomTextBox
+          value={String(value ?? '')}
+          onChange={e => tableData.updateRow(String(row.id), { name: e.target.value })}
+          placeholder="名前"
+          style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}
+        />
+      ),
+    },
+    {
+      key: 'type',
+      header: 'タイプ',
+      width: '10rem',
+      render: (value, row) => (
+        <CustomTextBox
+          value={String(value ?? '')}
+          onChange={e => tableData.updateRow(String(row.id), { type: e.target.value })}
+          placeholder="タイプ"
+          style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}
+        />
+      ),
+    },
+    {
+      key: 'score',
+      header: 'スコア',
+      width: '7rem',
+      render: (value, row) => (
+        <CustomTextBox
+          value={String(value ?? '')}
+          onChange={e => tableData.updateRow(String(row.id), { score: e.target.value })}
+          placeholder="0"
+          style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}
+        />
+      ),
+    },
+    {
+      key: 'active',
+      header: '有効',
+      width: '4rem',
+      render: (value, row) => (
+        <CustomCheckBox
+          checked={Boolean(value)}
+          onChange={e => tableData.updateRow(String(row.id), { active: e.target.checked })}
+          aria-label="有効"
+        />
+      ),
+    },
+  ];
+
+  const currentJson = tableData.rows.map(omitTrackedFields);
+
+  return (
+    <div className="space-y-3">
+      <DataTable<EditablePokemon>
+        columns={columns}
+        data={tableData.rows as EditablePokemon[]}
+        rowKey="id"
+        onAddRow={tableData.addRow}
+      />
+      <div className="flex gap-2 flex-wrap items-center">
+        <p className="text-xs text-zinc-500">
+          追加行: {tableData.addedRows.length} 件　変更行: {tableData.modifiedRows.length} 件
+        </p>
+        {(tableData.addedRows.length > 0 || tableData.modifiedRows.length > 0) && (
+          <button
+            type="button"
+            className="text-xs text-red-500 underline"
+            onClick={tableData.resetAll}
+          >
+            変更を全て取り消す
+          </button>
+        )}
+      </div>
+      <details open className="text-xs">
+        <summary className="cursor-pointer text-zinc-500 font-medium select-none">
+          現在の JSON データ（リアルタイム更新）
+        </summary>
+        <pre className="mt-1 p-3 bg-zinc-100 dark:bg-zinc-800 rounded text-xs overflow-auto max-h-64 leading-relaxed">
+          {JSON.stringify(currentJson, null, 2)}
+        </pre>
+      </details>
     </div>
   );
 }
@@ -527,6 +636,14 @@ export default function ComponentsPage() {
                 ④ 行追加・変更追跡（useTableData フック）
               </p>
               <AddRowDemo />
+            </div>
+
+            {/* 5. インライン編集テーブル（CustomTextBox + CustomCheckBox） */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-zinc-500">
+                ⑤ インライン編集テーブル（CustomTextBox・CustomCheckBox でセルを直接編集 / JSON リアルタイム表示）
+              </p>
+              <EditableDemo />
             </div>
 
           </div>
