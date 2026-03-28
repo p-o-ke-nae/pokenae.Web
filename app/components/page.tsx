@@ -1,6 +1,7 @@
-'use client';
+ 'use client';
 
 import { useRef, useState } from 'react';
+import { getSession } from 'next-auth/react';
 import CustomButton from '@/components/atoms/CustomButton';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomHeader from '@/components/atoms/CustomHeader';
@@ -228,6 +229,43 @@ export default function ComponentsPage() {
     { key: 'label', header: '名前', searchable: true },
     { key: 'type', header: 'タイプ', width: '6rem', searchable: true },
   ];
+
+  // Debug: サーバー側で受信したヘッダを表示するための状態と実行関数
+  const [dbgHeaders, setDbgHeaders] = useState<Record<string, string> | null>(null);
+  const [dbgLoading, setDbgLoading] = useState(false);
+
+  const fetchDebugHeaders = async (includeToken: boolean) => {
+    setDbgLoading(true);
+    setDbgHeaders(null);
+    try {
+      const headers: Record<string, string> = {};
+      if (includeToken) {
+        try {
+          const session = await getSession();
+          if (session?.accessToken) {
+            headers['Authorization'] = `Bearer ${session.accessToken}`;
+            headers['X-Google-Access-Token'] = session.accessToken;
+          }
+        } catch (err) {
+          console.warn('getSession failed', err);
+        }
+      }
+
+      const res = await fetch('/api/debug/inspect-headers', {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
+
+      const json = await res.json();
+      if (json && json.headers) setDbgHeaders(json.headers);
+      else setDbgHeaders(json);
+    } catch (err) {
+      setDbgHeaders({ error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setDbgLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black p-8">
@@ -646,6 +684,32 @@ export default function ComponentsPage() {
               <EditableDemo />
             </div>
 
+          </div>
+        </section>
+
+        {/* Debug: Auth ヘッダ確認 */}
+        <section className="space-y-4">
+          <CustomHeader level={2}>認証ヘッダ確認（デバッグ）</CustomHeader>
+          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">ボタンを押すと /api/debug/inspect-headers にリクエストを送り、サーバー側で受信したヘッダを表示します。</p>
+            <div className="flex gap-3 mb-4">
+              <CustomButton
+                variant="accent"
+                onClick={async () => await fetchDebugHeaders(true)}
+              >
+                ヘッダ取得（トークン付与）
+              </CustomButton>
+              <CustomButton
+                variant="neutral"
+                onClick={async () => await fetchDebugHeaders(false)}
+              >
+                ヘッダ取得（トークン未付与）
+              </CustomButton>
+            </div>
+            {dbgLoading && <div className="mb-3"><CustomLoader /></div>}
+            {dbgHeaders && (
+              <pre className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded text-sm overflow-auto">{JSON.stringify(dbgHeaders, null, 2)}</pre>
+            )}
           </div>
         </section>
       </div>
