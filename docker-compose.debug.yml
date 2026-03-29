@@ -4,6 +4,8 @@ version: '3.8'
 
 services:
   app:
+    env_file:
+      - .env.docker.debug
     build:
       target: dev  # Dockerfile の dev ステージを使用（next dev でホットリロード）
       args:
@@ -27,6 +29,8 @@ services:
       # WATCHPACK_POLLING で polling 監視を有効にすることでホットリロードを実現している。
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
+      # デバッグ環境ではバックエンドが自己署名証明書を使用しているため、TLS検証を無効にする
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"
     volumes:
       # ソースコードをマウントしてホットリロードを有効化
       - .:/app:cached

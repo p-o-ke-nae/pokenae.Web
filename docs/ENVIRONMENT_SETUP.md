@@ -185,15 +185,49 @@ Next.js では以下の順序で環境ファイルが読み込まれます：
 # ローカル開発用：.env.local
 NEXT_PUBLIC_ENVIRONMENT=debug
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+API_SERVICES=game-library-api
+API_SERVICE_GAME_LIBRARY_API_BASE_URL=http://localhost:10080
+# API_SERVICES=game-library-api,inventory-api,reporting-api
+# API_SERVICE_INVENTORY_API_BASE_URL=http://localhost:8011
+# API_SERVICE_REPORTING_API_BASE_URL=http://localhost:8012
+ADMIN_ALLOWED_EMAILS=admin@example.com,another-admin@example.com
 
 # 開発環境用：.env.development
 NEXT_PUBLIC_ENVIRONMENT=development
 NEXT_PUBLIC_API_BASE_URL=https://api-dev.example.com
+API_SERVICES=game-library-api
+API_SERVICE_GAME_LIBRARY_API_BASE_URL=https://game-library-dev.example.com
+# API_SERVICES=game-library-api,inventory-api,reporting-api
+# API_SERVICE_INVENTORY_API_BASE_URL=https://inventory-dev.example.com
+# API_SERVICE_REPORTING_API_BASE_URL=https://reporting-dev.example.com
+ADMIN_ALLOWED_EMAILS=admin@example.com,another-admin@example.com
 
 # 本番環境用：.env.production
 NEXT_PUBLIC_ENVIRONMENT=production
 NEXT_PUBLIC_API_BASE_URL=https://api.example.com
+API_SERVICES=game-library-api
+API_SERVICE_GAME_LIBRARY_API_BASE_URL=https://game-library.example.com
+# API_SERVICES=game-library-api,inventory-api,reporting-api
+# API_SERVICE_INVENTORY_API_BASE_URL=https://inventory.example.com
+# API_SERVICE_REPORTING_API_BASE_URL=https://reporting.example.com
+ADMIN_ALLOWED_EMAILS=admin@example.com,another-admin@example.com
 ```
+
+### 複数 Web API を使う場合
+
+- `NEXT_PUBLIC_API_BASE_URL` は全体の既定 API です。
+- 業務機能 API は `game-library-api` のように、画面名ではなく業務ドメインが分かる名前を推奨します。
+- `API_SERVICES` に追加サービス名をカンマ区切りで列挙すると、`/api/services/{service}` 経由で利用できます。
+- 追加サービスの URL は `API_SERVICE_<サービス名>_BASE_URL` で指定します。
+- サービス名にハイフンが含まれる場合は `_` に変換して大文字で指定します。
+  - 例: `inventory-api` → `API_SERVICE_INVENTORY_API_BASE_URL`
+
+### 管理画面用の許可リスト
+
+- `/game-management` 配下は管理者専用です。
+- 管理者判定は `ADMIN_ALLOWED_EMAILS` または `ADMIN_EMAIL_ALLOWLIST` に設定したメールアドレスのカンマ区切り許可リストで行います。
+- 判定対象は Google OAuth2 / NextAuth セッションの `session.user.email` です。
+- 例: `ADMIN_ALLOWED_EMAILS=admin@example.com,owner@example.com`
 
 ## ナビゲーションバーのバッジ表示
 

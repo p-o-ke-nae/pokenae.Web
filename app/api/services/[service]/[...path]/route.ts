@@ -91,9 +91,9 @@ async function handleRequest(
     const searchParams = request.nextUrl.searchParams.toString();
     const fullEndpoint = searchParams ? `${endpoint}?${searchParams}` : endpoint;
 
-    // リクエストボディを取得（GET/DELETE以外）
+    // リクエストボディを取得（GET以外）
     let body;
-    if (method !== 'GET' && method !== 'DELETE') {
+    if (method !== 'GET') {
       body = await parseRequestBody(request);
     }
 
@@ -130,7 +130,7 @@ async function handleRequest(
         response = await client.patch(fullEndpoint, body, { headers: proxyHeaders });
         break;
       case 'DELETE':
-        response = await client.delete(fullEndpoint, { headers: proxyHeaders });
+        response = await client.delete(fullEndpoint, { headers: proxyHeaders, body });
         break;
       default:
         return createErrorResponse('METHOD_NOT_ALLOWED', 'Method not allowed', 405);
