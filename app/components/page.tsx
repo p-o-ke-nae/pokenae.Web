@@ -18,7 +18,7 @@ import CheckboxField from '@/components/molecules/CheckboxField';
 import Dialog from '@/components/molecules/Dialog';
 import RadioField from '@/components/molecules/RadioField';
 import SearchField, { type SearchOption, type SearchFieldColumn } from '@/components/molecules/SearchField';
-import DataTable, { type DataTableColumn, type SortState } from '@/components/molecules/DataTable';
+import DataTable, { DATA_TABLE_DEFAULT_PAGE_HEIGHT, type DataTableColumn, type SortState } from '@/components/molecules/DataTable';
 import { useTableData, omitTrackedFields } from '@/lib/hooks/useTableData';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 
@@ -65,6 +65,7 @@ function AddRowDemo() {
       <DataTable<AddRowPokemon>
         columns={ADD_ROW_COLUMNS}
         data={tableData.rows as AddRowPokemon[]}
+        height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
         rowKey="id"
         onAddRow={tableData.addRow}
       />
@@ -162,6 +163,7 @@ function EditableDemo() {
       <DataTable<EditablePokemon>
         columns={columns}
         data={tableData.rows as EditablePokemon[]}
+        height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
         rowKey="id"
         onAddRow={tableData.addRow}
       />
@@ -590,6 +592,7 @@ export default function ComponentsPage() {
                   { id: '133', name: 'イーブイ', type: 'ノーマル', active: false, score: '60' },
                 ]}
                 rowKey="id"
+                height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
                 selectable
                 selectedKeys={dataTableSelectedKeys}
                 onSelectionChange={setDataTableSelectedKeys}
@@ -626,6 +629,7 @@ export default function ComponentsPage() {
                   { id: '133', name: 'イーブイ', type: 'ノーマル', active: false, score: '60' },
                 ]}
                 rowKey="id"
+                height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
                 resizable
                 sortState={dataTableSortState}
                 onSortChange={setDataTableSortState}
@@ -664,6 +668,7 @@ export default function ComponentsPage() {
                   { id: 'cat-electric', name: '電気タイプ（子なし）', type: '電気系', active: false },
                 ]}
                 rowKey="id"
+                height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
                 childrenKey="children"
               />
             </div>

@@ -19,7 +19,7 @@ import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import {
   hasTrialData,
   trialClearAll,
-} from '@/lib/game-management/trial-storage';
+} from '@/lib/game-management/trial';
 import {
   getTrialSummary,
   importSelectedItems,

@@ -31,6 +31,12 @@ const LoadingOverlay = ({ open, message = resources.loadingOverlay.message }: Lo
 					overflow: visible;
 					border-radius: 1rem;
 					outline: none;
+					cursor: default;
+					user-select: none;
+				}
+
+				dialog.loading-overlay-modal::backdrop {
+					cursor: default;
 				}
 			`}</style>
 
@@ -42,6 +48,8 @@ const LoadingOverlay = ({ open, message = resources.loadingOverlay.message }: Lo
 					gap: 1.25rem;
 					padding: 2.5rem 3rem;
 					color-scheme: light;
+					cursor: default;
+					user-select: none;
 				}
 
 				.loading-overlay__message {
@@ -50,6 +58,7 @@ const LoadingOverlay = ({ open, message = resources.loadingOverlay.message }: Lo
 					font-weight: 500;
 					margin: 0;
 					letter-spacing: 0.01em;
+					cursor: default;
 				}
 			`}</style>
 		</>

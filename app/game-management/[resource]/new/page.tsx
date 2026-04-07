@@ -1,5 +1,4 @@
-import { notFound } from 'next/navigation';
-import { GameManagementResourceEditorPage } from '@/components/organisms/GameManagement';
+import { redirect, notFound } from 'next/navigation';
 import { isResourceKey, ADMIN_RESOURCE_ORDER } from '@/lib/game-management/resources';
 
 export default async function GameManagementResourceNewPage({
@@ -13,11 +12,5 @@ export default async function GameManagementResourceNewPage({
     notFound();
   }
 
-  return (
-    <GameManagementResourceEditorPage
-      resourceKey={resource}
-      basePath="/game-management"
-      scope="admin"
-    />
-  );
+  redirect(`/game-management/${resource}`);
 }

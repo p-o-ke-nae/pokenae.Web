@@ -8,6 +8,20 @@ export type DialogProps = Omit<CustomModalProps, "children"> & {
 	title?: string;
 	children?: ReactNode;
 	footer?: ReactNode;
+	/** Dialog width preset. Defaults to "sm" (28 rem). */
+	size?: "sm" | "md" | "lg";
+};
+
+const sizeWidthMap: Record<NonNullable<DialogProps["size"]>, string> = {
+	sm: "min(90vw, 28rem)",
+	md: "min(90vw, 40rem)",
+	lg: "min(90vw, 56rem)",
+};
+
+const sizeMaxHeightMap: Record<NonNullable<DialogProps["size"]>, string> = {
+	sm: "min(60vh, 36rem)",
+	md: "min(70vh, 42rem)",
+	lg: "min(75vh, 48rem)",
 };
 
 const Dialog = ({
@@ -16,13 +30,15 @@ const Dialog = ({
 	title,
 	children,
 	footer,
+	size = "sm",
 	style,
 	...rest
 }: DialogProps) => {
 	const dialogStyle: CSSProperties = {
-		width: "min(90vw, 28rem)",
+		width: sizeWidthMap[size],
+		'--dialog-body-max-height': sizeMaxHeightMap[size],
 		...style,
-	};
+	} as CSSProperties;
 
 	return (
 		<>
@@ -97,12 +113,15 @@ const Dialog = ({
 
 				.dialog__body {
 					padding: 1.25rem;
+					max-height: var(--dialog-body-max-height, min(60vh, 36rem));
+					overflow-y: auto;
 				}
 
 				.dialog__footer {
 					display: flex;
+					flex-wrap: wrap;
 					justify-content: flex-end;
-					gap: 0.5rem;
+					gap: 0.75rem;
 					padding: 0.875rem 1.25rem;
 					border-top: 1px solid var(--color-base-70-dark);
 					background-color: color-mix(in srgb, var(--color-base-70) 40%, var(--color-base-70-light));

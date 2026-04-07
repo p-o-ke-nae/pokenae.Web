@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CustomButton from '@/components/atoms/CustomButton';
+import PageModeToggle from '@/components/atoms/PageModeToggle';
 import CustomCheckBox from '@/components/atoms/CustomCheckBox';
 import CustomComboBox from '@/components/atoms/CustomComboBox';
 import CustomHeader from '@/components/atoms/CustomHeader';
@@ -9,30 +10,60 @@ import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
 import CustomTextBox from '@/components/atoms/CustomTextBox';
-import DataTable, { type DataTableColumn } from '@/components/molecules/DataTable';
+import DataTable, { DATA_TABLE_DEFAULT_PAGE_HEIGHT, type DataTableColumn } from '@/components/molecules/DataTable';
 import Dialog from '@/components/molecules/Dialog';
+import RowMoveButtons from '@/components/organisms/GameManagement/RowMoveButtons';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import {
   ApiError,
+  fetchMasterLookups,
+} from '@/lib/game-management/api';
+import {
+  fetchPublicStoryProgressSchema,
+} from '@/lib/game-management/api/public';
+import {
   createStoryProgressDefinition,
   deleteStoryProgressDefinition,
   deleteStoryProgressOverride,
-  fetchMasterLookups,
-  fetchPublicStoryProgressSchema,
   fetchStoryProgressDefinitions,
   fetchStoryProgressOverrides,
+  reorderStoryProgressDefinitions,
   updateStoryProgressDefinition,
   upsertStoryProgressOverride,
-} from '@/lib/game-management/api';
+} from '@/lib/game-management/api/schema';
 import type {
   CreateStoryProgressDefinitionRequest,
   MasterLookups,
+  ReorderItemRequest,
   StoryProgressDefinitionDto,
   StoryProgressOverrideDto,
   StoryProgressSchemaDto,
   UpdateStoryProgressDefinitionRequest,
   UpsertStoryProgressOverrideRequest,
 } from '@/lib/game-management/types';
+import type { PageMode } from '@/lib/game-management/resources';
+
+function parsePositiveDisplayOrder(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (!/^\d+$/.test(trimmed)) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed >= 1 ? parsed : null;
+}
+
+function validateDisplayOrderInput(value: string, required: boolean): string {
+  if (!value.trim()) {
+    return required ? '表示順を入力してください。' : '';
+  }
+
+  return parsePositiveDisplayOrder(value) == null ? '表示順は1以上の整数で入力してください。' : '';
+}
 
 // ---------------------------------------------------------------------------
 // Row types
@@ -119,7 +150,7 @@ function nullIfBlank(value: string): string | null {
 }
 
 function createEmptyDefinitionFormState(): DefinitionFormState {
-  return { progressKey: '', label: '', description: '', displayOrder: '0' };
+  return { progressKey: '', label: '', description: '', displayOrder: '' };
 }
 
 function createEmptyOverrideFormState(): OverrideFormState {
@@ -135,11 +166,12 @@ function createOverrideFormStateFromDto(override: StoryProgressOverrideDto | nul
 }
 
 function createDefinitionRequest(formState: DefinitionFormState): CreateStoryProgressDefinitionRequest {
+  const displayOrder = parsePositiveDisplayOrder(formState.displayOrder);
   return {
     progressKey: formState.progressKey.trim(),
     label: formState.label.trim(),
     description: nullIfBlank(formState.description),
-    displayOrder: Number(formState.displayOrder),
+    ...(displayOrder != null ? { displayOrder } : {}),
   };
 }
 
@@ -187,7 +219,7 @@ function SectionCard({ title, description, actions, children }: { title: string;
           <CustomHeader level={2}>{title}</CustomHeader>
           <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">{description}</p>
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
       </div>
       {children}
     </section>
@@ -199,7 +231,8 @@ function SectionCard({ title, description, actions, children }: { title: string;
 // ---------------------------------------------------------------------------
 
 export default function StoryProgressManager() {
-  const { startLoading } = useLoadingOverlay();
+  const { isPending, startLoading } = useLoadingOverlay();
+  const definitionDialogBodyRef = useRef<HTMLDivElement | null>(null);
 
   const [lookups, setLookups] = useState<MasterLookups | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
@@ -222,6 +255,15 @@ export default function StoryProgressManager() {
   const [editingOverride, setEditingOverride] = useState<StoryProgressOverrideDto | null>(null);
   const [overrideTargetDefinition, setOverrideTargetDefinition] = useState<StoryProgressDefinitionDto | null>(null);
   const [overrideFormState, setOverrideFormState] = useState<OverrideFormState>(createEmptyOverrideFormState());
+  const inlineDialogMessageVisible = definitionDialogOpen;
+
+  // Page mode
+  const [pageMode, setPageMode] = useState<PageMode>('view');
+
+  // Reorder state for definitions
+  const [defRowOrder, setDefRowOrder] = useState<number[] | null>(null);
+  const [defReorderDirty, setDefReorderDirty] = useState(false);
+  const [defReorderSaving, setDefReorderSaving] = useState(false);
 
   // -----------------------------------------------------------------------
   // Load master lookups
@@ -266,6 +308,8 @@ export default function StoryProgressManager() {
     }
     const items = await fetchStoryProgressDefinitions(Number(selectedContentGroupId));
     setDefinitions(items);
+    setDefRowOrder(null);
+    setDefReorderDirty(false);
   }, [selectedContentGroupId]);
 
   useEffect(() => {
@@ -337,6 +381,12 @@ export default function StoryProgressManager() {
     [definitions],
   );
 
+  const sortedDefinitionRows = useMemo(() => {
+    if (!defRowOrder) return definitionRows;
+    const rowMap = new Map(definitionRows.map((r) => [r.id, r]));
+    return defRowOrder.map((id) => rowMap.get(id)).filter((r): r is DefinitionRow => r !== undefined);
+  }, [definitionRows, defRowOrder]);
+
   // -----------------------------------------------------------------------
   // Override table rows
   // -----------------------------------------------------------------------
@@ -371,6 +421,15 @@ export default function StoryProgressManager() {
     [resolvedSchema],
   );
 
+  const focusFirstField = useCallback((container: HTMLDivElement | null) => {
+    requestAnimationFrame(() => {
+      const firstField = container?.querySelector<HTMLElement>(
+        'input:not([readonly]):not([disabled]), select:not([disabled]), textarea:not([readonly]):not([disabled])',
+      );
+      firstField?.focus();
+    });
+  }, []);
+
   // -----------------------------------------------------------------------
   // Definition CRUD handlers
   // -----------------------------------------------------------------------
@@ -390,23 +449,38 @@ export default function StoryProgressManager() {
     setDefinitionDialogOpen(true);
   }
 
-  async function handleSaveDefinition() {
-    if (!selectedContentGroupId) return;
-    setError(null);
+  async function handleSaveDefinition(afterSave: 'close' | 'continue' = 'close') {
     setSuccess(null);
+
+    if (!selectedContentGroupId) return;
+
+    const displayOrderError = validateDisplayOrderInput(definitionFormState.displayOrder, editingDefinition != null);
+    if (displayOrderError) {
+      setError(displayOrderError);
+      return;
+    }
+
+    setError(null);
     try {
+      const continueCreating = afterSave === 'continue' && !editingDefinition;
       await startLoading(async () => {
         const request = createDefinitionRequest(definitionFormState);
         if (editingDefinition) {
           await updateStoryProgressDefinition(editingDefinition.id, request as UpdateStoryProgressDefinitionRequest);
-          setSuccess('進行度定義を更新しました。');
         } else {
           await createStoryProgressDefinition(Number(selectedContentGroupId), request);
-          setSuccess('進行度定義を作成しました。');
         }
-        setDefinitionDialogOpen(false);
-        await loadDefinitions();
       }, '保存中...');
+      await loadDefinitions();
+      if (continueCreating) {
+        setEditingDefinition(null);
+        setDefinitionFormState(createEmptyDefinitionFormState());
+        setSuccess('進行度定義を作成しました。続けて入力できます。');
+        focusFirstField(definitionDialogBodyRef.current);
+      } else {
+        setDefinitionDialogOpen(false);
+        setSuccess(editingDefinition ? '進行度定義を更新しました。' : '進行度定義を作成しました。');
+      }
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : '進行度定義の保存に失敗しました。');
     }
@@ -425,6 +499,77 @@ export default function StoryProgressManager() {
       setError(deleteError instanceof Error ? deleteError.message : '進行度定義の削除に失敗しました。');
     }
   }
+
+  // -----------------------------------------------------------------------
+  // Definition reorder
+  // -----------------------------------------------------------------------
+
+  const defReorderEnabled = defRowOrder !== null;
+
+  const handleEnterDefReorder = useCallback(() => {
+    setDefRowOrder(definitions.filter((d) => !d.isDeleted).map((d) => d.id));
+    setDefReorderDirty(false);
+  }, [definitions]);
+
+  const handleCancelDefReorder = useCallback(() => {
+    setDefRowOrder(null);
+    setDefReorderDirty(false);
+  }, []);
+
+  const handleMoveDefinition = useCallback((id: number, direction: 'up' | 'down') => {
+    setDefRowOrder((prev) => {
+      if (!prev) return prev;
+      const idx = prev.indexOf(id);
+      if (idx === -1) return prev;
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+      return next;
+    });
+    setDefReorderDirty(true);
+  }, []);
+
+  const handleDefRowMove = useCallback((fromIndex: number, toIndex: number) => {
+    setDefRowOrder((prev) => {
+      if (!prev) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+    setDefReorderDirty(true);
+  }, []);
+
+  const handleSaveDefReorder = useCallback(async () => {
+    if (!defRowOrder || !defReorderDirty || !selectedContentGroupId) return;
+    setDefReorderSaving(true);
+    try {
+      const defMap = new Map(definitions.map((d) => [d.id, d]));
+      const items: ReorderItemRequest[] = defRowOrder
+        .map((id, index) => {
+          const newOrder = index + 1;
+          const dto = defMap.get(id);
+          if (dto?.displayOrder === newOrder) return null;
+          return { id, displayOrder: newOrder };
+        })
+        .filter((item): item is ReorderItemRequest => item !== null);
+
+      if (items.length > 0) {
+        await startLoading(async () => {
+          await reorderStoryProgressDefinitions(Number(selectedContentGroupId), items);
+        }, '進行度定義の表示順を保存中...');
+      }
+      setDefRowOrder(null);
+      setDefReorderDirty(false);
+      setSuccess('進行度定義の表示順を保存しました。');
+      await loadDefinitions();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : '進行度定義の表示順保存に失敗しました。');
+    } finally {
+      setDefReorderSaving(false);
+    }
+  }, [defRowOrder, defReorderDirty, selectedContentGroupId, definitions, startLoading, loadDefinitions]);
 
   // -----------------------------------------------------------------------
   // Override CRUD handlers
@@ -500,10 +645,13 @@ export default function StoryProgressManager() {
               StoryProgressDefinitions、StoryProgressOverrides、公開 story-progress-schema の resolved 結果を 1 画面で管理します。
             </p>
           </div>
+          <div className="mt-3 flex items-center gap-2">
+            <PageModeToggle mode={pageMode} onChange={setPageMode} />
+          </div>
         </div>
 
-        {error && <CustomMessageArea variant="error">{error}</CustomMessageArea>}
-        {success && <CustomMessageArea variant="success">{success}</CustomMessageArea>}
+        {error && !inlineDialogMessageVisible && <CustomMessageArea variant="error">{error}</CustomMessageArea>}
+        {success && !inlineDialogMessageVisible && <CustomMessageArea variant="success">{success}</CustomMessageArea>}
 
         <SectionCard
           title="進行度定義"
@@ -517,36 +665,73 @@ export default function StoryProgressManager() {
                 options={contentGroupOptions}
                 onChange={setSelectedContentGroupId}
               />
-              <CustomButton variant="accent" disabled={!selectedContentGroupId} onClick={() => openDefinitionDialog(null)}>
-                進行度定義を追加
-              </CustomButton>
+              {defReorderEnabled ? (
+                <>
+                  <CustomButton variant="accent" disabled={!defReorderDirty || defReorderSaving} onClick={() => void handleSaveDefReorder()}>表示順を保存</CustomButton>
+                  <CustomButton onClick={handleCancelDefReorder}>キャンセル</CustomButton>
+                </>
+              ) : pageMode === 'edit' ? (
+                <>
+                  <CustomButton variant="accent" disabled={!selectedContentGroupId} onClick={() => openDefinitionDialog(null)}>
+                    進行度定義を追加
+                  </CustomButton>
+                  {definitions.filter((d) => !d.isDeleted).length > 1 ? (
+                    <CustomButton onClick={handleEnterDefReorder}>表示順の変更</CustomButton>
+                  ) : null}
+                </>
+              ) : null}
             </>
           }
         >
           <DataTable<DefinitionRow>
+            key={`definitions:${defReorderEnabled ? 'reorder' : 'default'}`}
             columns={[
-              ...definitionColumns,
+              ...definitionColumns.map((column) =>
+                defReorderEnabled
+                  ? { ...column, sortable: false, filterable: false }
+                  : column
+              ),
               {
                 key: 'actions',
                 header: '操作',
-                render: (_value, row) => (
-                  <span className="flex flex-wrap gap-2">
-                    <CustomButton variant="neutral" onClick={() => {
-                      const def = definitions.find((item) => item.id === row.id);
-                      if (def) openDefinitionDialog(def);
-                    }}>
-                      編集
-                    </CustomButton>
-                    <CustomButton variant="ghost" onClick={() => void handleDeleteDefinition(row.id)}>
-                      削除
-                    </CustomButton>
-                  </span>
-                ),
+                render: (_value, row) => {
+                  if (defReorderEnabled) {
+                    const idx = defRowOrder!.indexOf(row.id);
+                    return (
+                      <RowMoveButtons
+                        isFirst={idx === 0}
+                        isLast={idx === defRowOrder!.length - 1}
+                        disabled={defReorderSaving}
+                        onMoveUp={() => handleMoveDefinition(row.id, 'up')}
+                        onMoveDown={() => handleMoveDefinition(row.id, 'down')}
+                      />
+                    );
+                  }
+                  return (
+                    <span className="flex flex-wrap gap-2">
+                      <CustomButton variant="neutral" onClick={() => {
+                        const def = definitions.find((item) => item.id === row.id);
+                        if (def) openDefinitionDialog(def);
+                      }}>
+                        {pageMode === 'view' ? '詳細' : '編集'}
+                      </CustomButton>
+                      {pageMode === 'edit' && (
+                        <CustomButton variant="ghost" onClick={() => void handleDeleteDefinition(row.id)}>
+                          削除
+                        </CustomButton>
+                      )}
+                    </span>
+                  );
+                },
               },
             ]}
-            data={definitionRows}
+            data={sortedDefinitionRows}
+            height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
             rowKey="id"
             emptyMessage="進行度定義がありません。"
+            paginated
+            rowReorderEnabled={defReorderEnabled}
+            onRowMove={handleDefRowMove}
           />
         </SectionCard>
 
@@ -575,9 +760,9 @@ export default function StoryProgressManager() {
                   return (
                     <span className="flex flex-wrap gap-2">
                       <CustomButton variant="neutral" onClick={() => { if (def) openOverrideDialog(def); }}>
-                        {hasOverride ? '編集' : '設定'}
+                        {pageMode === 'view' ? '詳細' : hasOverride ? '編集' : '設定'}
                       </CustomButton>
-                      {hasOverride && (
+                      {pageMode === 'edit' && hasOverride && (
                         <CustomButton variant="ghost" onClick={() => void handleDeleteOverride(row.id)}>
                           削除
                         </CustomButton>
@@ -588,6 +773,7 @@ export default function StoryProgressManager() {
               },
             ]}
             data={overrideRows}
+            height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
             rowKey="id"
             emptyMessage="override 対象がありません。"
           />
@@ -598,7 +784,7 @@ export default function StoryProgressManager() {
           description="公開 story-progress-schema API から取得した、作品ごとの最終的な進行度候補を確認します。"
         >
           {resolvedSchema ? (
-            <DataTable<PreviewRow> columns={previewColumns} data={previewRows} rowKey="id" emptyMessage="候補がありません。" />
+            <DataTable<PreviewRow> columns={previewColumns} data={previewRows} height={DATA_TABLE_DEFAULT_PAGE_HEIGHT} rowKey="id" emptyMessage="候補がありません。" />
           ) : (
             <p className="text-sm text-zinc-500">ゲームソフトマスタを選択するとプレビューが表示されます。</p>
           )}
@@ -610,28 +796,47 @@ export default function StoryProgressManager() {
       <Dialog
         open={definitionDialogOpen}
         onClose={() => setDefinitionDialogOpen(false)}
-        title={editingDefinition ? '進行度定義の編集' : '進行度定義の新規作成'}
+        title={editingDefinition ? (pageMode === 'view' ? '進行度定義の詳細' : '進行度定義の編集') : '進行度定義の新規作成'}
+        footer={
+          pageMode === 'view' && editingDefinition ? (
+            <>
+              <CustomButton onClick={() => setDefinitionDialogOpen(false)}>閉じる</CustomButton>
+              <CustomButton variant="accent" onClick={() => setPageMode('edit')}>編集を有効化</CustomButton>
+            </>
+          ) : (
+            <>
+              {editingDefinition && <CustomButton onClick={() => setPageMode('view')}>読み取り専用に戻す</CustomButton>}
+              <CustomButton variant="neutral" onClick={() => setDefinitionDialogOpen(false)} disabled={isPending}>キャンセル</CustomButton>
+              {!editingDefinition ? (
+                <>
+                  <CustomButton onClick={() => void handleSaveDefinition('continue')} disabled={isPending}>作成して続ける</CustomButton>
+                  <CustomButton variant="accent" onClick={() => void handleSaveDefinition('close')} disabled={isPending}>作成して閉じる</CustomButton>
+                </>
+              ) : (
+                <CustomButton variant="accent" onClick={() => void handleSaveDefinition('close')} disabled={isPending}>保存</CustomButton>
+              )}
+            </>
+          )
+        }
       >
-        <div className="space-y-4">
+        <div ref={definitionDialogBodyRef} className="space-y-4">
+          {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
+          {success ? <CustomMessageArea variant="success">{success}</CustomMessageArea> : null}
           <div className="space-y-2">
             <CustomLabel htmlFor="def-key">progressKey</CustomLabel>
-            <CustomTextBox id="def-key" value={definitionFormState.progressKey} onChange={(event) => setDefinitionFormState((current) => ({ ...current, progressKey: event.target.value }))} />
+            <CustomTextBox id="def-key" value={definitionFormState.progressKey} onChange={(event) => setDefinitionFormState((current) => ({ ...current, progressKey: event.target.value }))} displayOnly={pageMode === 'view' && !!editingDefinition} />
           </div>
           <div className="space-y-2">
             <CustomLabel htmlFor="def-label">表示名</CustomLabel>
-            <CustomTextBox id="def-label" value={definitionFormState.label} onChange={(event) => setDefinitionFormState((current) => ({ ...current, label: event.target.value }))} />
+            <CustomTextBox id="def-label" value={definitionFormState.label} onChange={(event) => setDefinitionFormState((current) => ({ ...current, label: event.target.value }))} displayOnly={pageMode === 'view' && !!editingDefinition} />
           </div>
           <div className="space-y-2">
             <CustomLabel htmlFor="def-description">説明</CustomLabel>
-            <CustomTextArea id="def-description" value={definitionFormState.description} onChange={(event) => setDefinitionFormState((current) => ({ ...current, description: event.target.value }))} />
+            <CustomTextArea id="def-description" value={definitionFormState.description} onChange={(event) => setDefinitionFormState((current) => ({ ...current, description: event.target.value }))} displayOnly={pageMode === 'view' && !!editingDefinition} />
           </div>
           <div className="space-y-2">
-            <CustomLabel htmlFor="def-order">表示順</CustomLabel>
-            <CustomTextBox id="def-order" type="number" step="1" value={definitionFormState.displayOrder} onChange={(event) => setDefinitionFormState((current) => ({ ...current, displayOrder: event.target.value }))} />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <CustomButton variant="neutral" onClick={() => setDefinitionDialogOpen(false)}>キャンセル</CustomButton>
-            <CustomButton variant="accent" onClick={() => void handleSaveDefinition()}>保存</CustomButton>
+            <CustomLabel htmlFor="def-order">{editingDefinition ? '表示順' : '表示順（任意）'}</CustomLabel>
+            <CustomTextBox id="def-order" type="number" min={1} step="1" value={definitionFormState.displayOrder} placeholder={editingDefinition ? '1' : '未入力で末尾に追加'} onChange={(event) => setDefinitionFormState((current) => ({ ...current, displayOrder: event.target.value }))} displayOnly={pageMode === 'view' && !!editingDefinition} />
           </div>
         </div>
       </Dialog>
@@ -642,31 +847,41 @@ export default function StoryProgressManager() {
       <Dialog
         open={overrideDialogOpen}
         onClose={() => setOverrideDialogOpen(false)}
-        title={editingOverride ? 'override の編集' : 'override の新規設定'}
+        title={pageMode === 'view' ? 'override の詳細' : editingOverride ? 'override の編集' : 'override の新規設定'}
+        footer={
+          pageMode === 'view' ? (
+            <>
+              <CustomButton onClick={() => setOverrideDialogOpen(false)}>閉じる</CustomButton>
+              <CustomButton variant="accent" onClick={() => setPageMode('edit')}>編集を有効化</CustomButton>
+            </>
+          ) : (
+            <>
+              <CustomButton onClick={() => setPageMode('view')}>読み取り専用に戻す</CustomButton>
+              <CustomButton variant="neutral" onClick={() => setOverrideDialogOpen(false)}>キャンセル</CustomButton>
+              <CustomButton variant="accent" onClick={() => void handleSaveOverride()}>保存</CustomButton>
+            </>
+          )
+        }
       >
         <div className="space-y-4">
           {overrideTargetDefinition ? (
-            <div className="rounded bg-zinc-50 p-3 text-sm dark:bg-zinc-800">
+            <div className="select-none rounded bg-zinc-50 p-3 text-sm dark:bg-zinc-800">
               <p>progressKey: {overrideTargetDefinition.progressKey}</p>
               <p>基本ラベル: {overrideTargetDefinition.label}</p>
             </div>
           ) : null}
           <div className="space-y-2">
             <CustomLabel htmlFor="ovr-label">override ラベル</CustomLabel>
-            <CustomTextBox id="ovr-label" value={overrideFormState.overrideLabel} onChange={(event) => setOverrideFormState((current) => ({ ...current, overrideLabel: event.target.value }))} />
+            <CustomTextBox id="ovr-label" value={overrideFormState.overrideLabel} onChange={(event) => setOverrideFormState((current) => ({ ...current, overrideLabel: event.target.value }))} displayOnly={pageMode === 'view'} />
           </div>
           <div className="space-y-2">
             <CustomLabel htmlFor="ovr-description">override 説明</CustomLabel>
-            <CustomTextArea id="ovr-description" value={overrideFormState.overrideDescription} onChange={(event) => setOverrideFormState((current) => ({ ...current, overrideDescription: event.target.value }))} />
+            <CustomTextArea id="ovr-description" value={overrideFormState.overrideDescription} onChange={(event) => setOverrideFormState((current) => ({ ...current, overrideDescription: event.target.value }))} displayOnly={pageMode === 'view'} />
           </div>
           <label className="flex items-center gap-3 text-sm text-zinc-700 dark:text-zinc-200">
-            <CustomCheckBox checked={overrideFormState.isDisabled} onChange={(event) => setOverrideFormState((current) => ({ ...current, isDisabled: event.target.checked }))} />
+            <CustomCheckBox checked={overrideFormState.isDisabled} onChange={(event) => setOverrideFormState((current) => ({ ...current, isDisabled: event.target.checked }))} displayOnly={pageMode === 'view'} />
             この作品では項目を無効化する
           </label>
-          <div className="flex justify-end gap-2 pt-2">
-            <CustomButton variant="neutral" onClick={() => setOverrideDialogOpen(false)}>キャンセル</CustomButton>
-            <CustomButton variant="accent" onClick={() => void handleSaveOverride()}>保存</CustomButton>
-          </div>
         </div>
       </Dialog>
       </div>

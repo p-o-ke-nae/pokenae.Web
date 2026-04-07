@@ -2,6 +2,8 @@ import type { ResourceKey } from '@/lib/game-management/types';
 
 export type ResourceScope = 'admin' | 'user';
 
+export type PageMode = 'view' | 'edit';
+
 export type ResourceDefinition = {
   key: ResourceKey;
   label: string;
@@ -12,19 +14,34 @@ export type ResourceDefinition = {
   canCreate: boolean;
   canEdit: boolean;
   canDelete: boolean;
+  /** 一括編集で変更可能なフィールド名の配列。未指定の場合は一括編集不可。 */
+  bulkEditableFields?: string[];
 };
 
 export const RESOURCE_DEFINITIONS: Record<ResourceKey, ResourceDefinition> = {
+  'account-type-masters': {
+    key: 'account-type-masters',
+    label: 'アカウント種類管理',
+    shortLabel: 'アカウント種類',
+    description: 'アカウントの種類（Nintendo Account、PlayStation Networkなど）を管理します。',
+    apiPath: '/api/AccountTypeMasters',
+    scope: 'admin',
+    canCreate: true,
+    canEdit: true,
+    canDelete: true,
+    bulkEditableFields: ['gameConsoleCategoryIds'],
+  },
   accounts: {
     key: 'accounts',
     label: 'アカウント管理',
     shortLabel: 'アカウント',
-    description: 'ゲーム機分類に紐づくアカウント情報を管理します。',
+    description: 'アカウント種類に紐づくアカウント情報を管理します。',
     apiPath: '/api/Accounts',
     scope: 'user',
     canCreate: true,
     canEdit: true,
     canDelete: true,
+    bulkEditableFields: ['memo'],
   },
   'game-console-categories': {
     key: 'game-console-categories',
@@ -36,6 +53,7 @@ export const RESOURCE_DEFINITIONS: Record<ResourceKey, ResourceDefinition> = {
     canCreate: true,
     canEdit: true,
     canDelete: true,
+    bulkEditableFields: ['saveStorageType'],
   },
   'game-console-masters': {
     key: 'game-console-masters',
@@ -47,6 +65,7 @@ export const RESOURCE_DEFINITIONS: Record<ResourceKey, ResourceDefinition> = {
     canCreate: true,
     canEdit: true,
     canDelete: true,
+    bulkEditableFields: ['gameConsoleCategoryId'],
   },
   'game-console-edition-masters': {
     key: 'game-console-edition-masters',
@@ -58,6 +77,7 @@ export const RESOURCE_DEFINITIONS: Record<ResourceKey, ResourceDefinition> = {
     canCreate: true,
     canEdit: true,
     canDelete: true,
+    bulkEditableFields: ['gameConsoleMasterId'],
   },
   'game-consoles': {
     key: 'game-consoles',
@@ -91,6 +111,7 @@ export const RESOURCE_DEFINITIONS: Record<ResourceKey, ResourceDefinition> = {
     canCreate: true,
     canEdit: true,
     canDelete: true,
+    bulkEditableFields: ['gameConsoleCategoryId', 'contentGroupId'],
   },
   'game-softwares': {
     key: 'game-softwares',
@@ -102,6 +123,7 @@ export const RESOURCE_DEFINITIONS: Record<ResourceKey, ResourceDefinition> = {
     canCreate: true,
     canEdit: true,
     canDelete: true,
+    bulkEditableFields: ['variant', 'memo'],
   },
   'memory-cards': {
     key: 'memory-cards',
@@ -110,6 +132,17 @@ export const RESOURCE_DEFINITIONS: Record<ResourceKey, ResourceDefinition> = {
     description: 'メモリーカードの管理を行います。',
     apiPath: '/api/MemoryCards',
     scope: 'user',
+    canCreate: true,
+    canEdit: true,
+    canDelete: true,
+  },
+  'memory-card-edition-masters': {
+    key: 'memory-card-edition-masters',
+    label: 'メモリーカードエディション管理',
+    shortLabel: 'MCエディション',
+    description: 'メモリーカードの種類（ブロック数の違い等）を管理します。',
+    apiPath: '/api/MemoryCardEditionMasters',
+    scope: 'admin',
     canCreate: true,
     canEdit: true,
     canDelete: true,
@@ -124,15 +157,18 @@ export const RESOURCE_DEFINITIONS: Record<ResourceKey, ResourceDefinition> = {
     canCreate: true,
     canEdit: true,
     canDelete: true,
+    bulkEditableFields: ['memo'],
   },
 };
 
 export const ADMIN_RESOURCE_ORDER: ResourceKey[] = [
+  'account-type-masters',
   'game-console-categories',
   'game-console-masters',
   'game-console-edition-masters',
   'game-software-content-groups',
   'game-software-masters',
+  'memory-card-edition-masters',
 ];
 
 export const USER_RESOURCE_ORDER: ResourceKey[] = [

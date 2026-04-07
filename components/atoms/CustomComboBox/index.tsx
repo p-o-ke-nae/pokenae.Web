@@ -6,14 +6,16 @@ import type { SelectHTMLAttributes, ReactNode } from "react";
 export type CustomComboBoxProps = SelectHTMLAttributes<HTMLSelectElement> & {
 	isError?: boolean;
 	placeholder?: string;
+	displayOnly?: boolean;
 	children?: ReactNode;
 };
 
 const CustomComboBox = forwardRef<HTMLSelectElement, CustomComboBoxProps>(
-	({ isError = false, placeholder, className = "", children, ...rest }, ref) => {
+	({ isError = false, placeholder, displayOnly = false, className = "", children, ...rest }, ref) => {
 		const classes = [
 			"custom-combobox",
 			isError ? "custom-combobox--error" : "",
+			displayOnly ? "custom-combobox--display-only" : "",
 			className,
 		]
 			.filter(Boolean)
@@ -22,7 +24,13 @@ const CustomComboBox = forwardRef<HTMLSelectElement, CustomComboBoxProps>(
 		return (
 			<>
 				<div className="custom-combobox__wrapper">
-					<select ref={ref} className={classes} aria-invalid={isError} {...rest}>
+					<select
+						ref={ref}
+						className={classes}
+						aria-invalid={isError}
+						{...rest}
+						{...(displayOnly ? { disabled: true, tabIndex: -1, "aria-disabled": true } : {})}
+					>
 						{placeholder && (
 							<option value="" disabled hidden>
 								{placeholder}
@@ -100,6 +108,13 @@ const CustomComboBox = forwardRef<HTMLSelectElement, CustomComboBoxProps>(
 						opacity: 0.55;
 						cursor: not-allowed;
 						background-color: var(--color-base-70);
+					}
+
+					.custom-combobox--display-only {
+						opacity: 1;
+						cursor: default;
+						pointer-events: none;
+						background-color: var(--color-base-70-light);
 					}
 
 					.custom-combobox__arrow {

@@ -1,5 +1,6 @@
 'use client';
 
+import CustomCheckBox from '@/components/atoms/CustomCheckBox';
 import CustomComboBox from '@/components/atoms/CustomComboBox';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
@@ -12,6 +13,7 @@ type Props = {
   onChange: (fieldKey: string, value: string) => void;
   loading: boolean;
   error: string | null;
+  displayOnly?: boolean;
 };
 
 function FieldHint({ description, required }: { description: string | null; required: boolean }) {
@@ -20,7 +22,7 @@ function FieldHint({ description, required }: { description: string | null; requ
   }
 
   return (
-    <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+    <p className="select-none text-xs leading-5 text-zinc-500 dark:text-zinc-400">
       {required ? '必須項目です。' : null}
       {required && description ? ' ' : null}
       {description ?? ''}
@@ -28,7 +30,7 @@ function FieldHint({ description, required }: { description: string | null; requ
   );
 }
 
-export default function SaveDataDynamicFields({ schema, values, onChange, loading, error }: Props) {
+export default function SaveDataDynamicFields({ schema, values, onChange, loading, error, displayOnly = false }: Props) {
   if (loading) {
     return <p className="text-sm text-zinc-500">可変項目を読み込んでいます...</p>;
   }
@@ -63,6 +65,7 @@ export default function SaveDataDynamicFields({ schema, values, onChange, loadin
                 value={value}
                 onChange={(event) => onChange(field.fieldKey, event.target.value)}
                 placeholder={field.label}
+                displayOnly={displayOnly}
               />
             ) : null}
             {field.fieldType === 1 ? (
@@ -71,6 +74,7 @@ export default function SaveDataDynamicFields({ schema, values, onChange, loadin
                 value={value}
                 onChange={(event) => onChange(field.fieldKey, event.target.value)}
                 placeholder={field.label}
+                displayOnly={displayOnly}
               />
             ) : null}
             {field.fieldType === 2 ? (
@@ -81,6 +85,7 @@ export default function SaveDataDynamicFields({ schema, values, onChange, loadin
                 value={value}
                 onChange={(event) => onChange(field.fieldKey, event.target.value)}
                 placeholder="0"
+                displayOnly={displayOnly}
               />
             ) : null}
             {field.fieldType === 3 ? (
@@ -91,14 +96,19 @@ export default function SaveDataDynamicFields({ schema, values, onChange, loadin
                 value={value}
                 onChange={(event) => onChange(field.fieldKey, event.target.value)}
                 placeholder="0.0"
+                displayOnly={displayOnly}
               />
             ) : null}
             {field.fieldType === 4 ? (
-              <CustomComboBox id={`dynamic-${field.fieldKey}`} value={value} onChange={(event) => onChange(field.fieldKey, event.target.value)}>
-                <option value="">未設定</option>
-                <option value="true">はい</option>
-                <option value="false">いいえ</option>
-              </CustomComboBox>
+              <label className={`inline-flex items-center gap-2${displayOnly ? '' : ' cursor-pointer'}`}>
+                <CustomCheckBox
+                  id={`dynamic-${field.fieldKey}`}
+                  checked={value === 'true'}
+                  onChange={(event) => onChange(field.fieldKey, event.target.checked ? 'true' : 'false')}
+                  displayOnly={displayOnly}
+                />
+                <span className="text-sm text-zinc-700 dark:text-zinc-300">{value === 'true' ? 'はい' : 'いいえ'}</span>
+              </label>
             ) : null}
             {field.fieldType === 5 ? (
               <CustomTextBox
@@ -106,10 +116,11 @@ export default function SaveDataDynamicFields({ schema, values, onChange, loadin
                 type="date"
                 value={value}
                 onChange={(event) => onChange(field.fieldKey, event.target.value)}
+                displayOnly={displayOnly}
               />
             ) : null}
             {field.fieldType === 6 ? (
-              <CustomComboBox id={`dynamic-${field.fieldKey}`} value={value} onChange={(event) => onChange(field.fieldKey, event.target.value)}>
+              <CustomComboBox id={`dynamic-${field.fieldKey}`} value={value} onChange={(event) => onChange(field.fieldKey, event.target.value)} displayOnly={displayOnly}>
                 <option value="">未選択</option>
                 {field.options.map((option) => (
                   <option key={option.optionKey} value={option.optionKey}>

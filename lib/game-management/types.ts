@@ -4,7 +4,7 @@ export type SaveDataFieldType = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export type GameSoftwareVariant = 0 | 1;
 
-export type MemoryCardCapacity = 59 | 251;
+export type MemoryCardBlockCount = 59 | 251 | 1019;
 
 export type ProblemDetails = {
   type?: string;
@@ -19,28 +19,81 @@ export type ValidationProblemDetails = ProblemDetails & {
 };
 
 // ---------------------------------------------------------------------------
+// AccountTypeMaster
+// ---------------------------------------------------------------------------
+
+export type AccountTypeMasterDto = {
+  id: number;
+  name: string;
+  abbreviation: string;
+  gameConsoleCategoryIds: number[];
+  displayOrder: number;
+  isDeleted: boolean;
+};
+
+export type CreateAccountTypeMasterRequest = {
+  name: string;
+  abbreviation: string;
+  gameConsoleCategoryIds: number[] | null;
+  displayOrder?: number | null;
+};
+
+export type UpdateAccountTypeMasterRequest = {
+  name: string;
+  abbreviation: string;
+  gameConsoleCategoryIds: number[] | null;
+  displayOrder: number;
+};
+
+// ---------------------------------------------------------------------------
 // Account
 // ---------------------------------------------------------------------------
 
 export type AccountDto = {
   id: number;
   ownerGoogleUserId: string;
+  accountTypeMasterId: number;
+  displayOrder: number;
   label: string | null;
   memo: string | null;
-  gameConsoleCategoryIds: number[];
+  linkedGameConsoleIds: number[];
   isDeleted: boolean;
 };
 
 export type CreateAccountRequest = {
+  accountTypeMasterId: number;
+  displayOrder?: number | null;
   label: string | null;
   memo: string | null;
-  gameConsoleCategoryIds: number[] | null;
+  linkedGameConsoleIds: number[] | null;
 };
 
 export type UpdateAccountRequest = {
+  displayOrder: number;
   label: string | null;
   memo: string | null;
-  gameConsoleCategoryIds: number[] | null;
+  linkedGameConsoleIds: number[] | null;
+};
+
+export type MoveAccountBetweenConsolesRequest = {
+  accountId: number;
+  sourceGameConsoleId: number;
+  targetGameConsoleId: number;
+};
+
+// ---------------------------------------------------------------------------
+// GameConsoleCategoryCompatibility
+// ---------------------------------------------------------------------------
+
+export type GameConsoleCategoryCompatibilityDto = {
+  id: number;
+  hostGameConsoleCategoryId: number;
+  supportedGameConsoleCategoryId: number;
+  isDeleted: boolean;
+};
+
+export type SetGameConsoleCategoryCompatibilitiesRequest = {
+  supportedGameConsoleCategoryIds: number[];
 };
 
 // ---------------------------------------------------------------------------
@@ -53,6 +106,7 @@ export type GameConsoleCategoryDto = {
   abbreviation: string;
   manufacturer: string | null;
   saveStorageType: SaveStorageType;
+  displayOrder: number;
   isDeleted: boolean;
 };
 
@@ -61,6 +115,7 @@ export type CreateGameConsoleCategoryRequest = {
   abbreviation: string;
   manufacturer: string | null;
   saveStorageType: SaveStorageType;
+  displayOrder?: number | null;
 };
 
 export type UpdateGameConsoleCategoryRequest = {
@@ -68,6 +123,7 @@ export type UpdateGameConsoleCategoryRequest = {
   abbreviation: string;
   manufacturer: string | null;
   saveStorageType: SaveStorageType;
+  displayOrder: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -79,6 +135,7 @@ export type GameConsoleMasterDto = {
   gameConsoleCategoryId: number;
   name: string;
   abbreviation: string;
+  displayOrder: number;
   isDeleted: boolean;
 };
 
@@ -86,12 +143,14 @@ export type CreateGameConsoleMasterRequest = {
   gameConsoleCategoryId: number;
   name: string;
   abbreviation: string;
+  displayOrder?: number | null;
 };
 
 export type UpdateGameConsoleMasterRequest = {
   gameConsoleCategoryId: number;
   name: string;
   abbreviation: string;
+  displayOrder: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -103,6 +162,7 @@ export type GameConsoleEditionMasterDto = {
   gameConsoleMasterId: number;
   name: string;
   abbreviation: string;
+  displayOrder: number;
   isDeleted: boolean;
 };
 
@@ -110,12 +170,14 @@ export type CreateGameConsoleEditionMasterRequest = {
   gameConsoleMasterId: number;
   name: string;
   abbreviation: string;
+  displayOrder?: number | null;
 };
 
 export type UpdateGameConsoleEditionMasterRequest = {
   gameConsoleMasterId: number;
   name: string;
   abbreviation: string;
+  displayOrder: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -127,6 +189,7 @@ export type GameConsoleDto = {
   gameConsoleMasterId: number;
   gameConsoleEditionMasterId: number | null;
   ownerGoogleUserId: string;
+  displayOrder: number;
   label: string | null;
   memo: string | null;
   isDeleted: boolean;
@@ -135,11 +198,14 @@ export type GameConsoleDto = {
 export type CreateGameConsoleRequest = {
   gameConsoleMasterId: number;
   gameConsoleEditionMasterId: number | null;
+  displayOrder?: number | null;
   label: string | null;
   memo: string | null;
 };
 
 export type UpdateGameConsoleRequest = {
+  gameConsoleEditionMasterId?: number | null;
+  displayOrder: number;
   label: string | null;
   memo: string | null;
 };
@@ -157,15 +223,18 @@ export type GameConsoleCountByMasterDto = {
 export type GameSoftwareContentGroupDto = {
   id: number;
   name: string;
+  displayOrder: number;
   isDeleted: boolean;
 };
 
 export type CreateGameSoftwareContentGroupRequest = {
   name: string;
+  displayOrder?: number | null;
 };
 
 export type UpdateGameSoftwareContentGroupRequest = {
   name: string;
+  displayOrder: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -178,6 +247,7 @@ export type GameSoftwareMasterDto = {
   abbreviation: string;
   gameConsoleCategoryId: number;
   contentGroupId: number | null;
+  displayOrder: number;
   isDeleted: boolean;
 };
 
@@ -186,6 +256,7 @@ export type CreateGameSoftwareMasterRequest = {
   abbreviation: string;
   gameConsoleCategoryId: number;
   contentGroupId: number | null;
+  displayOrder?: number | null;
 };
 
 export type UpdateGameSoftwareMasterRequest = {
@@ -193,6 +264,7 @@ export type UpdateGameSoftwareMasterRequest = {
   abbreviation: string;
   gameConsoleCategoryId: number;
   contentGroupId: number | null;
+  displayOrder: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -203,7 +275,10 @@ export type GameSoftwareDto = {
   id: number;
   gameSoftwareMasterId: number;
   variant: GameSoftwareVariant | null;
+  accountId: number | null;
+  installedGameConsoleId: number | null;
   ownerGoogleUserId: string;
+  displayOrder: number;
   label: string | null;
   memo: string | null;
   isDeleted: boolean;
@@ -212,12 +287,18 @@ export type GameSoftwareDto = {
 export type CreateGameSoftwareRequest = {
   gameSoftwareMasterId: number;
   variant: GameSoftwareVariant | null;
+  accountId: number | null;
+  installedGameConsoleId: number | null;
+  displayOrder?: number | null;
   label: string | null;
   memo: string | null;
 };
 
 export type UpdateGameSoftwareRequest = {
   variant: GameSoftwareVariant | null;
+  accountId: number | null;
+  installedGameConsoleId: number | null;
+  displayOrder: number;
   label: string | null;
   memo: string | null;
 };
@@ -229,26 +310,53 @@ export type GameSoftwareCountByMasterDto = {
 };
 
 // ---------------------------------------------------------------------------
+// MemoryCardEditionMaster (メモリーカード種類マスタ)
+// ---------------------------------------------------------------------------
+
+export type MemoryCardEditionMasterDto = {
+  id: number;
+  name: string;
+  blockCount: MemoryCardBlockCount;
+  displayOrder: number;
+  isDeleted: boolean;
+};
+
+export type CreateMemoryCardEditionMasterRequest = {
+  name: string;
+  blockCount: MemoryCardBlockCount;
+  displayOrder?: number | null;
+};
+
+export type UpdateMemoryCardEditionMasterRequest = {
+  name: string;
+  blockCount: MemoryCardBlockCount;
+  displayOrder: number;
+};
+
+// ---------------------------------------------------------------------------
 // MemoryCard (ユーザー所有)
 // ---------------------------------------------------------------------------
 
 export type MemoryCardDto = {
   id: number;
-  capacity: MemoryCardCapacity;
+  memoryCardEditionMasterId: number;
   ownerGoogleUserId: string;
+  displayOrder: number;
   label: string | null;
   memo: string | null;
   isDeleted: boolean;
 };
 
 export type CreateMemoryCardRequest = {
-  capacity: MemoryCardCapacity;
+  memoryCardEditionMasterId: number;
+  displayOrder?: number | null;
   label: string | null;
   memo: string | null;
 };
 
 export type UpdateMemoryCardRequest = {
-  capacity: MemoryCardCapacity;
+  memoryCardEditionMasterId: number;
+  displayOrder: number;
   label: string | null;
   memo: string | null;
 };
@@ -284,6 +392,8 @@ export type SaveDataFieldValueDto = {
 export type SaveDataDto = {
   id: number;
   ownerGoogleUserId: string;
+  displayOrder: number;
+  memo: string | null;
   replacedBySaveDataId: number | null;
   saveStorageType: SaveStorageType;
   gameSoftwareMasterId: number;
@@ -304,6 +414,8 @@ export type CreateSaveDataRequest = {
   accountId: number | null;
   memoryCardId: number | null;
   storyProgressDefinitionId: number | null;
+  memo: string | null;
+  displayOrder?: number | null;
   extendedFields: SaveDataFieldInputDto[] | null;
 };
 
@@ -315,6 +427,8 @@ export type UpdateSaveDataRequest = {
   memoryCardId: number | null;
   storyProgressDefinitionId: number | null;
   replacedBySaveDataId: number | null;
+  memo: string | null;
+  displayOrder: number;
   extendedFields: SaveDataFieldInputDto[] | null;
 };
 
@@ -336,6 +450,7 @@ export type SaveDataFieldDefinitionDto = {
   fieldType: SaveDataFieldType;
   displayOrder: number;
   isRequired: boolean;
+  sharedChoiceSetId: number | null;
   isDeleted: boolean;
 };
 
@@ -344,8 +459,9 @@ export type CreateSaveDataFieldDefinitionRequest = {
   label: string;
   description: string | null;
   fieldType: string;
-  displayOrder: number;
+  displayOrder?: number | null;
   isRequired: boolean;
+  sharedChoiceSetId?: number | null;
 };
 
 export type UpdateSaveDataFieldDefinitionRequest = {
@@ -355,6 +471,13 @@ export type UpdateSaveDataFieldDefinitionRequest = {
   fieldType: string;
   displayOrder: number;
   isRequired: boolean;
+  sharedChoiceSetId?: number | null;
+};
+
+export type BatchSaveDataFieldDefinitionTypeItem = {
+  id: number;
+  updatePayload: UpdateSaveDataFieldDefinitionRequest;
+  rollbackPayload: UpdateSaveDataFieldDefinitionRequest;
 };
 
 export type SaveDataFieldOptionDto = {
@@ -371,7 +494,7 @@ export type CreateSaveDataFieldOptionRequest = {
   optionKey: string;
   label: string;
   description: string | null;
-  displayOrder: number;
+  displayOrder?: number | null;
 };
 
 export type UpdateSaveDataFieldOptionRequest = {
@@ -397,6 +520,54 @@ export type UpsertSaveDataFieldOverrideRequest = {
   overrideDescription: string | null;
   overrideIsRequired: boolean | null;
   isDisabled: boolean;
+};
+
+// ---------------------------------------------------------------------------
+// SaveDataFieldChoiceSet / ChoiceOption (共有単一選択肢セット)
+// ---------------------------------------------------------------------------
+
+export type SaveDataFieldChoiceSetDto = {
+  id: number;
+  choiceSetKey: string;
+  label: string;
+  description: string | null;
+  isDeleted: boolean;
+};
+
+export type CreateSaveDataFieldChoiceSetRequest = {
+  choiceSetKey: string;
+  label: string;
+  description: string | null;
+};
+
+export type UpdateSaveDataFieldChoiceSetRequest = {
+  choiceSetKey: string;
+  label: string;
+  description: string | null;
+};
+
+export type SaveDataFieldChoiceOptionDto = {
+  id: number;
+  choiceSetId: number;
+  optionKey: string;
+  label: string;
+  description: string | null;
+  displayOrder: number;
+  isDeleted: boolean;
+};
+
+export type CreateSaveDataFieldChoiceOptionRequest = {
+  optionKey: string;
+  label: string;
+  description: string | null;
+  displayOrder?: number | null;
+};
+
+export type UpdateSaveDataFieldChoiceOptionRequest = {
+  optionKey: string;
+  label: string;
+  description: string | null;
+  displayOrder: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -445,7 +616,7 @@ export type CreateStoryProgressDefinitionRequest = {
   progressKey: string;
   label: string;
   description: string | null;
-  displayOrder: number;
+  displayOrder?: number | null;
 };
 
 export type UpdateStoryProgressDefinitionRequest = {
@@ -491,10 +662,20 @@ export type StoryProgressSchemaDto = {
 };
 
 // ---------------------------------------------------------------------------
+// Reorder
+// ---------------------------------------------------------------------------
+
+export type ReorderItemRequest = {
+  id: number;
+  displayOrder: number;
+};
+
+// ---------------------------------------------------------------------------
 // Resource / Lookup
 // ---------------------------------------------------------------------------
 
 export type ResourceKey =
+  | 'account-type-masters'
   | 'accounts'
   | 'game-console-categories'
   | 'game-console-masters'
@@ -503,10 +684,12 @@ export type ResourceKey =
   | 'game-software-content-groups'
   | 'game-software-masters'
   | 'game-softwares'
+  | 'memory-card-edition-masters'
   | 'memory-cards'
   | 'save-datas';
 
 export type ResourceRecordMap = {
+  'account-type-masters': AccountTypeMasterDto;
   accounts: AccountDto;
   'game-console-categories': GameConsoleCategoryDto;
   'game-console-masters': GameConsoleMasterDto;
@@ -515,6 +698,7 @@ export type ResourceRecordMap = {
   'game-software-content-groups': GameSoftwareContentGroupDto;
   'game-software-masters': GameSoftwareMasterDto;
   'game-softwares': GameSoftwareDto;
+  'memory-card-edition-masters': MemoryCardEditionMasterDto;
   'memory-cards': MemoryCardDto;
   'save-datas': SaveDataDto;
 };
@@ -526,11 +710,14 @@ export type SelectOption = {
 };
 
 export type MasterLookups = {
+  accountTypeMasters: AccountTypeMasterDto[];
   gameConsoleCategories: GameConsoleCategoryDto[];
+  gameConsoleCategoryCompatibilities: GameConsoleCategoryCompatibilityDto[];
   gameConsoleMasters: GameConsoleMasterDto[];
   gameConsoleEditionMasters: GameConsoleEditionMasterDto[];
   gameSoftwareContentGroups: GameSoftwareContentGroupDto[];
   gameSoftwareMasters: GameSoftwareMasterDto[];
+  memoryCardEditionMasters: MemoryCardEditionMasterDto[];
 };
 
 export type ManagementLookups = MasterLookups & {

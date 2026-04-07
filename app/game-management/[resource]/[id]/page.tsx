@@ -1,5 +1,4 @@
-import { notFound } from 'next/navigation';
-import { GameManagementResourceEditorPage } from '@/components/organisms/GameManagement';
+import { redirect, notFound } from 'next/navigation';
 import { isResourceKey, ADMIN_RESOURCE_ORDER } from '@/lib/game-management/resources';
 
 export default async function GameManagementResourceDetailPage({
@@ -7,18 +6,11 @@ export default async function GameManagementResourceDetailPage({
 }: {
   params: Promise<{ resource: string; id: string }>;
 }) {
-  const { resource, id } = await params;
+  const { resource } = await params;
 
   if (!isResourceKey(resource) || !ADMIN_RESOURCE_ORDER.includes(resource)) {
     notFound();
   }
 
-  return (
-    <GameManagementResourceEditorPage
-      resourceKey={resource}
-      recordId={id}
-      basePath="/game-management"
-      scope="admin"
-    />
-  );
+  redirect(`/game-management/${resource}`);
 }

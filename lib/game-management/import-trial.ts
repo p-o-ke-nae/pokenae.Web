@@ -6,13 +6,7 @@
  * 送信順は依存関係に従い、trial ID → server ID の対応表で外部キーを解決する。
  */
 
-import {
-  createAccount,
-  createGameConsole,
-  createGameSoftware,
-  createMemoryCard,
-  createSaveData,
-} from '@/lib/game-management/api';
+import { createResource } from '@/lib/game-management/api';
 import {
   trialListAccounts,
   trialListGameConsoles,
@@ -20,7 +14,7 @@ import {
   trialListMemoryCards,
   trialListSaveDatas,
   trialRemoveByIds,
-} from '@/lib/game-management/trial-storage';
+} from '@/lib/game-management/trial';
 import type {
   AccountDto,
   GameConsoleDto,
@@ -154,9 +148,10 @@ export async function importSelectedItems(
   for (const item of trialListGameConsoles()) {
     if (!gcSelected.has(item.id)) continue;
     try {
-      const serverId = await createGameConsole({
+      const serverId = await createResource('game-consoles', {
         gameConsoleMasterId: item.gameConsoleMasterId,
         gameConsoleEditionMasterId: item.gameConsoleEditionMasterId,
+        displayOrder: item.displayOrder,
         label: item.label,
         memo: item.memo,
       });
@@ -172,9 +167,10 @@ export async function importSelectedItems(
   for (const item of trialListGameSoftwares()) {
     if (!gsSelected.has(item.id)) continue;
     try {
-      const serverId = await createGameSoftware({
+      const serverId = await createResource('game-softwares', {
         gameSoftwareMasterId: item.gameSoftwareMasterId,
         variant: item.variant,
+        displayOrder: item.displayOrder,
         label: item.label,
         memo: item.memo,
       });
@@ -190,10 +186,11 @@ export async function importSelectedItems(
   for (const item of trialListAccounts()) {
     if (!acSelected.has(item.id)) continue;
     try {
-      const serverId = await createAccount({
+      const serverId = await createResource('accounts', {
+        accountTypeMasterId: item.accountTypeMasterId,
+        displayOrder: item.displayOrder,
         label: item.label,
         memo: item.memo,
-        gameConsoleCategoryIds: item.gameConsoleCategoryIds,
       });
       idMaps['accounts'].set(item.id, serverId);
       results.push({ trialId: item.id, resourceKey: 'accounts', status: 'success', serverId });
@@ -207,8 +204,9 @@ export async function importSelectedItems(
   for (const item of trialListMemoryCards()) {
     if (!mcSelected.has(item.id)) continue;
     try {
-      const serverId = await createMemoryCard({
-        capacity: item.capacity,
+      const serverId = await createResource('memory-cards', {
+        memoryCardEditionMasterId: item.memoryCardEditionMasterId,
+        displayOrder: item.displayOrder,
         label: item.label,
         memo: item.memo,
       });
@@ -260,13 +258,15 @@ export async function importSelectedItems(
     }
 
     try {
-      const serverId = await createSaveData({
+      const serverId = await createResource('save-datas', {
         gameSoftwareMasterId: item.gameSoftwareMasterId,
         gameSoftwareId: item.saveStorageType === 0 ? (gameSoftwareId ?? null) : null,
         gameConsoleId: gameConsoleId ?? null,
         accountId: accountId ?? null,
         memoryCardId: memoryCardId ?? null,
         storyProgressDefinitionId: item.storyProgressDefinitionId,
+        memo: item.memo,
+        displayOrder: item.displayOrder,
         extendedFields: convertValueFieldsToInputs(item.extendedFields),
       });
       idMaps['save-datas'].set(item.id, serverId);

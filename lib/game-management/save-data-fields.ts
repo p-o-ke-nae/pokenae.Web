@@ -66,7 +66,7 @@ export function getFieldDisplayValue(field: Pick<SaveDataFieldValueDto, 'fieldTy
     case 3:
       return field.decimalValue == null ? '' : String(field.decimalValue);
     case 4:
-      return field.boolValue == null ? '' : String(field.boolValue);
+      return String(field.boolValue ?? false);
     case 5:
       return field.dateValue ?? '';
     case 6:

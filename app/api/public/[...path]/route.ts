@@ -13,11 +13,14 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/api/route-help
 
 /** 許可するパスプレフィックス（先頭スラッシュなし） */
 const ALLOWED_PREFIXES = [
+  'account-type-masters',
   'game-console-categories',
+  'game-console-category-compatibilities',
   'game-console-masters',
   'game-console-edition-masters',
   'game-software-content-groups',
   'game-software-masters',
+  'memory-card-edition-masters',
 ];
 
 interface RouteParams {
@@ -31,6 +34,10 @@ function isAllowedPath(segments: string[]): boolean {
   const prefix = segments[0];
   if (!ALLOWED_PREFIXES.includes(prefix)) {
     return false;
+  }
+
+  if (prefix === 'game-console-category-compatibilities') {
+    return segments.length === 1;
   }
 
   if (prefix !== 'game-software-masters') {

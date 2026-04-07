@@ -61,6 +61,7 @@ export class FrontendApiClient {
         method,
         headers,
         signal: options.signal,
+        cache: 'no-store',
       };
 
       // GET以外のメソッドでbodyを追加

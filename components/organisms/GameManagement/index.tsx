@@ -1,941 +1,257 @@
 ﻿'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import CustomButton from '@/components/atoms/CustomButton';
-import CustomCheckBox from '@/components/atoms/CustomCheckBox';
+import PageModeToggle from '@/components/atoms/PageModeToggle';
 import CustomComboBox from '@/components/atoms/CustomComboBox';
-import CustomHeader from '@/components/atoms/CustomHeader';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
-import CustomTextArea from '@/components/atoms/CustomTextArea';
-import CustomTextBox from '@/components/atoms/CustomTextBox';
-import DataTable, { type DataTableColumn } from '@/components/molecules/DataTable';
-import Dialog from '@/components/molecules/Dialog';
+import DataTable, { DATA_TABLE_DEFAULT_PAGE_HEIGHT, type DataTableColumn, type SortState } from '@/components/molecules/DataTable';
+import {
+  moveSelectedItemsByOne,
+  moveSelectedItemsToTarget,
+} from '@/components/molecules/DataTable/selection-utils';
+import RowMoveButtons from '@/components/organisms/GameManagement/RowMoveButtons';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import {
   ApiError,
-  createAccount,
-  createGameConsole,
-  createGameConsoleCategory,
-  createGameConsoleMaster,
-  createGameConsoleEditionMaster,
-  createGameSoftware,
-  createGameSoftwareContentGroup,
-  createGameSoftwareMaster,
-  createMemoryCard,
-  createSaveData,
-  deleteAccount,
-  deleteGameConsole,
-  deleteGameConsoleCategory,
-  deleteGameConsoleMaster,
-  deleteGameConsoleEditionMaster,
-  deleteGameSoftware,
-  deleteGameSoftwareContentGroup,
-  deleteGameSoftwareMaster,
-  deleteMemoryCard,
-  deleteSaveData,
   fetchMasterLookups,
-  fetchPublicSaveDataSchema,
-  fetchPublicStoryProgressSchema,
   fetchPublicMasterLookups,
   fetchAuthenticatedUserLookups,
-  fetchResourceById,
-  updateAccount,
-  updateGameConsole,
-  updateGameConsoleCategory,
-  updateGameConsoleMaster,
-  updateGameConsoleEditionMaster,
-  updateGameSoftware,
-  updateGameSoftwareContentGroup,
-  updateGameSoftwareMaster,
-  updateMemoryCard,
-  updateSaveData,
+  reorderResource,
 } from '@/lib/game-management/api';
+import {
+  fetchPublicSaveDataSchema,
+  fetchPublicStoryProgressSchema,
+} from '@/lib/game-management/api/public';
 import {
   getResourceDefinition,
   RESOURCE_DEFINITIONS,
   ADMIN_RESOURCE_ORDER,
-  type ResourceDefinition,
 } from '@/lib/game-management/resources';
-import { formatSaveStorageType, SAVE_STORAGE_TYPE_LABELS } from '@/lib/game-management/save-storage-type';
-import SaveDataDynamicFields from '@/components/organisms/GameManagement/SaveDataDynamicFields';
-import {
-  buildExtendedFieldInputs,
-  createDynamicFieldValueMapFromSaveData,
-  formatMergedFieldValue,
-  formatSaveDataFieldValueForList,
-  mergeSchemaWithSaveData,
-  validateDynamicFieldInputs,
-} from '@/lib/game-management/save-data-fields';
+import type { PageMode } from '@/lib/game-management/resources';
 import {
   buildTrialUserData,
-  trialCreateAccount,
-  trialCreateGameConsole,
-  trialCreateGameSoftware,
-  trialCreateMemoryCard,
-  trialCreateSaveData,
-  trialDeleteAccount,
-  trialDeleteGameConsole,
-  trialDeleteGameSoftware,
-  trialDeleteMemoryCard,
-  trialDeleteSaveData,
-  trialGetResourceById,
-  trialUpdateAccount,
-  trialUpdateGameConsole,
-  trialUpdateGameSoftware,
-  trialUpdateMemoryCard,
-  trialUpdateSaveData,
-} from '@/lib/game-management/trial-storage';
+  trialBatchUpdateDisplayOrder,
+} from '@/lib/game-management/trial';
 import type {
-  AccountDto,
-  CreateSaveDataRequest,
-  GameConsoleCategoryDto,
-  GameConsoleDto,
-  GameConsoleEditionMasterDto,
-  GameConsoleMasterDto,
-  GameSoftwareContentGroupDto,
-  GameSoftwareDto,
-  GameSoftwareMasterDto,
-  GameSoftwareVariant,
   ManagementLookups,
-  MemoryCardCapacity,
-  MemoryCardDto,
   ResourceKey,
-  SaveDataDto,
   SaveDataSchemaDto,
-  SaveStorageType,
-  SelectOption,
-  StoryProgressSchemaDto,
 } from '@/lib/game-management/types';
+import { getSaveDataGameSoftwareMasterId } from './helpers';
+import {
+  buildTableRows,
+  getGameSoftwareMasterChildTableColumns,
+  getTableColumns,
+} from './table-rows';
+import AccountMoveDialog from './AccountMoveDialog';
+import EditorDialog from './EditorDialog';
+import BulkEditorDialog from './BulkEditorDialog';
+import { TrialBanner, PageCard, PageFrame } from './shared';
+import type { DashboardExtraCard, EditorDialogContext, ManagementTableRow, StoryProgressLabelMap } from './view-types';
+import type { AccountDto } from '@/lib/game-management/types';
 
-type ManagementTableRow = {
+type SaveDataListFieldHeader = {
   id: number;
-  primary: string;
-  relation: string;
-  note: string;
-  status: string;
-  edit: string;
-  href: string;
-};
-
-type FormState = {
-  name: string;
-  abbreviation: string;
-  manufacturer: string;
-  saveStorageType: string;
+  fieldKey: string;
   label: string;
-  memo: string;
-  gameConsoleCategoryId: string;
-  gameConsoleCategoryIds: string[];
-  gameConsoleMasterId: string;
-  gameConsoleEditionMasterId: string;
-  contentGroupId: string;
-  gameSoftwareMasterId: string;
-  variant: string;
-  capacity: string;
-  gameSoftwareId: string;
-  gameConsoleId: string;
-  accountId: string;
-  memoryCardId: string;
-  storyProgressDefinitionId: string;
-  replacedBySaveDataId: string;
-  deleteReason: string;
-  dynamicFieldValues: Record<string, string>;
+  displayOrder: number;
 };
 
-type DashboardExtraCard = {
-  href: string;
-  shortLabel: string;
-  title: string;
-  description: string;
-  actionLabel?: string;
+type SaveDataListRow = ManagementTableRow & {
+  [key: string]: unknown;
+  saveDataContentGroupId?: number | null;
+  saveDataGameSoftwareMasterId?: number | null;
+  saveDataDynamicFieldLabels?: Record<string, string>;
 };
 
-type StoryProgressLabelMap = Record<string, string>;
+type OpenEditorDialogOptions = {
+  resourceKey?: ResourceKey;
+  recordId?: number | null;
+  initialFormState?: EditorDialogContext['initialFormState'];
+  parentContentGroupId?: number | null;
+};
 
-const SAVE_STORAGE_TYPE_OPTIONS: SelectOption[] = [0, 1, 2, 3].map((value) => ({
-  value: String(value),
-  label: SAVE_STORAGE_TYPE_LABELS[value as SaveStorageType],
-}));
-
-const TABLE_COLUMNS: DataTableColumn<ManagementTableRow>[] = [
-  {
-    key: 'id',
-    header: 'ID',
-    width: '5rem',
-    sortable: true,
-    sortValue: (value) => Number(value ?? 0),
-  },
-  { key: 'primary', header: '名称', sortable: true, filterable: true },
-  { key: 'relation', header: '関連', filterable: true },
-  { key: 'note', header: '詳細', filterable: true },
-  { key: 'status', header: '状態', width: '9rem', sortable: true },
-  {
-    key: 'edit',
-    header: '操作',
-    width: '7rem',
-    render: (_, row) => (
-      <Link
-        href={String(row.href)}
-        className="text-sm font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
-      >
-        編集
-      </Link>
-    ),
-  },
-];
-
-function createEmptyFormState(): FormState {
-  return {
-    name: '',
-    abbreviation: '',
-    manufacturer: '',
-    saveStorageType: '0',
-    label: '',
-    memo: '',
-    gameConsoleCategoryId: '',
-    gameConsoleCategoryIds: [],
-    gameConsoleMasterId: '',
-    gameConsoleEditionMasterId: '',
-    contentGroupId: '',
-    gameSoftwareMasterId: '',
-    variant: '',
-    capacity: '59',
-    gameSoftwareId: '',
-    gameConsoleId: '',
-    accountId: '',
-    memoryCardId: '',
-    storyProgressDefinitionId: '',
-    replacedBySaveDataId: '',
-    deleteReason: '',
-    dynamicFieldValues: {},
-  };
+function sortSaveDataFieldHeaders(headers: SaveDataListFieldHeader[]): SaveDataListFieldHeader[] {
+  return [...headers].sort((left, right) => (
+    left.displayOrder - right.displayOrder
+    || left.id - right.id
+  ));
 }
 
-function nullIfBlank(value: string): string | null {
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
+function buildSaveDataFieldHeadersFromSchemas(schemas: SaveDataSchemaDto[]): SaveDataListFieldHeader[] {
+  let syntheticId = 1;
+  const fieldMap = new Map<string, SaveDataListFieldHeader>();
 
-function numberOrNull(value: string): number | null {
-  if (!value) {
-    return null;
-  }
-  return Number(value);
-}
-
-function numberOrZero(value: string): number {
-  return Number(value);
-}
-
-function formatDeletedState(isDeleted: boolean): string {
-  return isDeleted ? '削除済み' : '有効';
-}
-
-function getGameConsoleCategoryName(id: number | null | undefined, lookups: ManagementLookups): string {
-  if (!id) {
-    return '未設定';
-  }
-  return lookups.gameConsoleCategories.find((item) => item.id === id)?.name ?? `#${id}`;
-}
-
-function getGameConsoleMasterName(id: number | null | undefined, lookups: ManagementLookups): string {
-  if (!id) {
-    return '未設定';
-  }
-  return lookups.gameConsoleMasters.find((item) => item.id === id)?.name ?? `#${id}`;
-}
-
-function getGameSoftwareContentGroupName(id: number | null | undefined, lookups: ManagementLookups): string {
-  if (!id) {
-    return '未設定';
-  }
-  return lookups.gameSoftwareContentGroups.find((item) => item.id === id)?.name ?? `#${id}`;
-}
-
-function getGameSoftwareMasterName(id: number | null | undefined, lookups: ManagementLookups): string {
-  if (!id) {
-    return '未設定';
-  }
-  return lookups.gameSoftwareMasters.find((item) => item.id === id)?.name ?? `#${id}`;
-}
-
-function getGameSoftwareDisplay(item: GameSoftwareDto, lookups: ManagementLookups): string {
-  const masterName = getGameSoftwareMasterName(item.gameSoftwareMasterId, lookups);
-  return item.label ? `${masterName} / ${item.label}` : masterName;
-}
-
-function getGameConsoleDisplay(item: GameConsoleDto, lookups: ManagementLookups): string {
-  const masterName = getGameConsoleMasterName(item.gameConsoleMasterId, lookups);
-  return item.label ? `${masterName} / ${item.label}` : masterName;
-}
-
-function getAccountDisplay(item: AccountDto, lookups: ManagementLookups): string {
-  if (item.label) {
-    return item.label;
-  }
-  const categories = item.gameConsoleCategoryIds.map((id) => getGameConsoleCategoryName(id, lookups));
-  return categories.length > 0 ? categories.join(', ') : `Account #${item.id}`;
-}
-
-function getSaveStorageTypeForGameSoftwareMaster(gameSoftwareMasterId: number | null, lookups: ManagementLookups): SaveStorageType | null {
-  if (!gameSoftwareMasterId) {
-    return null;
-  }
-
-  const master = lookups.gameSoftwareMasters.find((item) => item.id === gameSoftwareMasterId);
-  if (!master) {
-    return null;
-  }
-
-  const category = lookups.gameConsoleCategories.find((item) => item.id === master.gameConsoleCategoryId);
-  return category?.saveStorageType ?? null;
-}
-
-function getConsoleCandidates(gameSoftwareMasterId: number | null, lookups: ManagementLookups): GameConsoleDto[] {
-  if (!gameSoftwareMasterId) {
-    return [];
-  }
-  const master = lookups.gameSoftwareMasters.find((item) => item.id === gameSoftwareMasterId);
-  if (!master) {
-    return [];
-  }
-  // GameSoftwareMaster.gameConsoleCategoryId → 同カテゴリに属する GameConsoleMaster の ID 群 → その ID を持つ GameConsole
-  const masterIdsInCategory = new Set(
-    lookups.gameConsoleMasters.filter((cm) => cm.gameConsoleCategoryId === master.gameConsoleCategoryId).map((cm) => cm.id),
-  );
-  return lookups.gameConsoles.filter((item) => masterIdsInCategory.has(item.gameConsoleMasterId));
-}
-
-function getAccountCandidates(gameSoftwareMasterId: number | null, lookups: ManagementLookups): AccountDto[] {
-  if (!gameSoftwareMasterId) {
-    return [];
-  }
-  const master = lookups.gameSoftwareMasters.find((item) => item.id === gameSoftwareMasterId);
-  if (!master) {
-    return [];
-  }
-  return lookups.accounts.filter((item) => item.gameConsoleCategoryIds.includes(master.gameConsoleCategoryId));
-}
-
-function getSaveDataGameSoftwareMasterId(
-  saveData: Pick<SaveDataDto, 'gameSoftwareMasterId' | 'gameSoftwareId'>,
-  lookups: ManagementLookups,
-): number | null {
-  if (saveData.gameSoftwareMasterId) {
-    return saveData.gameSoftwareMasterId;
-  }
-
-  if (!saveData.gameSoftwareId) {
-    return null;
-  }
-
-  return lookups.gameSoftwares.find((item) => item.id === saveData.gameSoftwareId)?.gameSoftwareMasterId ?? null;
-}
-
-function getSaveDataGameSoftwareDisplay(
-  saveData: Pick<SaveDataDto, 'gameSoftwareMasterId' | 'gameSoftwareId' | 'saveStorageType'>,
-  lookups: ManagementLookups,
-): string {
-  const software = saveData.saveStorageType === 0 && saveData.gameSoftwareId
-    ? lookups.gameSoftwares.find((candidate) => candidate.id === saveData.gameSoftwareId)
-    : null;
-
-  if (software) {
-    return getGameSoftwareDisplay(software, lookups);
-  }
-
-  return getGameSoftwareMasterName(getSaveDataGameSoftwareMasterId(saveData, lookups), lookups);
-}
-
-function getStoryProgressLabel(
-  gameSoftwareMasterId: number | null | undefined,
-  storyProgressDefinitionId: number | null | undefined,
-  labelMap: StoryProgressLabelMap,
-): string | null {
-  if (!gameSoftwareMasterId || !storyProgressDefinitionId) {
-    return null;
-  }
-
-  return labelMap[`${gameSoftwareMasterId}:${storyProgressDefinitionId}`] ?? `#${storyProgressDefinitionId}`;
-}
-
-function buildSaveDataPayload(
-  formState: FormState,
-  lookups: ManagementLookups,
-  saveDataSchema: SaveDataSchemaDto | null,
-): CreateSaveDataRequest {
-  const payload: CreateSaveDataRequest = {
-    gameSoftwareMasterId: numberOrZero(formState.gameSoftwareMasterId),
-    gameSoftwareId: null,
-    gameConsoleId: null,
-    accountId: null,
-    memoryCardId: null,
-    storyProgressDefinitionId: numberOrNull(formState.storyProgressDefinitionId),
-    extendedFields: buildExtendedFieldInputs(saveDataSchema, formState.dynamicFieldValues),
-  };
-  const saveStorageType = getSaveStorageTypeForGameSoftwareMaster(payload.gameSoftwareMasterId, lookups);
-
-  if (saveStorageType === 0) {
-    payload.gameSoftwareId = numberOrNull(formState.gameSoftwareId);
-  }
-
-  if (saveStorageType === 1 || saveStorageType === 2) {
-    const gameConsoleId = numberOrNull(formState.gameConsoleId);
-    if (gameConsoleId) {
-      payload.gameConsoleId = gameConsoleId;
-    }
-  }
-
-  if (saveStorageType === 2) {
-    const accountId = numberOrNull(formState.accountId);
-    if (accountId) {
-      payload.accountId = accountId;
-    }
-  }
-
-  if (saveStorageType === 3) {
-    const memoryCardId = numberOrNull(formState.memoryCardId);
-    if (memoryCardId) {
-      payload.memoryCardId = memoryCardId;
-    }
-  }
-
-  return payload;
-}
-
-function buildTableRows(resourceKey: ResourceKey, lookups: ManagementLookups, basePath: string, storyProgressLabels: StoryProgressLabelMap = {}): ManagementTableRow[] {
-  switch (resourceKey) {
-    case 'accounts':
-      return lookups.accounts.map((item) => ({
-        id: item.id,
-        primary: getAccountDisplay(item, lookups),
-        relation: item.gameConsoleCategoryIds.map((id) => getGameConsoleCategoryName(id, lookups)).join(', ') || '未設定',
-        note: item.memo ?? '',
-        status: formatDeletedState(item.isDeleted),
-        edit: '編集',
-        href: `${basePath}/accounts/${item.id}`,
-      }));
-    case 'game-console-categories':
-      return lookups.gameConsoleCategories.map((item) => ({
-        id: item.id,
-        primary: item.name,
-        relation: `${item.abbreviation} / ${item.manufacturer || 'メーカー未設定'}`,
-        note: `保存方式: ${formatSaveStorageType(item.saveStorageType)}`,
-        status: formatDeletedState(item.isDeleted),
-        edit: '編集',
-        href: `${basePath}/game-console-categories/${item.id}`,
-      }));
-    case 'game-console-masters':
-      return lookups.gameConsoleMasters.map((item) => ({
-        id: item.id,
-        primary: item.name,
-        relation: `略称: ${item.abbreviation}`,
-        note: `カテゴリ: ${getGameConsoleCategoryName(item.gameConsoleCategoryId, lookups)}`,
-        status: formatDeletedState(item.isDeleted),
-        edit: '編集',
-        href: `${basePath}/game-console-masters/${item.id}`,
-      }));
-    case 'game-consoles':
-      return lookups.gameConsoles.map((item) => ({
-        id: item.id,
-        primary: getGameConsoleDisplay(item, lookups),
-        relation: getGameConsoleMasterName(item.gameConsoleMasterId, lookups),
-        note: item.memo ?? '',
-        status: formatDeletedState(item.isDeleted),
-        edit: '編集',
-        href: `${basePath}/game-consoles/${item.id}`,
-      }));
-    case 'game-console-edition-masters':
-      return lookups.gameConsoleEditionMasters.map((item) => ({
-        id: item.id,
-        primary: item.name,
-        relation: `略称: ${item.abbreviation}`,
-        note: `マスタ: ${getGameConsoleMasterName(item.gameConsoleMasterId, lookups)}`,
-        status: formatDeletedState(item.isDeleted),
-        edit: '編集',
-        href: `${basePath}/game-console-edition-masters/${item.id}`,
-      }));
-    case 'game-software-content-groups':
-      return lookups.gameSoftwareContentGroups.map((item) => ({
-        id: item.id,
-        primary: item.name,
-        relation: '分類',
-        note: 'ゲームソフト分類',
-        status: formatDeletedState(item.isDeleted),
-        edit: '編集',
-        href: `${basePath}/game-software-content-groups/${item.id}`,
-      }));
-    case 'game-software-masters':
-      return lookups.gameSoftwareMasters.map((item) => ({
-        id: item.id,
-        primary: item.name,
-        relation: getGameConsoleCategoryName(item.gameConsoleCategoryId, lookups),
-        note: `略称: ${item.abbreviation} / 分類: ${getGameSoftwareContentGroupName(item.contentGroupId, lookups)}`,
-        status: formatDeletedState(item.isDeleted),
-        edit: '編集',
-        href: `${basePath}/game-software-masters/${item.id}`,
-      }));
-    case 'game-softwares':
-      return lookups.gameSoftwares.map((item) => ({
-        id: item.id,
-        primary: getGameSoftwareDisplay(item, lookups),
-        relation: getGameSoftwareMasterName(item.gameSoftwareMasterId, lookups),
-        note: [item.variant != null ? `種類: ${item.variant === 0 ? 'パッケージ版' : 'ダウンロード版'}` : '', item.memo ?? ''].filter(Boolean).join(' / '),
-        status: formatDeletedState(item.isDeleted),
-        edit: '編集',
-        href: `${basePath}/game-softwares/${item.id}`,
-      }));
-    case 'memory-cards':
-      return lookups.memoryCards.map((item) => ({
-        id: item.id,
-        primary: item.label || `MemoryCard #${item.id}`,
-        relation: `容量: ${item.capacity} ブロック`,
-        note: item.memo ?? '',
-        status: formatDeletedState(item.isDeleted),
-        edit: '詳細',
-        href: `${basePath}/memory-cards/${item.id}`,
-      }));
-    case 'save-datas':
-      return lookups.saveDatas.map((item) => ({
-        id: item.id,
-        primary: `SaveData #${item.id}`,
-        relation: getSaveDataGameSoftwareDisplay(item, lookups),
-        note: [
-          `方式: ${formatSaveStorageType(item.saveStorageType)}`,
-          item.storyProgressDefinitionId ? `進行度: ${getStoryProgressLabel(getSaveDataGameSoftwareMasterId(item, lookups), item.storyProgressDefinitionId, storyProgressLabels)}` : '',
-          item.gameConsoleId
-            ? `本体: ${(() => {
-                const consoleItem = lookups.gameConsoles.find((candidate) => candidate.id === item.gameConsoleId);
-                return consoleItem ? getGameConsoleDisplay(consoleItem, lookups) : `#${item.gameConsoleId}`;
-              })()}`
-            : '',
-          item.accountId
-            ? `アカウント: ${(() => {
-                const account = lookups.accounts.find((candidate) => candidate.id === item.accountId);
-                return account ? getAccountDisplay(account, lookups) : `#${item.accountId}`;
-              })()}`
-            : '',
-          item.memoryCardId ? `メモリーカード: #${item.memoryCardId}` : '',
-          item.extendedFields.length > 0
-            ? `項目: ${item.extendedFields
-                .slice(0, 3)
-                .map((field) => `${field.label}=${formatSaveDataFieldValueForList(field)}`)
-                .join(' / ')}`
-            : '',
-        ].filter(Boolean).join(' / '),
-        status: item.isDeleted ? `削除済み${item.deleteReason ? `: ${item.deleteReason}` : ''}` : '有効',
-        edit: '編集',
-        href: `${basePath}/save-datas/${item.id}`,
-      }));
-  }
-}
-
-function buildInitialFormState(resourceKey: ResourceKey, record: unknown): FormState {
-  const base = createEmptyFormState();
-
-  switch (resourceKey) {
-    case 'accounts': {
-      const item = record as AccountDto;
-      return {
-        ...base,
-        label: item.label ?? '',
-        memo: item.memo ?? '',
-        gameConsoleCategoryIds: item.gameConsoleCategoryIds.map(String),
-      };
-    }
-    case 'game-console-categories': {
-      const item = record as GameConsoleCategoryDto;
-      return {
-        ...base,
-        name: item.name,
-        abbreviation: item.abbreviation,
-        manufacturer: item.manufacturer ?? '',
-        saveStorageType: String(item.saveStorageType),
-      };
-    }
-    case 'game-console-masters': {
-      const item = record as GameConsoleMasterDto;
-      return {
-        ...base,
-        name: item.name,
-        abbreviation: item.abbreviation,
-        gameConsoleCategoryId: String(item.gameConsoleCategoryId),
-      };
-    }
-    case 'game-console-edition-masters': {
-      const item = record as GameConsoleEditionMasterDto;
-      return {
-        ...base,
-        name: item.name,
-        abbreviation: item.abbreviation,
-        gameConsoleMasterId: String(item.gameConsoleMasterId),
-      };
-    }
-    case 'game-consoles': {
-      const item = record as GameConsoleDto;
-      return {
-        ...base,
-        label: item.label ?? '',
-        memo: item.memo ?? '',
-        gameConsoleMasterId: String(item.gameConsoleMasterId),
-        gameConsoleEditionMasterId: item.gameConsoleEditionMasterId ? String(item.gameConsoleEditionMasterId) : '',
-      };
-    }
-    case 'game-software-content-groups': {
-      const item = record as GameSoftwareContentGroupDto;
-      return {
-        ...base,
-        name: item.name,
-      };
-    }
-    case 'game-software-masters': {
-      const item = record as GameSoftwareMasterDto;
-      return {
-        ...base,
-        name: item.name,
-        abbreviation: item.abbreviation,
-        gameConsoleCategoryId: String(item.gameConsoleCategoryId),
-        contentGroupId: item.contentGroupId ? String(item.contentGroupId) : '',
-      };
-    }
-    case 'game-softwares': {
-      const item = record as GameSoftwareDto;
-      return {
-        ...base,
-        label: item.label ?? '',
-        memo: item.memo ?? '',
-        gameSoftwareMasterId: String(item.gameSoftwareMasterId),
-        variant: item.variant != null ? String(item.variant) : '',
-      };
-    }
-    case 'memory-cards': {
-      const item = record as MemoryCardDto;
-      return {
-        ...base,
-        capacity: String(item.capacity),
-        label: item.label ?? '',
-        memo: item.memo ?? '',
-      };
-    }
-    case 'save-datas': {
-      const item = record as SaveDataDto;
-      return {
-        ...base,
-        gameSoftwareMasterId: item.gameSoftwareMasterId ? String(item.gameSoftwareMasterId) : '',
-        gameSoftwareId: item.saveStorageType === 0 && item.gameSoftwareId ? String(item.gameSoftwareId) : '',
-        gameConsoleId: item.gameConsoleId ? String(item.gameConsoleId) : '',
-        accountId: item.accountId ? String(item.accountId) : '',
-        memoryCardId: item.memoryCardId ? String(item.memoryCardId) : '',
-        storyProgressDefinitionId: item.storyProgressDefinitionId ? String(item.storyProgressDefinitionId) : '',
-        replacedBySaveDataId: item.replacedBySaveDataId ? String(item.replacedBySaveDataId) : '',
-        deleteReason: item.deleteReason ?? '',
-        dynamicFieldValues: createDynamicFieldValueMapFromSaveData(item),
-      };
-    }
-  }
-}
-
-function validateForm(
-  resourceKey: ResourceKey,
-  formState: FormState,
-  lookups: ManagementLookups,
-  saveDataSchema: SaveDataSchemaDto | null,
-  storyProgressSchema: StoryProgressSchemaDto | null,
-): string[] {
-  switch (resourceKey) {
-    case 'game-console-categories':
-      return [
-        !formState.name.trim() ? '名称を入力してください。' : '',
-        !formState.abbreviation.trim() ? '略称を入力してください。' : '',
-      ].filter(Boolean);
-    case 'game-console-masters':
-      return [
-        !formState.name.trim() ? '名称を入力してください。' : '',
-        !formState.abbreviation.trim() ? '略称を入力してください。' : '',
-        !formState.gameConsoleCategoryId ? 'ゲーム機カテゴリを選択してください。' : '',
-      ].filter(Boolean);
-    case 'game-console-edition-masters':
-      return [
-        !formState.name.trim() ? '名称を入力してください。' : '',
-        !formState.abbreviation.trim() ? '略称を入力してください。' : '',
-        !formState.gameConsoleMasterId ? 'ゲーム機マスタを選択してください。' : '',
-      ].filter(Boolean);
-    case 'game-consoles':
-      return [
-        !formState.gameConsoleMasterId ? 'ゲーム機マスタを選択してください。' : '',
-      ].filter(Boolean);
-    case 'game-software-content-groups':
-      return [
-        !formState.name.trim() ? '名称を入力してください。' : '',
-      ].filter(Boolean);
-    case 'game-software-masters':
-      return [
-        !formState.name.trim() ? '名称を入力してください。' : '',
-        !formState.abbreviation.trim() ? '略称を入力してください。' : '',
-        !formState.gameConsoleCategoryId ? 'ゲーム機カテゴリを選択してください。' : '',
-      ].filter(Boolean);
-    case 'game-softwares':
-      return [
-        !formState.gameSoftwareMasterId ? 'ゲームソフトマスタを選択してください。' : '',
-      ].filter(Boolean);
-    case 'save-datas': {
-      const gameSoftwareMasterId = numberOrNull(formState.gameSoftwareMasterId);
-      const gameSoftwareId = numberOrNull(formState.gameSoftwareId);
-      const saveStorageType = getSaveStorageTypeForGameSoftwareMaster(gameSoftwareMasterId, lookups);
-      const storyProgressDefinitionId = numberOrNull(formState.storyProgressDefinitionId);
-      const errors = [
-        !formState.gameSoftwareMasterId ? 'ゲームソフトマスタを選択してください。' : '',
-        formState.gameSoftwareMasterId && saveStorageType == null ? '保存方式を判定できません。ゲームソフトマスタの紐付けを確認してください。' : '',
-        saveStorageType === 0 && !formState.gameSoftwareId ? 'このセーブデータではゲームソフトの選択が必須です。' : '',
-        saveStorageType === 1 && !formState.gameConsoleId ? 'このセーブデータではゲーム機の選択が必須です。' : '',
-        saveStorageType === 2 && !formState.gameConsoleId ? 'このセーブデータではゲーム機の選択が必須です。' : '',
-        saveStorageType === 2 && !formState.accountId ? 'このセーブデータではアカウントの選択が必須です。' : '',
-        saveStorageType === 3 && !formState.memoryCardId ? 'このセーブデータではメモリーカードの選択が必須です。' : '',
-      ].filter(Boolean);
-
-      if (saveStorageType === 0 && gameSoftwareId != null) {
-        const selectedSoftware = lookups.gameSoftwares.find((item) => item.id === gameSoftwareId);
-        if (!selectedSoftware) {
-          errors.push('選択したゲームソフトが見つかりません。');
-        } else if (selectedSoftware.gameSoftwareMasterId !== gameSoftwareMasterId) {
-          errors.push('選択したゲームソフトがゲームソフトマスタと一致していません。');
-        }
+  for (const schema of schemas) {
+    for (const field of schema.fields) {
+      if (field.isDisabled) {
+        continue;
       }
 
-      if (saveStorageType === 0 && (formState.gameConsoleId || formState.accountId || formState.memoryCardId)) {
-        errors.push('ソフト保存では本体、アカウント、メモリーカードを指定できません。');
+      const current = fieldMap.get(field.fieldKey);
+      if (!current || field.displayOrder < current.displayOrder || (field.displayOrder === current.displayOrder && field.fieldKey.localeCompare(current.fieldKey, 'ja') < 0)) {
+        fieldMap.set(field.fieldKey, {
+          id: current?.id ?? syntheticId++,
+          fieldKey: field.fieldKey,
+          label: field.label,
+          displayOrder: field.displayOrder,
+        });
       }
-      if (saveStorageType !== 0 && formState.gameSoftwareId) {
-        errors.push('ソフト保存以外ではゲームソフトを指定できません。');
-      }
-      if (saveStorageType === 1 && (formState.accountId || formState.memoryCardId)) {
-        errors.push('本体保存ではアカウントとメモリーカードを指定できません。');
-      }
-      if (saveStorageType === 2 && formState.memoryCardId) {
-        errors.push('本体＋アカウント保存ではメモリーカードを指定できません。');
-      }
-      if (saveStorageType === 3 && (formState.gameConsoleId || formState.accountId)) {
-        errors.push('メモリーカード保存では本体とアカウントを指定できません。');
-      }
-
-      if (storyProgressDefinitionId != null) {
-        if (!storyProgressSchema) {
-          errors.push('ストーリー進行度候補を取得できていません。');
-        } else {
-          const selectedStoryProgress = storyProgressSchema.choices.find((choice) => choice.storyProgressDefinitionId === storyProgressDefinitionId);
-          if (!selectedStoryProgress) {
-            errors.push('選択したストーリー進行度はこの作品では利用できません。');
-          } else if (selectedStoryProgress.isDisabled) {
-            errors.push('無効化されたストーリー進行度は選択できません。');
-          }
-        }
-      }
-
-      errors.push(...validateDynamicFieldInputs(saveDataSchema, formState.dynamicFieldValues));
-
-      return errors;
     }
-    default:
-      return [];
-  }
-}
-
-function optionize(items: SelectOption[], includeEmpty = true): SelectOption[] {
-  if (!includeEmpty) {
-    return items;
-  }
-  return [{ value: '', label: '未選択' }, ...items];
-}
-
-function actionLinkClasses(variant: 'default' | 'accent' = 'default'): string {
-  if (variant === 'accent') {
-    return 'inline-flex items-center justify-center rounded-lg border border-[var(--color-accent-25-strong)] bg-[var(--color-accent-25)] px-6 py-2.5 text-sm font-semibold text-[var(--color-text-inverse)] shadow-sm transition hover:opacity-90';
   }
 
-  return 'text-sm font-medium text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-300';
+  return sortSaveDataFieldHeaders(Array.from(fieldMap.values()));
 }
 
-function selectOptionsFromLookups(lookups: ManagementLookups) {
-  return {
-    gameConsoleCategories: lookups.gameConsoleCategories.map((item) => ({ value: String(item.id), label: item.name })),
-    gameConsoleMasters: lookups.gameConsoleMasters.map((item) => ({ value: String(item.id), label: item.name })),
-    gameConsoleEditionMasters: lookups.gameConsoleEditionMasters.map((item) => ({ value: String(item.id), label: item.name })),
-    gameSoftwareContentGroups: lookups.gameSoftwareContentGroups.map((item) => ({ value: String(item.id), label: item.name })),
-    gameSoftwareMasters: lookups.gameSoftwareMasters.map((item) => ({ value: String(item.id), label: `${item.name} / ${getGameConsoleCategoryName(item.gameConsoleCategoryId, lookups)}` })),
-    gameSoftwares: lookups.gameSoftwares.map((item) => ({ value: String(item.id), label: getGameSoftwareDisplay(item, lookups) })),
-    gameConsoles: lookups.gameConsoles.map((item) => ({ value: String(item.id), label: getGameConsoleDisplay(item, lookups) })),
-    accounts: lookups.accounts.map((item) => ({ value: String(item.id), label: getAccountDisplay(item, lookups) })),
-    memoryCards: lookups.memoryCards.map((item) => ({ value: String(item.id), label: item.label || `MemoryCard #${item.id}` })),
-    saveDatas: lookups.saveDatas.map((item) => ({ value: String(item.id), label: `SaveData #${item.id}` })),
-  };
+function mergeVisibleRowIdsIntoOrder(
+  previousOrder: number[] | null,
+  visibleRowIds: number[],
+  nextVisibleRowIds: number[],
+): number[] | null {
+  if (!previousOrder) {
+    return previousOrder;
+  }
+
+  const visibleRowIdSet = new Set(visibleRowIds);
+  const nextOrder = [...previousOrder];
+  let visibleCursor = 0;
+
+  for (let index = 0; index < nextOrder.length; index += 1) {
+    if (!visibleRowIdSet.has(nextOrder[index])) {
+      continue;
+    }
+
+    nextOrder[index] = nextVisibleRowIds[visibleCursor];
+    visibleCursor += 1;
+  }
+
+  return nextOrder;
 }
 
-function SelectField({
-  id,
-  label,
-  value,
-  options,
-  onChange,
-  placeholder,
-  disabled = false,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  options: SelectOption[];
-  onChange: (value: string) => void;
-  placeholder?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="space-y-2">
-      <CustomLabel htmlFor={id}>{label}</CustomLabel>
-      <CustomComboBox id={id} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
-        {placeholder ? <option value="">{placeholder}</option> : null}
-        {options.map((option) => (
-          <option key={option.value} value={option.value} disabled={option.disabled}>
-            {option.label}
-          </option>
-        ))}
-      </CustomComboBox>
-    </div>
-  );
-}
-
-function TrialBanner() {
-  return (
-    <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
-      <p className="font-semibold">トライアルモード</p>
-      <p>データはこのブラウザの localStorage に保存されます。ログインするとサーバーに保存できます。</p>
-    </div>
-  );
-}
-
-function PageCard({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">{children}</div>;
-}
-
-function PageFrame({
-  eyebrowLabel = 'Game Management',
-  title,
-  description,
-  actions,
-  children,
-}: {
-  eyebrowLabel?: string;
-  title: string;
-  description: string;
-  actions?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <main className="min-h-screen bg-zinc-50 px-4 py-8 dark:bg-black sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
-        <div className="flex flex-col gap-4 rounded-3xl bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(241,245,249,0.95))] p-6 shadow-sm ring-1 ring-zinc-200 dark:bg-[linear-gradient(135deg,rgba(24,24,27,0.95),rgba(9,9,11,0.95))] dark:ring-zinc-800">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">{eyebrowLabel}</p>
-              <CustomHeader level={1}>{title}</CustomHeader>
-              <p className="max-w-3xl text-sm leading-6 text-zinc-600 dark:text-zinc-300">{description}</p>
-            </div>
-            {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
-          </div>
-        </div>
-        {children}
-      </div>
-    </main>
-  );
+function ordersEqual(left: number[], right: number[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 export function GameManagementDashboard({
-  basePath = '/game-management',
-  resourceKeys,
-  sectionLabel = 'Game Management',
-  sectionTitle = 'ゲーム管理ダッシュボード',
-  sectionDescription = '各マスタ、所有ゲーム機、ゲームソフト、アカウント、メモリーカード、セーブデータの一覧確認と編集画面への遷移をここから行えます。',
-  extraCards = [],
-}: {
-  basePath?: string;
-  resourceKeys?: ResourceKey[];
-  sectionLabel?: string;
-  sectionTitle?: string;
-  sectionDescription?: string;
-  extraCards?: DashboardExtraCard[];
-}) {
-  const { data: session } = useSession();
-  const isTrial = !session?.user;
-  const displayKeys = resourceKeys ?? ADMIN_RESOURCE_ORDER;
-  return (
-    <PageFrame
-      eyebrowLabel={sectionLabel}
-      title={sectionTitle}
-      description={sectionDescription}
-    >
-      {isTrial && (
-        <TrialBanner />
-      )}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {displayKeys.map((resourceKey) => {
-          const definition = RESOURCE_DEFINITIONS[resourceKey];
+    basePath = '/game-management',
+    resourceKeys,
+    sectionLabel = 'Game Management',
+    sectionTitle = 'ゲーム管理ダッシュボード',
+    sectionDescription = '各マスタ、所有ゲーム機、ゲームソフト、アカウント、メモリーカード、セーブデータの一覧確認と編集画面への遷移をここから行えます。',
+    extraCards = [],
+  }: {
+    basePath?: string;
+    resourceKeys?: ResourceKey[];
+    sectionLabel?: string;
+    sectionTitle?: string;
+    sectionDescription?: string;
+    extraCards?: DashboardExtraCard[];
+  }) {
+    const { data: session } = useSession();
+    const isTrial = !session?.user;
+    const displayKeys = resourceKeys ?? ADMIN_RESOURCE_ORDER;
 
-          return (
+    return (
+      <PageFrame
+        eyebrowLabel={sectionLabel}
+        title={sectionTitle}
+        description={sectionDescription}
+      >
+        {isTrial && (
+          <TrialBanner />
+        )}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {displayKeys.map((resourceKey) => {
+            const definition = RESOURCE_DEFINITIONS[resourceKey];
+
+            return (
+              <Link
+                key={resourceKey}
+                href={`${basePath}/${resourceKey}`}
+                className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
+              >
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{definition.shortLabel}</p>
+                  <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">{definition.label}</h2>
+                  <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">{definition.description}</p>
+                  <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">一覧を開く</p>
+                </div>
+              </Link>
+            );
+          })}
+          {extraCards.map((card) => (
             <Link
-              key={resourceKey}
-              href={`${basePath}/${resourceKey}`}
+              key={card.href}
+              href={card.href}
               className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
             >
               <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{definition.shortLabel}</p>
-                <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">{definition.label}</h2>
-                <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">{definition.description}</p>
-                <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">一覧を開く</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{card.shortLabel}</p>
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">{card.title}</h2>
+                <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">{card.description}</p>
+                <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">{card.actionLabel ?? '画面を開く'}</p>
               </div>
             </Link>
-          );
-        })}
-        {extraCards.map((card) => (
-          <Link
-            key={card.href}
-            href={card.href}
-            className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
-          >
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{card.shortLabel}</p>
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">{card.title}</h2>
-              <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">{card.description}</p>
-              <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">{card.actionLabel ?? '画面を開く'}</p>
-            </div>
-          </Link>
-        ))}
-      </div>
-    </PageFrame>
-  );
-}
+          ))}
+        </div>
+      </PageFrame>
+    );
+  }
 
-export function GameManagementResourceListPage({
-  resourceKey,
-  basePath = '/game-management',
-  scope = 'admin',
-}: {
-  resourceKey: ResourceKey;
-  basePath?: string;
-  scope?: 'admin' | 'user';
-}) {
-  const { data: session } = useSession();
-  const isTrial = scope === 'user' && !session?.user;
-  const definition = getResourceDefinition(resourceKey);
-  const [lookups, setLookups] = useState<ManagementLookups | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [storyProgressLabels, setStoryProgressLabels] = useState<StoryProgressLabelMap>({});
+  export function GameManagementResourceListPage({
+    resourceKey,
+    basePath = '/game-management',
+    scope = 'admin',
+  }: {
+    resourceKey: ResourceKey;
+    basePath?: string;
+    scope?: 'admin' | 'user';
+  }) {
+    const { data: session } = useSession();
+    const isTrial = scope === 'user' && !session?.user;
+    const definition = getResourceDefinition(resourceKey);
+    const [lookups, setLookups] = useState<ManagementLookups | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [storyProgressLabels, setStoryProgressLabels] = useState<StoryProgressLabelMap>({});
+    const [selectedContentGroupId, setSelectedContentGroupId] = useState('');
+    const [saveDataSchemas, setSaveDataSchemas] = useState<Record<number, SaveDataSchemaDto>>({});
+    const [saveDataFieldHeaders, setSaveDataFieldHeaders] = useState<SaveDataListFieldHeader[]>([]);
+    const [saveDataSchemaLoading, setSaveDataSchemaLoading] = useState(false);
+    const [saveDataSchemaError, setSaveDataSchemaError] = useState<string | null>(null);
+
+    const [localRowOrder, setLocalRowOrder] = useState<number[] | null>(null);
+    const [isDirty, setIsDirty] = useState(false);
+    const [sortState, setSortState] = useState<SortState | null>(null);
+    const [filteredCount, setFilteredCount] = useState<number | null>(null);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);
+    const { startLoading } = useLoadingOverlay();
+
+    const [editorContext, setEditorContext] = useState<EditorDialogContext | null>(null);
+    const [displayedRowIds, setDisplayedRowIds] = useState<number[]>([]);
+    const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>([]);
+    const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
+    const [pageMode, setPageMode] = useState<PageMode>('view');
+    const [bulkEditorOpen, setBulkEditorOpen] = useState(false);
+    const [bulkEditorTargetIds, setBulkEditorTargetIds] = useState<number[]>([]);
+    const [accountMoveTarget, setAccountMoveTarget] = useState<AccountDto | null>(null);
+
+    const softwareMasterDefinition = useMemo(() => getResourceDefinition('game-software-masters'), []);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setSaveError(null);
+    setIsDirty(false);
+    setLocalRowOrder(null);
+    setSortState(null);
+    setSelectedRowKeys([]);
+
     try {
       let result: ManagementLookups;
       if (scope === 'admin') {
@@ -957,11 +273,63 @@ export function GameManagementResourceListPage({
     } finally {
       setLoading(false);
     }
-  }, [scope, isTrial]);
+  }, [isTrial, scope]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (resourceKey !== 'game-software-content-groups') {
+      setExpandedRowKeys([]);
+    }
+  }, [resourceKey]);
+
+  const saveDataContentGroupOptions = useMemo(() => {
+    if (resourceKey !== 'save-datas' || !lookups) {
+      return [] as Array<{ value: string; label: string }>;
+    }
+
+    const availableContentGroupIds = new Set(
+      lookups.saveDatas
+        .map((saveData) => getSaveDataGameSoftwareMasterId(saveData, lookups))
+        .filter((value): value is number => value != null)
+        .map((gameSoftwareMasterId) => lookups.gameSoftwareMasters.find((master) => master.id === gameSoftwareMasterId)?.contentGroupId)
+        .filter((value): value is number => value != null),
+    );
+
+    return lookups.gameSoftwareContentGroups
+      .filter((group) => availableContentGroupIds.has(group.id))
+      .sort((left, right) => left.displayOrder - right.displayOrder || left.id - right.id)
+      .map((group) => ({ value: String(group.id), label: group.name }));
+  }, [lookups, resourceKey]);
+
+  useEffect(() => {
+    if (resourceKey !== 'save-datas') {
+      setSelectedContentGroupId('');
+      return;
+    }
+
+    if (selectedContentGroupId && !saveDataContentGroupOptions.some((option) => option.value === selectedContentGroupId)) {
+      setSelectedContentGroupId('');
+    }
+  }, [resourceKey, saveDataContentGroupOptions, selectedContentGroupId]);
+
+  const selectedContentGroupIdNumber = useMemo(() => {
+    if (resourceKey !== 'save-datas' || !selectedContentGroupId) {
+      return null;
+    }
+
+    return Number(selectedContentGroupId);
+  }, [resourceKey, selectedContentGroupId]);
+
+  const dynamicColumnSignature = useMemo(() => (
+    saveDataFieldHeaders.map((field) => field.fieldKey).join(',')
+  ), [saveDataFieldHeaders]);
+
+  useEffect(() => {
+    setSelectedRowKeys([]);
+  }, [dynamicColumnSignature, resourceKey, selectedContentGroupId]);
 
   useEffect(() => {
     if (resourceKey !== 'save-datas' || !lookups) {
@@ -1011,7 +379,557 @@ export function GameManagementResourceListPage({
     };
   }, [lookups, resourceKey]);
 
-  const rows = useMemo(() => (lookups ? buildTableRows(resourceKey, lookups, basePath, storyProgressLabels) : []), [lookups, resourceKey, basePath, storyProgressLabels]);
+  useEffect(() => {
+    if (resourceKey !== 'save-datas' || !lookups || selectedContentGroupIdNumber == null) {
+      setSaveDataSchemas({});
+      setSaveDataFieldHeaders([]);
+      setSaveDataSchemaLoading(false);
+      setSaveDataSchemaError(null);
+      return;
+    }
+
+    const targetSaveDatas = lookups.saveDatas.filter((saveData) => {
+      const gameSoftwareMasterId = getSaveDataGameSoftwareMasterId(saveData, lookups);
+      if (!gameSoftwareMasterId) {
+        return false;
+      }
+
+      const master = lookups.gameSoftwareMasters.find((item) => item.id === gameSoftwareMasterId);
+      return master?.contentGroupId === selectedContentGroupIdNumber;
+    });
+
+    const masterIds = Array.from(new Set(
+      targetSaveDatas
+        .map((saveData) => getSaveDataGameSoftwareMasterId(saveData, lookups))
+        .filter((value): value is number => value != null),
+    ));
+
+    if (masterIds.length === 0) {
+      setSaveDataSchemas({});
+      setSaveDataFieldHeaders([]);
+      setSaveDataSchemaLoading(false);
+      setSaveDataSchemaError(null);
+      return;
+    }
+
+    if (isTrial) {
+      setSaveDataSchemas({});
+      setSaveDataFieldHeaders([]);
+      setSaveDataSchemaLoading(false);
+      setSaveDataSchemaError('トライアルモードでは可変項目の元定義を取得できないため、可変項目列は表示されません。');
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadSaveDataSchemas = async () => {
+      setSaveDataSchemas({});
+      setSaveDataFieldHeaders([]);
+      setSaveDataSchemaLoading(true);
+      setSaveDataSchemaError(null);
+
+      const schemaEntries = await Promise.allSettled(masterIds.map(async (gameSoftwareMasterId) => (
+        [gameSoftwareMasterId, await fetchPublicSaveDataSchema(gameSoftwareMasterId)] as const
+      )));
+
+      if (cancelled) {
+        return;
+      }
+
+      const nextSchemas: Record<number, SaveDataSchemaDto> = {};
+      let failedSchemaCount = 0;
+
+      for (const entry of schemaEntries) {
+        if (entry.status !== 'fulfilled') {
+          failedSchemaCount += 1;
+          continue;
+        }
+
+        const [gameSoftwareMasterId, schema] = entry.value;
+        nextSchemas[gameSoftwareMasterId] = schema;
+      }
+
+      const schemaList = Object.values(nextSchemas);
+      const nextHeaders = schemaList.length > 0
+        ? buildSaveDataFieldHeadersFromSchemas(schemaList)
+        : [];
+
+      setSaveDataSchemas(nextSchemas);
+      setSaveDataFieldHeaders(nextHeaders);
+      setSaveDataSchemaLoading(false);
+      setSaveDataSchemaError(
+        failedSchemaCount === 0
+          ? null
+          : failedSchemaCount === masterIds.length
+            ? '可変項目 schema の取得に失敗したため、可変項目列は表示されません。'
+            : '一部の可変項目 schema の取得に失敗したため、該当レコードは空欄表示になります。',
+      );
+    };
+
+    void loadSaveDataSchemas();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isTrial, lookups, resourceKey, selectedContentGroupIdNumber]);
+
+  // 元テーブル行
+  const baseRows = useMemo<SaveDataListRow[]>(() => (
+    lookups ? buildTableRows(resourceKey, lookups, basePath, storyProgressLabels, saveDataSchemas) as SaveDataListRow[] : []
+  ), [lookups, resourceKey, basePath, storyProgressLabels, saveDataSchemas]);
+
+  // localRowOrder を baseRows の ID 集合へ追従させる
+  useEffect(() => {
+    const nextRowIds = baseRows.map((row) => row.id);
+
+    if (localRowOrder === null) {
+      if (nextRowIds.length > 0) {
+        setLocalRowOrder(nextRowIds);
+      }
+      return;
+    }
+
+    const nextRowIdSet = new Set(nextRowIds);
+    const currentVisibleRowIds = localRowOrder.filter((rowId) => nextRowIdSet.has(rowId));
+    const currentVisibleRowIdSet = new Set(currentVisibleRowIds);
+    const missingRowIds = nextRowIds.filter((rowId) => !currentVisibleRowIdSet.has(rowId));
+    const synchronizedRowOrder = isDirty ? [...currentVisibleRowIds, ...missingRowIds] : nextRowIds;
+
+    const isSameOrder = synchronizedRowOrder.length === localRowOrder.length
+      && synchronizedRowOrder.every((rowId, index) => rowId === localRowOrder[index]);
+
+    if (!isSameOrder) {
+      setLocalRowOrder(synchronizedRowOrder);
+    }
+  }, [baseRows, isDirty, localRowOrder]);
+
+  // ローカル順序が反映された表示行
+  const orderedRows = useMemo<SaveDataListRow[]>(() => {
+    if (!localRowOrder) return baseRows;
+    const rowMap = new Map(baseRows.map((row) => [row.id, row]));
+    return localRowOrder.map((id) => rowMap.get(id)).filter((row): row is SaveDataListRow => row !== undefined);
+  }, [baseRows, localRowOrder]);
+
+  const rows = useMemo<SaveDataListRow[]>(() => {
+    if (resourceKey !== 'save-datas' || selectedContentGroupIdNumber == null) {
+      return orderedRows;
+    }
+
+    return orderedRows.filter((row) => row.saveDataContentGroupId === selectedContentGroupIdNumber);
+  }, [orderedRows, resourceKey, selectedContentGroupIdNumber]);
+
+  useEffect(() => {
+    setFilteredCount(rows.length);
+    setDisplayedRowIds(rows.map((row) => row.id));
+  }, [rows]);
+
+  useEffect(() => {
+    if (resourceKey !== 'save-datas') {
+      return;
+    }
+
+    setSortState(null);
+    setFilteredCount(null);
+    setDisplayedRowIds([]);
+  }, [resourceKey, selectedContentGroupId, dynamicColumnSignature]);
+
+  // 並び替え有効判定: 編集モード＋ソートなし＋フィルタなし
+  const isContentGroupFilterActive = resourceKey === 'save-datas' && selectedContentGroupIdNumber != null;
+  const isFilterActive = filteredCount !== null && filteredCount !== rows.length;
+  const isSortActive = sortState !== null;
+  const isPageViewMode = pageMode === 'view';
+  const reorderEnabled = !isPageViewMode && !isSortActive && !isFilterActive && !isContentGroupFilterActive;
+  const reorderDisabledReason = isPageViewMode
+    ? '編集モードを有効にすると並び替えできます'
+    : isSortActive
+    ? 'ソートを解除すると並び替えできます'
+    : isContentGroupFilterActive
+      ? 'ゲームソフト分類の絞り込みを解除すると並び替えできます'
+    : isFilterActive
+      ? 'フィルタを解除すると並び替えできます'
+      : undefined;
+
+  // フィルタ後データ count の追跡
+  const handleFilteredDataChange = useCallback((data: SaveDataListRow[]) => {
+    setFilteredCount(data.length);
+    setDisplayedRowIds(data.map((row) => row.id));
+  }, []);
+
+  // ====== Editor dialog handlers ======
+
+  const openEditorDialog = useCallback((options?: OpenEditorDialogOptions) => {
+    setEditorContext({
+      resourceKey: options?.resourceKey ?? resourceKey,
+      recordId: options?.recordId ?? null,
+      initialFormState: options?.initialFormState,
+      parentContentGroupId: options?.parentContentGroupId ?? null,
+    });
+  }, [resourceKey]);
+
+  const closeEditorDialog = useCallback(() => {
+    setEditorContext(null);
+  }, []);
+
+  const handleEditorRecordIdChange = useCallback((recordId: number | null) => {
+    setEditorContext((current) => (current ? { ...current, recordId } : current));
+  }, []);
+
+  const handleEditorDataChanged = useCallback(() => {
+    void load();
+  }, [load]);
+
+  const effectiveDisplayedRowIds = useMemo(() => (
+    displayedRowIds.length > 0 ? displayedRowIds : rows.map((r) => r.id)
+  ), [displayedRowIds, rows]);
+
+  const selectedVisibleRowCount = useMemo(() => (
+    rows.filter((row) => selectedRowKeys.includes(row.tableRowKey)).length
+  ), [rows, selectedRowKeys]);
+
+  const editorRowIds = useMemo(() => {
+    if (!editorContext || !lookups) {
+      return [] as number[];
+    }
+
+    if (editorContext.resourceKey === 'game-software-masters' && editorContext.parentContentGroupId != null) {
+      return editorContext.recordId != null ? [editorContext.recordId] : [];
+    }
+
+    return effectiveDisplayedRowIds;
+  }, [editorContext, effectiveDisplayedRowIds, lookups]);
+
+  const editorDefinition = useMemo(() => (
+    editorContext ? getResourceDefinition(editorContext.resourceKey) : null
+  ), [editorContext]);
+
+  const editorIsTrial = useMemo(() => {
+    if (!editorDefinition) {
+      return false;
+    }
+
+    return editorDefinition.scope === 'user' && !session?.user;
+  }, [editorDefinition, session?.user]);
+
+  // 行移動ハンドラ
+  const handleRowMove = useCallback((fromIndex: number, toIndex: number) => {
+    setLocalRowOrder((prev) => {
+      if (!prev) return prev;
+
+      const visibleRowIds = rows.map((row) => row.id);
+      const draggedRow = rows[fromIndex];
+      if (!draggedRow) {
+        return prev;
+      }
+
+      const selectedVisibleRowIds = rows
+        .filter((row) => selectedRowKeys.includes(row.tableRowKey))
+        .map((row) => row.id);
+      const nextVisibleRowIds = selectedRowKeys.includes(draggedRow.tableRowKey) && selectedVisibleRowIds.length > 1
+        ? moveSelectedItemsToTarget(visibleRowIds, selectedVisibleRowIds, fromIndex, toIndex)
+        : (() => {
+          const next = [...visibleRowIds];
+          const [movedRowId] = next.splice(fromIndex, 1);
+
+          if (movedRowId == null) {
+            return visibleRowIds;
+          }
+
+          next.splice(toIndex, 0, movedRowId);
+          return next;
+        })();
+
+      if (ordersEqual(visibleRowIds, nextVisibleRowIds)) {
+        return prev;
+      }
+
+      setIsDirty(true);
+      return mergeVisibleRowIdsIntoOrder(prev, visibleRowIds, nextVisibleRowIds);
+    });
+  }, [rows, selectedRowKeys]);
+
+  const handleSelectionAwareRowMove = useCallback((rowKey: string, rowId: number, direction: 'up' | 'down') => {
+    setLocalRowOrder((prev) => {
+      if (!prev) {
+        return prev;
+      }
+
+      const visibleRowIds = rows.map((row) => row.id);
+      const selectedVisibleRowIds = rows
+        .filter((row) => selectedRowKeys.includes(row.tableRowKey))
+        .map((row) => row.id);
+      const moveIds = selectedRowKeys.includes(rowKey) && selectedVisibleRowIds.length > 0
+        ? selectedVisibleRowIds
+        : [rowId];
+      const nextVisibleRowIds = moveSelectedItemsByOne(visibleRowIds, moveIds, direction);
+
+      if (ordersEqual(visibleRowIds, nextVisibleRowIds)) {
+        return prev;
+      }
+
+      setIsDirty(true);
+      return mergeVisibleRowIdsIntoOrder(prev, visibleRowIds, nextVisibleRowIds);
+    });
+  }, [rows, selectedRowKeys]);
+
+  // lookups 内のリソース DTO 配列を取得
+  const getDtoListFromLookups = useCallback((key: ResourceKey, lk: ManagementLookups): Array<{ id: number } & Record<string, unknown>> => {
+    switch (key) {
+      case 'accounts': return lk.accounts as Array<{ id: number } & Record<string, unknown>>;
+      case 'game-console-categories': return lk.gameConsoleCategories as Array<{ id: number } & Record<string, unknown>>;
+      case 'game-console-masters': return lk.gameConsoleMasters as Array<{ id: number } & Record<string, unknown>>;
+      case 'game-console-edition-masters': return lk.gameConsoleEditionMasters as Array<{ id: number } & Record<string, unknown>>;
+      case 'game-consoles': return lk.gameConsoles as Array<{ id: number } & Record<string, unknown>>;
+      case 'game-software-content-groups': return lk.gameSoftwareContentGroups as Array<{ id: number } & Record<string, unknown>>;
+      case 'game-software-masters': return lk.gameSoftwareMasters as Array<{ id: number } & Record<string, unknown>>;
+      case 'game-softwares': return lk.gameSoftwares as Array<{ id: number } & Record<string, unknown>>;
+      case 'memory-cards': return lk.memoryCards as Array<{ id: number } & Record<string, unknown>>;
+      case 'memory-card-edition-masters': return lk.memoryCardEditionMasters as Array<{ id: number } & Record<string, unknown>>;
+      case 'save-datas': return lk.saveDatas as Array<{ id: number } & Record<string, unknown>>;
+    }
+  }, []);
+
+  // 表示順保存
+  const handleSaveDisplayOrder = useCallback(async () => {
+    if (!localRowOrder || !lookups || !isDirty) return;
+    setSaving(true);
+    setSaveError(null);
+
+    await startLoading(async () => {
+      try {
+        const dtoList = getDtoListFromLookups(resourceKey, lookups);
+        const dtoMap = new Map(dtoList.map((dto) => [dto.id, dto]));
+
+        // 差分のみ抽出: 新しい並び順で displayOrder が変わる行だけを送信
+        const reorderItems = localRowOrder
+          .map((id, index) => {
+            const newDisplayOrder = index + 1;
+            const dto = dtoMap.get(id);
+            const currentDisplayOrder = (dto as { displayOrder?: number } | undefined)?.displayOrder;
+            if (currentDisplayOrder === newDisplayOrder) return null;
+            return { id, displayOrder: newDisplayOrder };
+          })
+          .filter((item): item is { id: number; displayOrder: number } => item !== null);
+
+        if (reorderItems.length === 0) {
+          setIsDirty(false);
+          setLocalRowOrder(null);
+          setSaving(false);
+          return;
+        }
+
+        if (isTrial) {
+          trialBatchUpdateDisplayOrder(resourceKey, localRowOrder);
+        } else {
+          await reorderResource(resourceKey, reorderItems);
+        }
+
+        // 保存成功: 再読み込み
+        setIsDirty(false);
+        setLocalRowOrder(null);
+        await load();
+      } catch (saveErr) {
+        setSaveError(saveErr instanceof Error ? saveErr.message : '表示順の保存に失敗しました。');
+      } finally {
+        setSaving(false);
+      }
+    }, '表示順を保存中...');
+  }, [localRowOrder, lookups, isDirty, isTrial, resourceKey, load, getDtoListFromLookups, startLoading]);
+
+  // 操作列に上下ボタンを含めた columns を構築
+  const listColumns = useMemo((): DataTableColumn<SaveDataListRow>[] => {
+    const baseColumns = getTableColumns(resourceKey) as DataTableColumn<SaveDataListRow>[];
+    const dynamicColumns = resourceKey === 'save-datas' && selectedContentGroupIdNumber != null
+      ? saveDataFieldHeaders.map((field) => ({
+        key: `dynamic:${field.fieldKey}`,
+        header: field.label,
+        sortable: true,
+        filterable: true,
+        filterMode: 'select',
+        width: '12rem',
+      } satisfies DataTableColumn<SaveDataListRow>))
+      : [];
+
+    const columns = resourceKey === 'save-datas' && dynamicColumns.length > 0
+      ? (() => {
+        const storyProgressIndex = baseColumns.findIndex((column) => column.key === 'storyProgress');
+        if (storyProgressIndex === -1) {
+          return [...baseColumns, ...dynamicColumns];
+        }
+
+        return [
+          ...baseColumns.slice(0, storyProgressIndex + 1),
+          ...dynamicColumns,
+          ...baseColumns.slice(storyProgressIndex + 1),
+        ];
+      })()
+      : baseColumns;
+
+    return columns.map((col) => {
+      if (col.key === 'operation') {
+        return {
+          ...col,
+          render: (_: unknown, row: SaveDataListRow, rowIndex: number) => (
+            <RowMoveButtons
+              isFirst={rowIndex === 0}
+              isLast={rowIndex === rows.length - 1}
+              disabled={!reorderEnabled}
+              onMoveUp={() => handleSelectionAwareRowMove(row.tableRowKey, row.id, 'up')}
+              onMoveDown={() => handleSelectionAwareRowMove(row.tableRowKey, row.id, 'down')}
+            />
+          ),
+        };
+      }
+
+      if (col.key === 'edit') {
+        if (resourceKey === 'save-datas') {
+          return {
+            ...col,
+            render: (_: unknown, row: SaveDataListRow) => (
+              <button
+                type="button"
+                onClick={() => openEditorDialog({ recordId: row.id })}
+                title={`セーブデータ #${row.id} を編集`}
+                className="text-sm font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+              >
+                {`編集 (#${row.id})`}
+              </button>
+            ),
+          };
+        }
+
+        if (resourceKey === 'game-software-content-groups') {
+          return {
+            ...col,
+            width: '18rem',
+            render: (_: unknown, row: SaveDataListRow, rowIndex: number) => {
+              const isExpanded = expandedRowKeys.includes(row.tableRowKey);
+
+              return (
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <RowMoveButtons
+                    isFirst={rowIndex === 0}
+                    isLast={rowIndex === rows.length - 1}
+                    disabled={!reorderEnabled}
+                    onMoveUp={() => handleSelectionAwareRowMove(row.tableRowKey, row.id, 'up')}
+                    onMoveDown={() => handleSelectionAwareRowMove(row.tableRowKey, row.id, 'down')}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => openEditorDialog({ recordId: row.id })}
+                    className="text-sm font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+                  >
+                    分類編集
+                  </button>
+                  {(isExpanded || !(row.children && row.children.length > 0)) && softwareMasterDefinition.canCreate ? (
+                    <button
+                      type="button"
+                      onClick={() => openEditorDialog({
+                        resourceKey: 'game-software-masters',
+                        initialFormState: { contentGroupId: String(row.id) },
+                        parentContentGroupId: row.id,
+                      })}
+                      className="text-sm font-semibold text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-300"
+                    >
+                      ソフト追加
+                    </button>
+                  ) : null}
+                </span>
+              );
+            },
+          };
+        }
+
+        if (resourceKey === 'accounts' && !isTrial) {
+          return {
+            ...col,
+            width: '14rem',
+            render: (_: unknown, row: SaveDataListRow, rowIndex: number) => (
+              <span className="inline-flex items-center gap-2">
+                <RowMoveButtons
+                  isFirst={rowIndex === 0}
+                  isLast={rowIndex === rows.length - 1}
+                  disabled={!reorderEnabled}
+                  onMoveUp={() => handleSelectionAwareRowMove(row.tableRowKey, row.id, 'up')}
+                  onMoveDown={() => handleSelectionAwareRowMove(row.tableRowKey, row.id, 'down')}
+                />
+                <button
+                  type="button"
+                  onClick={() => openEditorDialog({ recordId: row.id })}
+                  className="text-sm font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+                >
+                  編集
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const account = lookups?.accounts.find((a) => a.id === row.id);
+                    if (account) setAccountMoveTarget(account);
+                  }}
+                  className="text-sm font-semibold text-amber-700 underline-offset-2 hover:underline dark:text-amber-300"
+                >
+                  移行
+                </button>
+              </span>
+            ),
+          };
+        }
+
+        return {
+          ...col,
+          width: '11rem',
+          render: (_: unknown, row: SaveDataListRow, rowIndex: number) => (
+            <span className="inline-flex items-center gap-2">
+              <RowMoveButtons
+                isFirst={rowIndex === 0}
+                isLast={rowIndex === rows.length - 1}
+                disabled={!reorderEnabled}
+                onMoveUp={() => handleSelectionAwareRowMove(row.tableRowKey, row.id, 'up')}
+                onMoveDown={() => handleSelectionAwareRowMove(row.tableRowKey, row.id, 'down')}
+              />
+              <button
+                type="button"
+                onClick={() => openEditorDialog({ recordId: row.id })}
+                className="text-sm font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+              >
+                編集
+              </button>
+            </span>
+          ),
+        };
+      }
+
+      return col;
+    });
+  }, [expandedRowKeys, handleSelectionAwareRowMove, isTrial, lookups, openEditorDialog, reorderEnabled, resourceKey, rows.length, saveDataFieldHeaders, selectedContentGroupIdNumber, softwareMasterDefinition.canCreate]);
+
+  const childTableColumns = useMemo((): DataTableColumn<SaveDataListRow>[] => {
+    return getGameSoftwareMasterChildTableColumns().map((column) => {
+      if (column.key !== 'edit') {
+        return column as DataTableColumn<SaveDataListRow>;
+      }
+
+      return {
+        ...column,
+        render: (_: unknown, row: SaveDataListRow) => (
+          <button
+            type="button"
+            onClick={() => openEditorDialog({
+              resourceKey: 'game-software-masters',
+              recordId: row.id,
+              parentContentGroupId: row.parentContentGroupId ?? null,
+            })}
+            className="text-sm font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+          >
+            編集
+          </button>
+        ),
+      } satisfies DataTableColumn<SaveDataListRow>;
+    });
+  }, [openEditorDialog]);
+
+  const dataTableKey = resourceKey === 'save-datas'
+    ? `${resourceKey}:${selectedContentGroupId || 'all'}:${dynamicColumnSignature}`
+    : resourceKey;
 
   return (
     <PageFrame
@@ -1022,1133 +940,185 @@ export function GameManagementResourceListPage({
           <Link href={basePath} className="text-sm font-medium text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-300">
             ダッシュボードへ戻る
           </Link>
+          <PageModeToggle mode={pageMode} onChange={setPageMode} />
           {definition.canCreate ? (
-            <Link href={`${basePath}/${resourceKey}/new`} className={actionLinkClasses('accent')}>
+            <CustomButton variant="accent" onClick={() => { setPageMode('edit'); openEditorDialog(); }}>
               新規作成
-            </Link>
+            </CustomButton>
           ) : null}
           <CustomButton onClick={() => void load()}>再読み込み</CustomButton>
         </>
       }
     >
       {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
+      {saveError ? <CustomMessageArea variant="error">{saveError}</CustomMessageArea> : null}
       {isTrial && <TrialBanner />}
       <PageCard>
         {loading ? (
           <p className="text-sm text-zinc-500">一覧を読み込んでいます...</p>
         ) : (
           <div className="space-y-4">
+            {resourceKey === 'save-datas' ? (
+              <div className="space-y-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,20rem)_1fr] md:items-end">
+                  <div className="space-y-2">
+                    <CustomLabel htmlFor="save-data-content-group-filter">ゲームソフト分類</CustomLabel>
+                    <CustomComboBox
+                      id="save-data-content-group-filter"
+                      value={selectedContentGroupId}
+                      onChange={(event) => setSelectedContentGroupId(event.target.value)}
+                    >
+                      <option value="">すべての分類</option>
+                      {saveDataContentGroupOptions.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </CustomComboBox>
+                  </div>
+                  <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-300">
+                    {isTrial
+                      ? '分類指定による一覧絞り込みは利用できます。可変項目列はログイン済み環境でのみ表示されます。'
+                      : '分類を指定すると、その分類のセーブデータのみを表示し、ストーリー進行度の右側に可変項目列を展開します。'}
+                  </p>
+                </div>
+                {selectedContentGroupIdNumber != null && saveDataSchemaLoading ? (
+                  <p className="text-sm text-zinc-500">可変項目列を読み込んでいます...</p>
+                ) : null}
+                {selectedContentGroupIdNumber != null && saveDataSchemaError ? (
+                  <CustomMessageArea variant="error">{saveDataSchemaError}</CustomMessageArea>
+                ) : null}
+              </div>
+            ) : null}
             <div className="flex items-center justify-between text-sm text-zinc-500">
               <span>表示件数: {rows.length} 件</span>
-              <span>行の編集リンクから単票画面へ移動できます。</span>
+              <div className="flex items-center gap-3">
+                {selectedVisibleRowCount > 0 && reorderEnabled ? (
+                  <span className="text-xs text-zinc-500 dark:text-zinc-300">
+                    選択中: {selectedVisibleRowCount} 件（Shift+クリックで範囲選択、上下移動でまとめて並び替え）
+                  </span>
+                ) : null}
+                {selectedVisibleRowCount >= 2 && definition.bulkEditableFields && definition.bulkEditableFields.length > 0 && pageMode === 'edit' ? (
+                  <CustomButton
+                    onClick={() => {
+                      const ids = rows
+                        .filter((row) => selectedRowKeys.includes(row.tableRowKey))
+                        .map((row) => row.id);
+                      setBulkEditorTargetIds(ids);
+                      setBulkEditorOpen(true);
+                    }}
+                  >
+                    一括編集（{selectedVisibleRowCount} 件）
+                  </CustomButton>
+                ) : null}
+                {!reorderEnabled && reorderDisabledReason && (
+                  <span className="text-xs text-amber-600 dark:text-amber-400">{reorderDisabledReason}</span>
+                )}
+                <CustomButton
+                  onClick={() => void handleSaveDisplayOrder()}
+                  disabled={!isDirty || saving || pageMode === 'view'}
+                >
+                  表示順を保存
+                </CustomButton>
+              </div>
             </div>
-            <DataTable columns={TABLE_COLUMNS} data={rows} rowKey="id" emptyMessage="データがありません。" />
+            <DataTable
+              key={dataTableKey}
+              title={definition.label}
+              columns={listColumns}
+              data={rows}
+              filterOptionsData={rows}
+              height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
+              rowKey="tableRowKey"
+              selectable
+              selectedKeys={selectedRowKeys}
+              onSelectionChange={setSelectedRowKeys}
+              resizable
+              paginated
+              isRowExpandable={resourceKey === 'game-software-content-groups'
+                ? (row) => Array.isArray(row.children) && row.children.length > 0
+                : undefined}
+              renderExpandedContent={resourceKey === 'game-software-content-groups'
+                ? (row) => {
+                  const childRows = (row.children ?? []) as SaveDataListRow[];
+
+                  return (
+                    <div className="space-y-3 rounded-2xl border border-zinc-200/80 bg-white/85 p-3 dark:border-zinc-800/80 dark:bg-zinc-950/70">
+                      <DataTable
+                        title="ゲームソフトマスタ"
+                        titleActions={softwareMasterDefinition.canCreate ? (
+                          <CustomButton
+                            variant="neutral"
+                            onClick={() => openEditorDialog({
+                              resourceKey: 'game-software-masters',
+                              initialFormState: { contentGroupId: String(row.id) },
+                              parentContentGroupId: row.id,
+                            })}
+                          >
+                            ソフト追加
+                          </CustomButton>
+                        ) : undefined}
+                        columns={childTableColumns}
+                        data={childRows}
+                        height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
+                        rowKey="tableRowKey"
+                        resizable
+                        emptyMessage="子データがありません。"
+                        className="game-management__child-table"
+                      />
+                    </div>
+                  );
+                }
+                : undefined}
+              expandedKeys={resourceKey === 'game-software-content-groups' ? expandedRowKeys : undefined}
+              onExpandChange={resourceKey === 'game-software-content-groups' ? setExpandedRowKeys : undefined}
+              emptyMessage="データがありません。"
+              rowReorderEnabled={resourceKey === 'game-software-content-groups' ? false : reorderEnabled}
+              rowReorderDisabledReason={reorderDisabledReason}
+              onRowMove={handleRowMove}
+              sortState={sortState}
+              onSortChange={setSortState}
+              onFilteredDataChange={handleFilteredDataChange}
+            />
           </div>
         )}
       </PageCard>
-    </PageFrame>
-  );
-}
-
-function ResourceSummary({ resourceKey, record, lookups, storyProgressLabel }: { resourceKey: ResourceKey; record: unknown; lookups: ManagementLookups; storyProgressLabel?: string | null }) {
-  switch (resourceKey) {
-    case 'accounts': {
-      const item = record as AccountDto;
-      return <p className="text-sm text-zinc-600 dark:text-zinc-300">所属カテゴリ: {item.gameConsoleCategoryIds.map((id) => getGameConsoleCategoryName(id, lookups)).join(', ') || '未設定'}</p>;
-    }
-    case 'game-console-categories': {
-      const item = record as GameConsoleCategoryDto;
-      return <p className="text-sm text-zinc-600 dark:text-zinc-300">略称: {item.abbreviation} / 保存方式: {formatSaveStorageType(item.saveStorageType)}</p>;
-    }
-    case 'game-console-masters': {
-      const item = record as GameConsoleMasterDto;
-      return <p className="text-sm text-zinc-600 dark:text-zinc-300">略称: {item.abbreviation} / カテゴリ: {getGameConsoleCategoryName(item.gameConsoleCategoryId, lookups)}</p>;
-    }
-    case 'game-console-edition-masters': {
-      const item = record as GameConsoleEditionMasterDto;
-      return <p className="text-sm text-zinc-600 dark:text-zinc-300">略称: {item.abbreviation} / マスタ: {getGameConsoleMasterName(item.gameConsoleMasterId, lookups)}</p>;
-    }
-    case 'game-consoles': {
-      const item = record as GameConsoleDto;
-      return <p className="text-sm text-zinc-600 dark:text-zinc-300">対応マスタ: {getGameConsoleMasterName(item.gameConsoleMasterId, lookups)}</p>;
-    }
-    case 'game-software-masters': {
-      const item = record as GameSoftwareMasterDto;
-      return <p className="text-sm text-zinc-600 dark:text-zinc-300">略称: {item.abbreviation} / カテゴリ: {getGameConsoleCategoryName(item.gameConsoleCategoryId, lookups)}</p>;
-    }
-    case 'game-softwares': {
-      const item = record as GameSoftwareDto;
-      return <p className="text-sm text-zinc-600 dark:text-zinc-300">ソフトマスタ: {getGameSoftwareMasterName(item.gameSoftwareMasterId, lookups)}</p>;
-    }
-    case 'memory-cards': {
-      const item = record as MemoryCardDto;
-      return <p className="text-sm text-zinc-600 dark:text-zinc-300">所有者: {item.ownerGoogleUserId}</p>;
-    }
-    case 'save-datas': {
-      const item = record as SaveDataDto;
-      return <p className="text-sm text-zinc-600 dark:text-zinc-300">保存方式: {formatSaveStorageType(item.saveStorageType)}{storyProgressLabel ? ` / 進行度: ${storyProgressLabel}` : ''}</p>;
-    }
-    default:
-      return null;
-  }
-}
-
-function FormFields({
-  resourceKey,
-  formState,
-  onChange,
-  lookups,
-  isNew,
-  saveDataSchema,
-  saveDataSchemaLoading,
-  saveDataSchemaError,
-  storyProgressSchema,
-  storyProgressSchemaLoading,
-  storyProgressSchemaError,
-}: {
-  resourceKey: ResourceKey;
-  formState: FormState;
-  onChange: (patch: Partial<FormState>) => void;
-  lookups: ManagementLookups;
-  isNew: boolean;
-  saveDataSchema: SaveDataSchemaDto | null;
-  saveDataSchemaLoading: boolean;
-  saveDataSchemaError: string | null;
-  storyProgressSchema: StoryProgressSchemaDto | null;
-  storyProgressSchemaLoading: boolean;
-  storyProgressSchemaError: string | null;
-}) {
-  const options = selectOptionsFromLookups(lookups);
-  const selectedGameSoftwareMasterId = numberOrNull(formState.gameSoftwareMasterId);
-  const derivedSaveStorageType = getSaveStorageTypeForGameSoftwareMaster(selectedGameSoftwareMasterId, lookups);
-  const filteredGameSoftwareOptions = options.gameSoftwares.filter((option) => {
-    const gameSoftware = lookups.gameSoftwares.find((item) => String(item.id) === option.value);
-    return gameSoftware?.gameSoftwareMasterId === selectedGameSoftwareMasterId;
-  });
-  const consoleCandidates = getConsoleCandidates(selectedGameSoftwareMasterId, lookups).map((item) => ({ value: String(item.id), label: getGameConsoleDisplay(item, lookups) }));
-  const accountCandidates = getAccountCandidates(selectedGameSoftwareMasterId, lookups).map((item) => ({ value: String(item.id), label: getAccountDisplay(item, lookups) }));
-  const storyProgressOptions = optionize([
-    ...((storyProgressSchema?.choices ?? []).map((choice) => ({
-      value: String(choice.storyProgressDefinitionId),
-      label: choice.isDisabled ? `${choice.label}（選択不可）` : choice.label,
-      disabled: choice.isDisabled,
-    }))),
-    ...((formState.storyProgressDefinitionId && !(storyProgressSchema?.choices ?? []).some((choice) => String(choice.storyProgressDefinitionId) === formState.storyProgressDefinitionId))
-      ? [{ value: formState.storyProgressDefinitionId, label: `現在の値 #${formState.storyProgressDefinitionId}（利用不可）`, disabled: true }]
-      : []),
-  ], true);
-
-  switch (resourceKey) {
-    case 'accounts':
-      return (
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <CustomLabel htmlFor="label">表示名</CustomLabel>
-            <CustomTextBox id="label" value={formState.label} onChange={(event) => onChange({ label: event.target.value })} placeholder="任意の表示名" />
-          </div>
-          <div className="space-y-2">
-            <CustomLabel htmlFor="memo">メモ</CustomLabel>
-            <CustomTextArea id="memo" value={formState.memo} onChange={(event) => onChange({ memo: event.target.value })} placeholder="補足メモ" />
-          </div>
-          <div className="space-y-3">
-            <CustomLabel>対象ゲーム機カテゴリ</CustomLabel>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {lookups.gameConsoleCategories.map((item) => {
-                const checked = formState.gameConsoleCategoryIds.includes(String(item.id));
-                return (
-                  <label key={item.id} className="flex items-start gap-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
-                    <CustomCheckBox
-                      checked={checked}
-                      onChange={(event) => {
-                        if (event.target.checked) {
-                          onChange({ gameConsoleCategoryIds: [...formState.gameConsoleCategoryIds, String(item.id)] });
-                          return;
-                        }
-                        onChange({ gameConsoleCategoryIds: formState.gameConsoleCategoryIds.filter((value) => value !== String(item.id)) });
-                      }}
-                    />
-                    <span className="text-sm text-zinc-700 dark:text-zinc-200">{item.name}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      );
-    case 'game-console-categories':
-      return (
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <CustomLabel htmlFor="name">名称</CustomLabel>
-            <CustomTextBox id="name" value={formState.name} onChange={(event) => onChange({ name: event.target.value })} placeholder="Nintendo Switch" />
-          </div>
-          <div className="space-y-2">
-            <CustomLabel htmlFor="abbreviation">略称</CustomLabel>
-            <CustomTextBox id="abbreviation" value={formState.abbreviation} onChange={(event) => onChange({ abbreviation: event.target.value })} placeholder="Switch" />
-          </div>
-          <div className="space-y-2">
-            <CustomLabel htmlFor="manufacturer">メーカー</CustomLabel>
-            <CustomTextBox id="manufacturer" value={formState.manufacturer} onChange={(event) => onChange({ manufacturer: event.target.value })} placeholder="任天堂" />
-          </div>
-          <SelectField
-            id="saveStorageType"
-            label="保存方式"
-            value={formState.saveStorageType}
-            options={SAVE_STORAGE_TYPE_OPTIONS}
-            onChange={(value) => onChange({ saveStorageType: value })}
-          />
-        </div>
-      );
-    case 'game-console-masters':
-      return (
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <CustomLabel htmlFor="name">名称</CustomLabel>
-            <CustomTextBox id="name" value={formState.name} onChange={(event) => onChange({ name: event.target.value })} placeholder="Nintendo Switch (有機ELモデル)" />
-          </div>
-          <div className="space-y-2">
-            <CustomLabel htmlFor="abbreviation">略称</CustomLabel>
-            <CustomTextBox id="abbreviation" value={formState.abbreviation} onChange={(event) => onChange({ abbreviation: event.target.value })} placeholder="Switch OLED" />
-          </div>
-          <SelectField
-            id="gameConsoleCategoryId"
-            label="ゲーム機カテゴリ"
-            value={formState.gameConsoleCategoryId}
-            options={options.gameConsoleCategories}
-            onChange={(value) => onChange({ gameConsoleCategoryId: value })}
-            placeholder="選択してください"
-          />
-        </div>
-      );
-    case 'game-console-edition-masters':
-      return (
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <CustomLabel htmlFor="name">名称</CustomLabel>
-            <CustomTextBox id="name" value={formState.name} onChange={(event) => onChange({ name: event.target.value })} placeholder="スプラトゥーン3エディション" />
-          </div>
-          <div className="space-y-2">
-            <CustomLabel htmlFor="abbreviation">略称</CustomLabel>
-            <CustomTextBox id="abbreviation" value={formState.abbreviation} onChange={(event) => onChange({ abbreviation: event.target.value })} placeholder="S3 Edition" />
-          </div>
-          <SelectField
-            id="gameConsoleMasterId"
-            label="ゲーム機マスタ"
-            value={formState.gameConsoleMasterId}
-            options={options.gameConsoleMasters}
-            onChange={(value) => onChange({ gameConsoleMasterId: value })}
-            placeholder="選択してください"
-          />
-        </div>
-      );
-    case 'game-consoles':
-      return (
-        <div className="space-y-5">
-          <SelectField
-            id="gameConsoleMasterId"
-            label="ゲーム機マスタ"
-            value={formState.gameConsoleMasterId}
-            options={options.gameConsoleMasters}
-            onChange={(value) => onChange({ gameConsoleMasterId: value, gameConsoleEditionMasterId: '' })}
-            placeholder="選択してください"
-            disabled={!isNew}
-          />
-          <SelectField
-            id="gameConsoleEditionMasterId"
-            label="エディション（任意）"
-            value={formState.gameConsoleEditionMasterId}
-            options={optionize(options.gameConsoleEditionMasters.filter((opt) => {
-              const edition = lookups.gameConsoleEditionMasters.find((e) => String(e.id) === opt.value);
-              return edition && String(edition.gameConsoleMasterId) === formState.gameConsoleMasterId;
-            }), true)}
-            onChange={(value) => onChange({ gameConsoleEditionMasterId: value })}
-            disabled={!isNew}
-          />
-          <div className="space-y-2">
-            <CustomLabel htmlFor="label">表示ラベル</CustomLabel>
-            <CustomTextBox id="label" value={formState.label} onChange={(event) => onChange({ label: event.target.value })} placeholder="自宅用 / 予備機 など" />
-          </div>
-          <div className="space-y-2">
-            <CustomLabel htmlFor="memo">メモ</CustomLabel>
-            <CustomTextArea id="memo" value={formState.memo} onChange={(event) => onChange({ memo: event.target.value })} placeholder="補足メモ" />
-          </div>
-        </div>
-      );
-    case 'game-software-content-groups':
-      return (
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <CustomLabel htmlFor="name">名称</CustomLabel>
-            <CustomTextBox id="name" value={formState.name} onChange={(event) => onChange({ name: event.target.value })} placeholder="本編 / DLC / 拡張版 など" />
-          </div>
-        </div>
-      );
-    case 'game-software-masters':
-      return (
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <CustomLabel htmlFor="name">名称</CustomLabel>
-            <CustomTextBox id="name" value={formState.name} onChange={(event) => onChange({ name: event.target.value })} placeholder="ゼルダの伝説 ブレス オブ ザ ワイルド" />
-          </div>
-          <div className="space-y-2">
-            <CustomLabel htmlFor="abbreviation">略称</CustomLabel>
-            <CustomTextBox id="abbreviation" value={formState.abbreviation} onChange={(event) => onChange({ abbreviation: event.target.value })} placeholder="BotW" />
-          </div>
-          <SelectField
-            id="gameConsoleCategoryId"
-            label="ゲーム機カテゴリ"
-            value={formState.gameConsoleCategoryId}
-            options={options.gameConsoleCategories}
-            onChange={(value) => onChange({ gameConsoleCategoryId: value })}
-            placeholder="選択してください"
-          />
-          <SelectField
-            id="contentGroupId"
-            label="分類"
-            value={formState.contentGroupId}
-            options={optionize(options.gameSoftwareContentGroups, true)}
-            onChange={(value) => onChange({ contentGroupId: value })}
-          />
-        </div>
-      );
-    case 'game-softwares':
-      return (
-        <div className="space-y-5">
-          <SelectField
-            id="gameSoftwareMasterId"
-            label="ゲームソフトマスタ"
-            value={formState.gameSoftwareMasterId}
-            options={options.gameSoftwareMasters}
-            onChange={(value) => onChange({ gameSoftwareMasterId: value })}
-            placeholder="選択してください"
-            disabled={!isNew}
-          />
-          <div className="space-y-2">
-            <CustomLabel htmlFor="label">表示ラベル</CustomLabel>
-            <CustomTextBox id="label" value={formState.label} onChange={(event) => onChange({ label: event.target.value })} placeholder="パッケージ版 / DL版 など" />
-          </div>
-          <SelectField
-            id="variant"
-            label="種類"
-            value={formState.variant}
-            options={[{ value: '', label: '未設定' }, { value: '0', label: 'パッケージ版' }, { value: '1', label: 'ダウンロード版' }]}
-            onChange={(value) => onChange({ variant: value })}
-          />
-          <div className="space-y-2">
-            <CustomLabel htmlFor="memo">メモ</CustomLabel>
-            <CustomTextArea id="memo" value={formState.memo} onChange={(event) => onChange({ memo: event.target.value })} placeholder="補足メモ" />
-          </div>
-        </div>
-      );
-    case 'memory-cards':
-      return (
-        <div className="space-y-5">
-          <SelectField
-            id="capacity"
-            label="容量（ブロック数）"
-            value={formState.capacity}
-            options={[{ value: '59', label: '59 ブロック' }, { value: '251', label: '251 ブロック' }]}
-            onChange={(value) => onChange({ capacity: value })}
-            disabled={!isNew}
-          />
-          <div className="space-y-2">
-            <CustomLabel htmlFor="label">表示ラベル</CustomLabel>
-            <CustomTextBox id="label" value={formState.label} onChange={(event) => onChange({ label: event.target.value })} placeholder="メインカード / サブカード など" />
-          </div>
-          <div className="space-y-2">
-            <CustomLabel htmlFor="memo">メモ</CustomLabel>
-            <CustomTextArea id="memo" value={formState.memo} onChange={(event) => onChange({ memo: event.target.value })} placeholder="補足メモ" />
-          </div>
-        </div>
-      );
-    case 'save-datas':
-      return (
-        <div className="space-y-5">
-          <SelectField
-            id="gameSoftwareMasterId"
-            label="ゲームソフトマスタ"
-            value={formState.gameSoftwareMasterId}
-            options={options.gameSoftwareMasters}
-            onChange={(value) => onChange({
-              gameSoftwareMasterId: value,
-              gameSoftwareId: '',
-              gameConsoleId: '',
-              accountId: '',
-              memoryCardId: '',
-              storyProgressDefinitionId: '',
-              dynamicFieldValues: {},
-            })}
-            placeholder="選択してください"
-          />
-          {derivedSaveStorageType === 0 ? (
-            <SelectField
-              id="gameSoftwareId"
-              label="所持ゲームソフト"
-              value={formState.gameSoftwareId}
-              options={filteredGameSoftwareOptions}
-              onChange={(value) => onChange({ gameSoftwareId: value })}
-              placeholder="選択してください"
-            />
-          ) : null}
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200">
-            保存方式: {formatSaveStorageType(derivedSaveStorageType)}
-          </div>
-          {derivedSaveStorageType === 1 || derivedSaveStorageType === 2 ? (
-            <SelectField
-              id="gameConsoleId"
-              label="ゲーム機"
-              value={formState.gameConsoleId}
-              options={consoleCandidates}
-              onChange={(value) => onChange({ gameConsoleId: value })}
-              placeholder="選択してください"
-            />
-          ) : null}
-          {derivedSaveStorageType === 2 ? (
-            <SelectField
-              id="accountId"
-              label="アカウント"
-              value={formState.accountId}
-              options={accountCandidates}
-              onChange={(value) => onChange({ accountId: value })}
-              placeholder="選択してください"
-            />
-          ) : null}
-          {derivedSaveStorageType === 3 ? (
-            <SelectField
-              id="memoryCardId"
-              label="メモリーカード"
-              value={formState.memoryCardId}
-              options={optionize(options.memoryCards, true)}
-              onChange={(value) => onChange({ memoryCardId: value })}
-              placeholder="選択してください"
-            />
-          ) : null}
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <CustomHeader level={3}>ストーリー進行度</CustomHeader>
-              <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                公開 story-progress-schema API をもとに、この作品で有効な進行度候補を表示します。未設定に戻すこともできます。
-              </p>
-            </div>
-            {!formState.gameSoftwareMasterId ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">ゲームソフトマスタを選択すると候補が表示されます。</p>
-            ) : storyProgressSchemaLoading ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">ストーリー進行度候補を読み込み中です...</p>
-            ) : storyProgressSchemaError ? (
-              <CustomMessageArea variant="error">{storyProgressSchemaError}</CustomMessageArea>
-            ) : (
-              <SelectField
-                id="storyProgressDefinitionId"
-                label="進行度"
-                value={formState.storyProgressDefinitionId}
-                options={storyProgressOptions}
-                onChange={(value) => onChange({ storyProgressDefinitionId: value })}
-              />
-            )}
-          </div>
-          {!isNew ? (
-            <SelectField
-              id="replacedBySaveDataId"
-              label="置換先 SaveData"
-              value={formState.replacedBySaveDataId}
-              options={optionize(options.saveDatas.filter((option) => option.value !== formState.replacedBySaveDataId), true)}
-              onChange={(value) => onChange({ replacedBySaveDataId: value })}
-            />
-          ) : null}
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <CustomHeader level={3}>可変項目</CustomHeader>
-              <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                公開 schema API をもとに、このゲームソフト固有の入力項目を表示します。
-              </p>
-            </div>
-            <SaveDataDynamicFields
-              schema={saveDataSchema}
-              values={formState.dynamicFieldValues}
-              onChange={(fieldKey, value) => onChange({
-                dynamicFieldValues: {
-                  ...formState.dynamicFieldValues,
-                  [fieldKey]: value,
-                },
-              })}
-              loading={saveDataSchemaLoading}
-              error={saveDataSchemaError}
-            />
-          </div>
-        </div>
-      );
-  }
-}
-
-export function GameManagementResourceEditorPage({
-  resourceKey,
-  recordId,
-  basePath = '/game-management',
-  scope = 'admin',
-}: {
-  resourceKey: ResourceKey;
-  recordId?: string;
-  basePath?: string;
-  scope?: 'admin' | 'user';
-}) {
-  const router = useRouter();
-  const { startLoading } = useLoadingOverlay();
-  const { data: session } = useSession();
-  const isTrial = scope === 'user' && !session?.user;
-  const definition: ResourceDefinition = getResourceDefinition(resourceKey);
-  const isNew = !recordId;
-  const [lookups, setLookups] = useState<ManagementLookups | null>(null);
-  const [formState, setFormState] = useState<FormState>(createEmptyFormState());
-  const [record, setRecord] = useState<unknown>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [saveDataSchema, setSaveDataSchema] = useState<SaveDataSchemaDto | null>(null);
-  const [saveDataSchemaLoading, setSaveDataSchemaLoading] = useState(false);
-  const [saveDataSchemaError, setSaveDataSchemaError] = useState<string | null>(null);
-  const [storyProgressSchema, setStoryProgressSchema] = useState<StoryProgressSchemaDto | null>(null);
-  const [storyProgressSchemaLoading, setStoryProgressSchemaLoading] = useState(false);
-  const [storyProgressSchemaError, setStoryProgressSchemaError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      let nextLookups: ManagementLookups;
-      if (scope === 'admin') {
-        const masters = await fetchMasterLookups();
-        nextLookups = { ...masters, accounts: [], gameConsoles: [], gameSoftwares: [], memoryCards: [], saveDatas: [] };
-      } else if (isTrial) {
-        const masters = await fetchPublicMasterLookups();
-        const userData = buildTrialUserData();
-        nextLookups = { ...masters, ...userData };
-      } else {
-        nextLookups = await fetchAuthenticatedUserLookups();
-      }
-      setLookups(nextLookups);
-
-      if (!isNew && recordId) {
-        let nextRecord: unknown;
-        if (isTrial) {
-          nextRecord = trialGetResourceById(resourceKey, Number(recordId));
-          if (!nextRecord) throw new Error(`レコード #${recordId} が見つかりません。`);
-        } else {
-          nextRecord = await fetchResourceById(resourceKey, recordId);
-        }
-        setRecord(nextRecord);
-        setFormState(buildInitialFormState(resourceKey, nextRecord));
-      } else {
-        setRecord(null);
-        setFormState(createEmptyFormState());
-      }
-    } catch (loadError) {
-      const msg = loadError instanceof ApiError && loadError.statusCode === 403
-        ? '管理者権限が必要です。この操作にはバックエンドの Admin ロールが必要です。'
-        : loadError instanceof Error ? loadError.message : 'データの取得に失敗しました。';
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [isNew, recordId, resourceKey, scope, isTrial]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => {
-    if (resourceKey !== 'save-datas' || !lookups) {
-      setSaveDataSchema(null);
-      setSaveDataSchemaLoading(false);
-      setSaveDataSchemaError(null);
-      setStoryProgressSchema(null);
-      setStoryProgressSchemaLoading(false);
-      setStoryProgressSchemaError(null);
-      return;
-    }
-
-    const gameSoftwareMasterId = numberOrNull(formState.gameSoftwareMasterId);
-
-    if (!gameSoftwareMasterId) {
-      setSaveDataSchema(null);
-      setSaveDataSchemaLoading(false);
-      setSaveDataSchemaError(null);
-      setStoryProgressSchema(null);
-      setStoryProgressSchemaLoading(false);
-      setStoryProgressSchemaError(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadSchema = async () => {
-      setSaveDataSchema(null);
-      setSaveDataSchemaLoading(true);
-      setSaveDataSchemaError(null);
-      setStoryProgressSchema(null);
-      setStoryProgressSchemaLoading(true);
-      setStoryProgressSchemaError(null);
-
-      const [saveDataResult, storyProgressResult] = await Promise.allSettled([
-        fetchPublicSaveDataSchema(gameSoftwareMasterId),
-        fetchPublicStoryProgressSchema(gameSoftwareMasterId),
-      ]);
-
-      if (cancelled) {
-        return;
-      }
-
-      if (saveDataResult.status === 'fulfilled') {
-        setSaveDataSchema(saveDataResult.value);
-      } else {
-        setSaveDataSchema(null);
-        setSaveDataSchemaError(saveDataResult.reason instanceof Error ? saveDataResult.reason.message : '可変項目 schema の取得に失敗しました。');
-      }
-      setSaveDataSchemaLoading(false);
-
-      if (storyProgressResult.status === 'fulfilled') {
-        setStoryProgressSchema(storyProgressResult.value);
-      } else {
-        setStoryProgressSchema(null);
-        setStoryProgressSchemaError(storyProgressResult.reason instanceof Error ? storyProgressResult.reason.message : 'ストーリー進行度 schema の取得に失敗しました。');
-      }
-      setStoryProgressSchemaLoading(false);
-    };
-
-    void loadSchema();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [formState.gameSoftwareMasterId, lookups, resourceKey]);
-
-  const applyPatch = useCallback((patch: Partial<FormState>) => {
-    setFormState((current) => ({ ...current, ...patch }));
-  }, []);
-
-  const selectedStoryProgressLabel = useMemo(() => {
-    if (!lookups || resourceKey !== 'save-datas') {
-      return null;
-    }
-    const gameSoftwareMasterId = numberOrNull(formState.gameSoftwareMasterId);
-    const storyProgressDefinitionId = numberOrNull(formState.storyProgressDefinitionId);
-    if (!gameSoftwareMasterId || !storyProgressDefinitionId) {
-      return null;
-    }
-    const fallbackMap = storyProgressSchema
-      ? Object.fromEntries(storyProgressSchema.choices.map((choice) => [`${storyProgressSchema.gameSoftwareMasterId}:${choice.storyProgressDefinitionId}`, choice.label]))
-      : {};
-    return getStoryProgressLabel(gameSoftwareMasterId, storyProgressDefinitionId, fallbackMap) ?? null;
-  }, [formState.gameSoftwareMasterId, formState.storyProgressDefinitionId, lookups, resourceKey, storyProgressSchema]);
-
-  const handleSave = useCallback(async () => {
-    if (!lookups) {
-      return;
-    }
-
-    if (resourceKey === 'save-datas' && formState.gameSoftwareMasterId && (saveDataSchemaLoading || storyProgressSchemaLoading)) {
-      setError('SaveData 用 schema を読み込み中です。読み込み完了後に再度保存してください。');
-      return;
-    }
-
-    if (resourceKey === 'save-datas' && formState.gameSoftwareMasterId && (saveDataSchemaError || storyProgressSchemaError)) {
-      setError([saveDataSchemaError, storyProgressSchemaError].filter(Boolean).join('\n'));
-      return;
-    }
-
-    const validationErrors = validateForm(resourceKey, formState, lookups, saveDataSchema, storyProgressSchema);
-    if (validationErrors.length > 0) {
-      setError(validationErrors.join('\n'));
-      return;
-    }
-
-    setError(null);
-    setSuccess(null);
-
-    try {
-      await startLoading(async () => {
-        if (isTrial) {
-          // --- トライアルモード: localStorage ---
-          switch (resourceKey) {
-            case 'accounts': {
-              const payload = {
-                label: nullIfBlank(formState.label),
-                memo: nullIfBlank(formState.memo),
-                gameConsoleCategoryIds: formState.gameConsoleCategoryIds.length > 0 ? formState.gameConsoleCategoryIds.map(Number) : null,
-              };
-              if (isNew) {
-                const id = trialCreateAccount(payload);
-                router.push(`${basePath}/accounts/${id}`);
-                return;
-              }
-              trialUpdateAccount(Number(recordId), payload);
-              break;
-            }
-            case 'game-consoles': {
-              if (isNew) {
-                const id = trialCreateGameConsole({
-                  gameConsoleMasterId: numberOrZero(formState.gameConsoleMasterId),
-                  gameConsoleEditionMasterId: numberOrNull(formState.gameConsoleEditionMasterId),
-                  label: nullIfBlank(formState.label),
-                  memo: nullIfBlank(formState.memo),
-                });
-                router.push(`${basePath}/game-consoles/${id}`);
-                return;
-              }
-              trialUpdateGameConsole(Number(recordId), {
-                label: nullIfBlank(formState.label),
-                memo: nullIfBlank(formState.memo),
-              });
-              break;
-            }
-            case 'game-softwares': {
-              const variantValue: GameSoftwareVariant | null = formState.variant ? (Number(formState.variant) as GameSoftwareVariant) : null;
-              if (isNew) {
-                const id = trialCreateGameSoftware({
-                  gameSoftwareMasterId: numberOrZero(formState.gameSoftwareMasterId),
-                  variant: variantValue,
-                  label: nullIfBlank(formState.label),
-                  memo: nullIfBlank(formState.memo),
-                });
-                router.push(`${basePath}/game-softwares/${id}`);
-                return;
-              }
-              trialUpdateGameSoftware(Number(recordId), {
-                variant: variantValue,
-                label: nullIfBlank(formState.label),
-                memo: nullIfBlank(formState.memo),
-              });
-              break;
-            }
-            case 'memory-cards': {
-              const capacityValue = Number(formState.capacity) as MemoryCardCapacity;
-              if (isNew) {
-                const id = trialCreateMemoryCard({
-                  capacity: capacityValue,
-                  label: nullIfBlank(formState.label),
-                  memo: nullIfBlank(formState.memo),
-                });
-                router.push(`${basePath}/memory-cards/${id}`);
-                return;
-              }
-              trialUpdateMemoryCard(Number(recordId), {
-                capacity: capacityValue,
-                label: nullIfBlank(formState.label),
-                memo: nullIfBlank(formState.memo),
-              });
-              break;
-            }
-            case 'save-datas': {
-              const savePayloadBase = buildSaveDataPayload(formState, lookups, saveDataSchema);
-              const derivedType = getSaveStorageTypeForGameSoftwareMaster(savePayloadBase.gameSoftwareMasterId, lookups);
-              if (isNew) {
-                const id = trialCreateSaveData(savePayloadBase, derivedType ?? 0, saveDataSchema);
-                router.push(`${basePath}/save-datas/${id}`);
-                return;
-              }
-              trialUpdateSaveData(Number(recordId), {
-                ...savePayloadBase,
-                replacedBySaveDataId: numberOrNull(formState.replacedBySaveDataId),
-              }, derivedType ?? 0, saveDataSchema);
-              break;
-            }
-          }
-        } else {
-          // --- 認証モード: API ---
-          switch (resourceKey) {
-            case 'accounts': {
-              const payload = {
-                label: nullIfBlank(formState.label),
-                memo: nullIfBlank(formState.memo),
-                gameConsoleCategoryIds: formState.gameConsoleCategoryIds.length > 0 ? formState.gameConsoleCategoryIds.map(Number) : null,
-              };
-              if (isNew) {
-                const id = await createAccount(payload);
-                router.push(`${basePath}/accounts/${id}`);
-                return;
-              }
-              await updateAccount(Number(recordId), payload);
-              break;
-            }
-            case 'game-console-categories': {
-              const payload = {
-                name: formState.name.trim(),
-                abbreviation: formState.abbreviation.trim(),
-                manufacturer: nullIfBlank(formState.manufacturer),
-                saveStorageType: numberOrZero(formState.saveStorageType) as SaveStorageType,
-              };
-              if (isNew) {
-                const id = await createGameConsoleCategory(payload);
-                router.push(`${basePath}/game-console-categories/${id}`);
-                return;
-              }
-              await updateGameConsoleCategory(Number(recordId), payload);
-              break;
-            }
-            case 'game-console-masters': {
-              const payload = {
-                gameConsoleCategoryId: numberOrZero(formState.gameConsoleCategoryId),
-                name: formState.name.trim(),
-                abbreviation: formState.abbreviation.trim(),
-              };
-              if (isNew) {
-                const id = await createGameConsoleMaster(payload);
-                router.push(`${basePath}/game-console-masters/${id}`);
-                return;
-              }
-              await updateGameConsoleMaster(Number(recordId), payload);
-              break;
-            }
-            case 'game-console-edition-masters': {
-              const payload = {
-                gameConsoleMasterId: numberOrZero(formState.gameConsoleMasterId),
-                name: formState.name.trim(),
-                abbreviation: formState.abbreviation.trim(),
-              };
-              if (isNew) {
-                const id = await createGameConsoleEditionMaster(payload);
-                router.push(`${basePath}/game-console-edition-masters/${id}`);
-                return;
-              }
-              await updateGameConsoleEditionMaster(Number(recordId), payload);
-              break;
-            }
-            case 'game-consoles': {
-              if (isNew) {
-                const id = await createGameConsole({
-                  gameConsoleMasterId: numberOrZero(formState.gameConsoleMasterId),
-                  gameConsoleEditionMasterId: numberOrNull(formState.gameConsoleEditionMasterId),
-                  label: nullIfBlank(formState.label),
-                  memo: nullIfBlank(formState.memo),
-                });
-                router.push(`${basePath}/game-consoles/${id}`);
-                return;
-              }
-              await updateGameConsole(Number(recordId), {
-                label: nullIfBlank(formState.label),
-                memo: nullIfBlank(formState.memo),
-              });
-              break;
-            }
-            case 'game-software-content-groups': {
-              const payload = { name: formState.name.trim() };
-              if (isNew) {
-                const id = await createGameSoftwareContentGroup(payload);
-                router.push(`${basePath}/game-software-content-groups/${id}`);
-                return;
-              }
-              await updateGameSoftwareContentGroup(Number(recordId), payload);
-              break;
-            }
-            case 'game-software-masters': {
-              const payload = {
-                name: formState.name.trim(),
-                abbreviation: formState.abbreviation.trim(),
-                gameConsoleCategoryId: numberOrZero(formState.gameConsoleCategoryId),
-                contentGroupId: numberOrNull(formState.contentGroupId),
-              };
-              if (isNew) {
-                const id = await createGameSoftwareMaster(payload);
-                router.push(`${basePath}/game-software-masters/${id}`);
-                return;
-              }
-              await updateGameSoftwareMaster(Number(recordId), payload);
-              break;
-            }
-            case 'game-softwares': {
-              const variantValue: GameSoftwareVariant | null = formState.variant ? (Number(formState.variant) as GameSoftwareVariant) : null;
-              if (isNew) {
-                const id = await createGameSoftware({
-                  gameSoftwareMasterId: numberOrZero(formState.gameSoftwareMasterId),
-                  variant: variantValue,
-                  label: nullIfBlank(formState.label),
-                  memo: nullIfBlank(formState.memo),
-                });
-                router.push(`${basePath}/game-softwares/${id}`);
-                return;
-              }
-              await updateGameSoftware(Number(recordId), {
-                variant: variantValue,
-                label: nullIfBlank(formState.label),
-                memo: nullIfBlank(formState.memo),
-              });
-              break;
-            }
-            case 'memory-cards': {
-              const capacityValue = Number(formState.capacity) as MemoryCardCapacity;
-              if (isNew) {
-                const id = await createMemoryCard({
-                  capacity: capacityValue,
-                  label: nullIfBlank(formState.label),
-                  memo: nullIfBlank(formState.memo),
-                });
-                router.push(`${basePath}/memory-cards/${id}`);
-                return;
-              }
-              await updateMemoryCard(Number(recordId), {
-                capacity: capacityValue,
-                label: nullIfBlank(formState.label),
-                memo: nullIfBlank(formState.memo),
-              });
-              break;
-            }
-            case 'save-datas': {
-              const savePayloadBase = buildSaveDataPayload(formState, lookups, saveDataSchema);
-              if (isNew) {
-                const id = await createSaveData(savePayloadBase);
-                router.push(`${basePath}/save-datas/${id}`);
-                return;
-              }
-              await updateSaveData(Number(recordId), {
-                ...savePayloadBase,
-                replacedBySaveDataId: numberOrNull(formState.replacedBySaveDataId),
-              });
-              break;
-            }
-          }
-        }
-      }, '保存中...');
-
-      setSuccess(isNew ? '作成しました。' : '更新しました。');
-      await load();
-      router.refresh();
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : '保存に失敗しました。');
-    }
-  }, [
-    basePath,
-    formState,
-    isNew,
-    isTrial,
-    load,
-    lookups,
-    recordId,
-    resourceKey,
-    router,
-    saveDataSchema,
-    saveDataSchemaError,
-    saveDataSchemaLoading,
-    storyProgressSchema,
-    storyProgressSchemaError,
-    storyProgressSchemaLoading,
-    startLoading,
-  ]);
-
-  const handleDelete = useCallback(async () => {
-    try {
-      await startLoading(async () => {
-        if (isTrial) {
-          switch (resourceKey) {
-            case 'accounts':
-              trialDeleteAccount(Number(recordId));
-              break;
-            case 'game-consoles':
-              trialDeleteGameConsole(Number(recordId));
-              break;
-            case 'game-softwares':
-              trialDeleteGameSoftware(Number(recordId));
-              break;
-            case 'memory-cards':
-              trialDeleteMemoryCard(Number(recordId));
-              break;
-            case 'save-datas':
-              trialDeleteSaveData(Number(recordId), {
-                deleteReason: nullIfBlank(formState.deleteReason),
-                replacedBySaveDataId: numberOrNull(formState.replacedBySaveDataId),
-              });
-              break;
-          }
-        } else {
-          switch (resourceKey) {
-            case 'accounts':
-              await deleteAccount(Number(recordId));
-              break;
-            case 'game-console-categories':
-              await deleteGameConsoleCategory(Number(recordId));
-              break;
-            case 'game-console-masters':
-              await deleteGameConsoleMaster(Number(recordId));
-              break;
-            case 'game-console-edition-masters':
-              await deleteGameConsoleEditionMaster(Number(recordId));
-              break;
-            case 'game-consoles':
-              await deleteGameConsole(Number(recordId));
-              break;
-            case 'game-software-content-groups':
-              await deleteGameSoftwareContentGroup(Number(recordId));
-              break;
-            case 'game-software-masters':
-              await deleteGameSoftwareMaster(Number(recordId));
-              break;
-            case 'game-softwares':
-              await deleteGameSoftware(Number(recordId));
-              break;
-            case 'memory-cards':
-              await deleteMemoryCard(Number(recordId));
-              break;
-            case 'save-datas':
-              await deleteSaveData(Number(recordId), {
-                deleteReason: nullIfBlank(formState.deleteReason),
-                replacedBySaveDataId: numberOrNull(formState.replacedBySaveDataId),
-              });
-              break;
-          }
-        }
-      }, '削除中...');
-
-      router.push(`${basePath}/${resourceKey}`);
-      router.refresh();
-    } catch (deleteError) {
-      setDeleteDialogOpen(false);
-      setError(deleteError instanceof Error ? deleteError.message : '削除に失敗しました。');
-    }
-  }, [basePath, formState.deleteReason, formState.replacedBySaveDataId, isTrial, recordId, resourceKey, router, startLoading]);
-
-  const options = useMemo(() => (lookups ? selectOptionsFromLookups(lookups) : null), [lookups]);
-
-  return (
-    <PageFrame
-      title={`${definition.shortLabel}${isNew ? '作成' : '編集'}`}
-      description={definition.description}
-      actions={
-        <>
-          <Link href={`${basePath}/${resourceKey}`} className="text-sm font-medium text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-300">
-            一覧へ戻る
-          </Link>
-          {!isNew && definition.canDelete ? (
-            <CustomButton variant="ghost" onClick={() => setDeleteDialogOpen(true)}>
-              削除
-            </CustomButton>
-          ) : null}
-          {(definition.canEdit || isNew) ? (
-            <CustomButton variant="accent" onClick={() => void handleSave()}>
-              {isNew ? '作成する' : '保存する'}
-            </CustomButton>
-          ) : null}
-        </>
-      }
-    >
-      {error ? <CustomMessageArea variant="error" className="whitespace-pre-line">{error}</CustomMessageArea> : null}
-      {success ? <CustomMessageArea variant="success">{success}</CustomMessageArea> : null}
-      {isTrial && <TrialBanner />}
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
-        <PageCard>
-          {loading || !lookups ? (
-            <p className="text-sm text-zinc-500">画面を読み込んでいます...</p>
-          ) : (
-            <FormFields
-              resourceKey={resourceKey}
-              formState={formState}
-              onChange={applyPatch}
-              lookups={lookups}
-              isNew={isNew}
-              saveDataSchema={saveDataSchema}
-              saveDataSchemaLoading={saveDataSchemaLoading}
-              saveDataSchemaError={saveDataSchemaError}
-              storyProgressSchema={storyProgressSchema}
-              storyProgressSchemaLoading={storyProgressSchemaLoading}
-              storyProgressSchemaError={storyProgressSchemaError}
-            />
-          )}
-        </PageCard>
-        <PageCard>
-          <div className="space-y-4">
-            <CustomHeader level={3}>レコード情報</CustomHeader>
-            <div className="space-y-2 text-sm text-zinc-600 dark:text-zinc-300">
-              <p>ID: {recordId ?? '新規作成'}</p>
-              {!isNew && record && lookups ? <ResourceSummary resourceKey={resourceKey} record={record} lookups={lookups} storyProgressLabel={selectedStoryProgressLabel} /> : <p>新規作成では保存後に ID が採番されます。</p>}
-              {resourceKey === 'memory-cards' ? <p>メモリーカードはラベル・メモの編集が可能です。容量は作成時のみ指定できます。</p> : null}
-              {resourceKey === 'save-datas' ? <p>保存方式は選択したゲームソフトマスタから自動判定され、ストーリー進行度は公開 story-progress-schema の候補から選択します。</p> : null}
-            </div>
-            {resourceKey === 'save-datas' && record && !isNew ? (() => {
-              const saveData = record as SaveDataDto;
-              const mergedFields = mergeSchemaWithSaveData(saveDataSchema, saveData);
-              if (mergedFields.length > 0) {
-                return (
-                  <div className="space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-                    <p className="font-semibold text-zinc-800 dark:text-zinc-100">可変項目の現在値</p>
-                    <div className="space-y-2">
-                      {mergedFields.filter((field) => !field.isDisabled).map((field) => (
-                        <p key={field.fieldKey}>
-                          <span className="font-medium text-zinc-800 dark:text-zinc-100">{field.label}</span>: {formatMergedFieldValue(field)}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                );
-              }
-
-              if (saveData.extendedFields.length > 0) {
-                return (
-                  <div className="space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-                    <p className="font-semibold text-zinc-800 dark:text-zinc-100">可変項目の現在値</p>
-                    <div className="space-y-2">
-                      {saveData.extendedFields.map((field) => (
-                        <p key={field.fieldKey}>
-                          <span className="font-medium text-zinc-800 dark:text-zinc-100">{field.label}</span>: {formatSaveDataFieldValueForList(field)}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                );
-              }
-
-              return null;
-            })() : null}
-            {options && resourceKey === 'save-datas' ? (
-              <div className="space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-                <p className="font-semibold text-zinc-800 dark:text-zinc-100">削除時入力</p>
-                <p>削除確認ダイアログでも同じ内容を送信します。</p>
-                <SelectField
-                  id="replacedBySaveDataId-panel"
-                  label="置換先 SaveData"
-                  value={formState.replacedBySaveDataId}
-                  options={optionize(options.saveDatas.filter((option) => option.value !== recordId), true)}
-                  onChange={(value) => applyPatch({ replacedBySaveDataId: value })}
-                />
-                <div className="space-y-2">
-                  <CustomLabel htmlFor="deleteReason-panel">削除理由</CustomLabel>
-                  <CustomTextArea id="deleteReason-panel" value={formState.deleteReason} onChange={(event) => applyPatch({ deleteReason: event.target.value })} placeholder="任意の削除理由" />
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </PageCard>
-      </div>
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-        title={`${definition.shortLabel}を削除`}
-        footer={
-          <>
-            <CustomButton onClick={() => setDeleteDialogOpen(false)}>キャンセル</CustomButton>
-            <CustomButton variant="accent" onClick={() => void handleDelete()}>
-              削除する
-            </CustomButton>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">このレコードを削除します。操作は元に戻せない場合があります。</p>
-          {resourceKey === 'save-datas' && options ? (
-            <div className="space-y-4">
-              <SelectField
-                id="replacedBySaveDataId-dialog"
-                label="置換先 SaveData"
-                value={formState.replacedBySaveDataId}
-                options={optionize(options.saveDatas.filter((option) => option.value !== recordId), true)}
-                onChange={(value) => applyPatch({ replacedBySaveDataId: value })}
-              />
-              <div className="space-y-2">
-                <CustomLabel htmlFor="deleteReason-dialog">削除理由</CustomLabel>
-                <CustomTextArea id="deleteReason-dialog" value={formState.deleteReason} onChange={(event) => applyPatch({ deleteReason: event.target.value })} placeholder="任意の削除理由" />
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </Dialog>
+      {lookups && editorContext && editorDefinition ? (
+        <EditorDialog
+          open
+          onClose={closeEditorDialog}
+          resourceKey={editorContext.resourceKey}
+          definition={editorDefinition}
+          lookups={lookups}
+          isTrial={editorIsTrial}
+          recordId={editorContext.recordId}
+          initialFormState={editorContext.initialFormState}
+          onRecordIdChange={handleEditorRecordIdChange}
+          rowIds={editorRowIds}
+          onDataChanged={handleEditorDataChanged}
+          pageMode={pageMode}
+          onPageModeChange={setPageMode}
+        />
+      ) : null}
+      {lookups && bulkEditorOpen && definition.bulkEditableFields ? (
+        <BulkEditorDialog
+          open
+          onClose={() => { setBulkEditorOpen(false); setBulkEditorTargetIds([]); }}
+          resourceKey={resourceKey}
+          definition={definition}
+          lookups={lookups}
+          targetRecordIds={bulkEditorTargetIds}
+          bulkEditableFields={definition.bulkEditableFields}
+          onDataChanged={handleEditorDataChanged}
+        />
+      ) : null}
+      {lookups && accountMoveTarget ? (
+        <AccountMoveDialog
+          open
+          onClose={() => setAccountMoveTarget(null)}
+          account={accountMoveTarget}
+          lookups={lookups}
+          onSuccess={() => { setAccountMoveTarget(null); void load(); }}
+        />
+      ) : null}
     </PageFrame>
   );
 }

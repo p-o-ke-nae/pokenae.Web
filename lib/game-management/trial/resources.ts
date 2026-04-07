@@ -1,142 +1,77 @@
 /**
- * トライアルモード用 localStorage リポジトリ
- *
- * 未ログイン時に、ゲームライブラリの全5リソース（accounts, game-consoles,
- * game-softwares, memory-cards, save-datas）をブラウザ内で管理する。
- * DTO 互換の構造体を保持し、公開マスタ API と組み合わせて利用する。
+ * トライアルモード用リソース CRUD
  */
 
 import type {
   AccountDto,
+  CreateAccountRequest,
+  CreateGameConsoleRequest,
+  CreateGameSoftwareRequest,
   CreateMemoryCardRequest,
   CreateSaveDataRequest,
   GameConsoleDto,
   GameSoftwareDto,
-  GameSoftwareVariant,
   ManagementLookups,
   MasterLookups,
-  MemoryCardCapacity,
   MemoryCardDto,
   SaveDataDto,
   SaveDataSchemaDto,
   SaveStorageType,
+  UpdateAccountRequest,
+  UpdateGameConsoleRequest,
+  UpdateGameSoftwareRequest,
+  UpdateMemoryCardRequest,
+  UpdateSaveDataRequest,
 } from '@/lib/game-management/types';
 import { createTrialExtendedFields } from '@/lib/game-management/save-data-fields';
-
-// ---------------------------------------------------------------------------
-// ストレージキーとバージョン
-// ---------------------------------------------------------------------------
-
-const NAMESPACE = 'pokenae_trial_v1';
-
-type CollectionKey =
-  | 'accounts'
-  | 'game-consoles'
-  | 'game-softwares'
-  | 'memory-cards'
-  | 'save-datas';
-
-function storageKey(collection: CollectionKey): string {
-  return `${NAMESPACE}:${collection}`;
-}
-
-type TrialSaveDataStorageRecord = Omit<SaveDataDto, 'gameSoftwareMasterId' | 'gameSoftwareId'> & {
-  gameSoftwareMasterId?: number;
-  gameSoftwareId: number | null;
-};
-
-function nextIdKey(collection: CollectionKey): string {
-  return `${NAMESPACE}:${collection}:nextId`;
-}
-
-// ---------------------------------------------------------------------------
-// 低レベル localStorage ヘルパー
-// ---------------------------------------------------------------------------
-
-function isStorageAvailable(): boolean {
-  try {
-    const testKey = `${NAMESPACE}:__test__`;
-    localStorage.setItem(testKey, '1');
-    localStorage.removeItem(testKey);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function readList<T>(collection: CollectionKey): T[] {
-  if (!isStorageAvailable()) return [];
-  try {
-    const raw = localStorage.getItem(storageKey(collection));
-    return raw ? (JSON.parse(raw) as T[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeList<T>(collection: CollectionKey, items: T[]): void {
-  if (!isStorageAvailable()) return;
-  localStorage.setItem(storageKey(collection), JSON.stringify(items));
-}
-
-function getNextId(collection: CollectionKey): number {
-  if (!isStorageAvailable()) return Date.now();
-  const raw = localStorage.getItem(nextIdKey(collection));
-  const nextId = raw ? Number(raw) + 1 : 1;
-  localStorage.setItem(nextIdKey(collection), String(nextId));
-  return nextId;
-}
-
-// ---------------------------------------------------------------------------
-// ダミー所有者 ID
-// ---------------------------------------------------------------------------
-
-const TRIAL_OWNER = 'trial-user';
+import {
+  getNextId,
+  readDisplayOrderedList,
+  readList,
+  sortByDisplayOrder,
+  TRIAL_OWNER,
+  writeList,
+} from './core';
 
 // ---------------------------------------------------------------------------
 // Accounts
 // ---------------------------------------------------------------------------
 
 export function trialListAccounts(): AccountDto[] {
-  return readList<AccountDto>('accounts');
+  return readDisplayOrderedList<AccountDto>('accounts');
 }
 
 export function trialGetAccount(id: number): AccountDto | undefined {
   return trialListAccounts().find((item) => item.id === id);
 }
 
-export function trialCreateAccount(payload: {
-  label: string | null;
-  memo: string | null;
-  gameConsoleCategoryIds: number[] | null;
-}): number {
+export function trialCreateAccount(payload: CreateAccountRequest): number {
   const items = trialListAccounts();
   const newId = getNextId('accounts');
   items.push({
     id: newId,
     ownerGoogleUserId: TRIAL_OWNER,
+    accountTypeMasterId: payload.accountTypeMasterId,
+    displayOrder: payload.displayOrder,
     label: payload.label,
     memo: payload.memo,
-    gameConsoleCategoryIds: payload.gameConsoleCategoryIds ?? [],
+    linkedGameConsoleIds: payload.linkedGameConsoleIds ?? [],
     isDeleted: false,
   });
   writeList('accounts', items);
   return newId;
 }
 
-export function trialUpdateAccount(id: number, payload: {
-  label: string | null;
-  memo: string | null;
-  gameConsoleCategoryIds: number[] | null;
-}): AccountDto {
+export function trialUpdateAccount(id: number, payload: UpdateAccountRequest): AccountDto {
   const items = trialListAccounts();
   const idx = items.findIndex((item) => item.id === id);
   if (idx === -1) throw new Error(`Account #${id} not found`);
   items[idx] = {
     ...items[idx],
+    displayOrder: payload.displayOrder,
     label: payload.label,
     memo: payload.memo,
-    gameConsoleCategoryIds: payload.gameConsoleCategoryIds ?? [],
+    linkedGameConsoleIds: payload.linkedGameConsoleIds ?? [],
   };
   writeList('accounts', items);
   return items[idx];
@@ -155,19 +90,14 @@ export function trialDeleteAccount(id: number): void {
 // ---------------------------------------------------------------------------
 
 export function trialListGameConsoles(): GameConsoleDto[] {
-  return readList<GameConsoleDto>('game-consoles');
+  return readDisplayOrderedList<GameConsoleDto>('game-consoles');
 }
 
 export function trialGetGameConsole(id: number): GameConsoleDto | undefined {
   return trialListGameConsoles().find((item) => item.id === id);
 }
 
-export function trialCreateGameConsole(payload: {
-  gameConsoleMasterId: number;
-  gameConsoleEditionMasterId: number | null;
-  label: string | null;
-  memo: string | null;
-}): number {
+export function trialCreateGameConsole(payload: CreateGameConsoleRequest): number {
   const items = trialListGameConsoles();
   const newId = getNextId('game-consoles');
   items.push({
@@ -175,6 +105,7 @@ export function trialCreateGameConsole(payload: {
     gameConsoleMasterId: payload.gameConsoleMasterId,
     gameConsoleEditionMasterId: payload.gameConsoleEditionMasterId,
     ownerGoogleUserId: TRIAL_OWNER,
+    displayOrder: payload.displayOrder,
     label: payload.label,
     memo: payload.memo,
     isDeleted: false,
@@ -183,14 +114,20 @@ export function trialCreateGameConsole(payload: {
   return newId;
 }
 
-export function trialUpdateGameConsole(id: number, payload: {
-  label: string | null;
-  memo: string | null;
-}): GameConsoleDto {
+export function trialUpdateGameConsole(id: number, payload: UpdateGameConsoleRequest): GameConsoleDto {
   const items = trialListGameConsoles();
   const idx = items.findIndex((item) => item.id === id);
   if (idx === -1) throw new Error(`GameConsole #${id} not found`);
-  items[idx] = { ...items[idx], label: payload.label, memo: payload.memo };
+  const nextEditionMasterId = Object.prototype.hasOwnProperty.call(payload, 'gameConsoleEditionMasterId')
+    ? payload.gameConsoleEditionMasterId ?? null
+    : items[idx].gameConsoleEditionMasterId;
+  items[idx] = {
+    ...items[idx],
+    gameConsoleEditionMasterId: nextEditionMasterId,
+    displayOrder: payload.displayOrder,
+    label: payload.label,
+    memo: payload.memo,
+  };
   writeList('game-consoles', items);
   return items[idx];
 }
@@ -208,26 +145,24 @@ export function trialDeleteGameConsole(id: number): void {
 // ---------------------------------------------------------------------------
 
 export function trialListGameSoftwares(): GameSoftwareDto[] {
-  return readList<GameSoftwareDto>('game-softwares');
+  return readDisplayOrderedList<GameSoftwareDto>('game-softwares');
 }
 
 export function trialGetGameSoftware(id: number): GameSoftwareDto | undefined {
   return trialListGameSoftwares().find((item) => item.id === id);
 }
 
-export function trialCreateGameSoftware(payload: {
-  gameSoftwareMasterId: number;
-  variant: GameSoftwareVariant | null;
-  label: string | null;
-  memo: string | null;
-}): number {
+export function trialCreateGameSoftware(payload: CreateGameSoftwareRequest): number {
   const items = trialListGameSoftwares();
   const newId = getNextId('game-softwares');
   items.push({
     id: newId,
     gameSoftwareMasterId: payload.gameSoftwareMasterId,
     variant: payload.variant,
+    accountId: payload.accountId ?? null,
+    installedGameConsoleId: payload.installedGameConsoleId ?? null,
     ownerGoogleUserId: TRIAL_OWNER,
+    displayOrder: payload.displayOrder,
     label: payload.label,
     memo: payload.memo,
     isDeleted: false,
@@ -236,15 +171,19 @@ export function trialCreateGameSoftware(payload: {
   return newId;
 }
 
-export function trialUpdateGameSoftware(id: number, payload: {
-  variant: GameSoftwareVariant | null;
-  label: string | null;
-  memo: string | null;
-}): GameSoftwareDto {
+export function trialUpdateGameSoftware(id: number, payload: UpdateGameSoftwareRequest): GameSoftwareDto {
   const items = trialListGameSoftwares();
   const idx = items.findIndex((item) => item.id === id);
   if (idx === -1) throw new Error(`GameSoftware #${id} not found`);
-  items[idx] = { ...items[idx], variant: payload.variant, label: payload.label, memo: payload.memo };
+  items[idx] = {
+    ...items[idx],
+    displayOrder: payload.displayOrder,
+    variant: payload.variant,
+    accountId: payload.accountId ?? null,
+    installedGameConsoleId: payload.installedGameConsoleId ?? null,
+    label: payload.label,
+    memo: payload.memo,
+  };
   writeList('game-softwares', items);
   return items[idx];
 }
@@ -262,7 +201,7 @@ export function trialDeleteGameSoftware(id: number): void {
 // ---------------------------------------------------------------------------
 
 export function trialListMemoryCards(): MemoryCardDto[] {
-  return readList<MemoryCardDto>('memory-cards');
+  return readDisplayOrderedList<MemoryCardDto>('memory-cards');
 }
 
 export function trialGetMemoryCard(id: number): MemoryCardDto | undefined {
@@ -274,8 +213,9 @@ export function trialCreateMemoryCard(payload: CreateMemoryCardRequest): number 
   const newId = getNextId('memory-cards');
   items.push({
     id: newId,
-    capacity: payload.capacity,
+    memoryCardEditionMasterId: payload.memoryCardEditionMasterId,
     ownerGoogleUserId: TRIAL_OWNER,
+    displayOrder: payload.displayOrder,
     label: payload.label,
     memo: payload.memo,
     isDeleted: false,
@@ -284,17 +224,14 @@ export function trialCreateMemoryCard(payload: CreateMemoryCardRequest): number 
   return newId;
 }
 
-export function trialUpdateMemoryCard(id: number, payload: {
-  capacity: MemoryCardCapacity;
-  label: string | null;
-  memo: string | null;
-}): MemoryCardDto {
+export function trialUpdateMemoryCard(id: number, payload: UpdateMemoryCardRequest): MemoryCardDto {
   const items = trialListMemoryCards();
   const idx = items.findIndex((item) => item.id === id);
   if (idx === -1) throw new Error(`MemoryCard #${id} not found`);
   items[idx] = {
     ...items[idx],
-    capacity: payload.capacity,
+    memoryCardEditionMasterId: payload.memoryCardEditionMasterId,
+    displayOrder: payload.displayOrder,
     label: payload.label,
     memo: payload.memo,
   };
@@ -314,33 +251,47 @@ export function trialDeleteMemoryCard(id: number): void {
 // SaveDatas
 // ---------------------------------------------------------------------------
 
+type TrialSaveDataStorageRecord = Omit<SaveDataDto, 'gameSoftwareMasterId' | 'gameSoftwareId' | 'displayOrder'> & {
+  gameSoftwareMasterId?: number;
+  gameSoftwareId: number | null;
+  displayOrder?: number | null;
+};
+
 export function trialListSaveDatas(): SaveDataDto[] {
   const gameSoftwares = trialListGameSoftwares();
-  return readList<TrialSaveDataStorageRecord>('save-datas').map((item) => ({
-    ...item,
-    gameSoftwareMasterId: item.gameSoftwareMasterId ?? gameSoftwares.find((software) => software.id === item.gameSoftwareId)?.gameSoftwareMasterId ?? 0,
-    gameSoftwareId: item.saveStorageType === 0 ? (item.gameSoftwareId ?? null) : null,
-  }));
+  return sortByDisplayOrder(
+    readList<TrialSaveDataStorageRecord>('save-datas').map((item) => {
+      const normalized = {
+        ...item,
+        displayOrder: typeof item.displayOrder === 'number' && Number.isInteger(item.displayOrder) && item.displayOrder > 0
+          ? item.displayOrder
+          : item.id,
+      };
+      return {
+        ...normalized,
+        gameSoftwareMasterId: normalized.gameSoftwareMasterId ?? gameSoftwares.find((software) => software.id === normalized.gameSoftwareId)?.gameSoftwareMasterId ?? 0,
+        gameSoftwareId: normalized.saveStorageType === 0 ? (normalized.gameSoftwareId ?? null) : null,
+      };
+    }),
+  );
 }
 
 export function trialGetSaveData(id: number): SaveDataDto | undefined {
   return trialListSaveDatas().find((item) => item.id === id);
 }
 
-export function trialCreateSaveData(payload: {
-  gameSoftwareMasterId: number;
-  gameSoftwareId: number | null;
-  gameConsoleId: number | null;
-  accountId: number | null;
-  memoryCardId: number | null;
-  storyProgressDefinitionId: number | null;
-  extendedFields: CreateSaveDataRequest['extendedFields'];
-}, saveStorageType: SaveStorageType, schema: SaveDataSchemaDto | null): number {
+export function trialCreateSaveData(
+  payload: CreateSaveDataRequest,
+  saveStorageType: SaveStorageType,
+  schema: SaveDataSchemaDto | null,
+): number {
   const items = trialListSaveDatas();
   const newId = getNextId('save-datas');
   items.push({
     id: newId,
     ownerGoogleUserId: TRIAL_OWNER,
+    displayOrder: payload.displayOrder,
+    memo: payload.memo,
     replacedBySaveDataId: null,
     saveStorageType,
     gameSoftwareMasterId: payload.gameSoftwareMasterId,
@@ -357,21 +308,19 @@ export function trialCreateSaveData(payload: {
   return newId;
 }
 
-export function trialUpdateSaveData(id: number, payload: {
-  gameSoftwareMasterId: number;
-  gameSoftwareId: number | null;
-  gameConsoleId: number | null;
-  accountId: number | null;
-  memoryCardId: number | null;
-  storyProgressDefinitionId: number | null;
-  replacedBySaveDataId: number | null;
-  extendedFields: CreateSaveDataRequest['extendedFields'];
-}, saveStorageType: SaveStorageType, schema: SaveDataSchemaDto | null): SaveDataDto {
+export function trialUpdateSaveData(
+  id: number,
+  payload: UpdateSaveDataRequest,
+  saveStorageType: SaveStorageType,
+  schema: SaveDataSchemaDto | null,
+): SaveDataDto {
   const items = trialListSaveDatas();
   const idx = items.findIndex((item) => item.id === id);
   if (idx === -1) throw new Error(`SaveData #${id} not found`);
   items[idx] = {
     ...items[idx],
+    displayOrder: payload.displayOrder,
+    memo: payload.memo,
     saveStorageType,
     gameSoftwareMasterId: payload.gameSoftwareMasterId,
     gameSoftwareId: payload.gameSoftwareId,
@@ -400,48 +349,6 @@ export function trialDeleteSaveData(id: number, payload: {
     replacedBySaveDataId: payload.replacedBySaveDataId,
   };
   writeList('save-datas', items);
-}
-
-// ---------------------------------------------------------------------------
-// データ存在確認・一括操作
-// ---------------------------------------------------------------------------
-
-const ALL_COLLECTIONS: CollectionKey[] = [
-  'accounts',
-  'game-consoles',
-  'game-softwares',
-  'memory-cards',
-  'save-datas',
-];
-
-/** localStorage に trial データが 1 件でも存在するか */
-export function hasTrialData(): boolean {
-  if (typeof window === 'undefined' || !isStorageAvailable()) return false;
-  return ALL_COLLECTIONS.some((key) => readList(key).length > 0);
-}
-
-/** 指定リソースから指定 ID 群だけを削除する */
-export function trialRemoveByIds(collection: CollectionKey, ids: Set<number>): void {
-  const items = readList<{ id: number }>(collection);
-  const remaining = items.filter((item) => !ids.has(item.id));
-  if (remaining.length === 0) {
-    // コレクションが空なら key ごと削除
-    if (isStorageAvailable()) {
-      localStorage.removeItem(storageKey(collection));
-      localStorage.removeItem(nextIdKey(collection));
-    }
-  } else {
-    writeList(collection, remaining);
-  }
-}
-
-/** trial 名前空間を全削除する */
-export function trialClearAll(): void {
-  if (typeof window === 'undefined' || !isStorageAvailable()) return;
-  for (const key of ALL_COLLECTIONS) {
-    localStorage.removeItem(storageKey(key));
-    localStorage.removeItem(nextIdKey(key));
-  }
 }
 
 // ---------------------------------------------------------------------------
