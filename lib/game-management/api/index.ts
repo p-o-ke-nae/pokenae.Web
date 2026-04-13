@@ -1,5 +1,6 @@
 export {
   ApiError,
+  getGameManagementErrorMessage,
   getLocalizedErrorMessage,
   fetchResourceList,
   fetchResourceById,
@@ -28,10 +29,12 @@ export {
 } from './public';
 
 export {
+  fetchSaveDataFieldDefinitionCatalog,
   fetchSaveDataFieldDefinitions,
   fetchSaveDataFieldDefinition,
   createSaveDataFieldDefinition,
   updateSaveDataFieldDefinition,
+  upsertSaveDataFieldDefinitionAssignment,
   deleteSaveDataFieldDefinition,
   fetchSaveDataFieldOptions,
   fetchSaveDataFieldOption,

@@ -7,7 +7,8 @@ import CustomMessageArea from '@/components/atoms/CustomMessageArea';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
 import Dialog from '@/components/molecules/Dialog';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
-import { updateResource } from '@/lib/game-management/api';
+import { getGameManagementErrorMessage, updateResource } from '@/lib/game-management/api';
+import resources from '@/lib/resources';
 import type { ResourceDefinition } from '@/lib/game-management/resources';
 import type { ManagementLookups, ResourceKey } from '@/lib/game-management/types';
 import { selectOptionsFromLookups, optionize, SAVE_STORAGE_TYPE_OPTIONS } from './options';
@@ -45,7 +46,7 @@ export default function BulkEditorDialog({
   bulkEditableFields,
   onDataChanged,
 }: BulkEditorDialogProps) {
-  const { startLoading } = useLoadingOverlay();
+  const { isPending, startLoading } = useLoadingOverlay();
   const [formState, setFormState] = useState<BulkFormState>({});
   const [enabledFields, setEnabledFields] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
@@ -61,10 +62,12 @@ export default function BulkEditorDialog({
     setEnabledFields((prev) => ({ ...prev, [field]: !prev[field] }));
   }, []);
 
+  const activeFieldCount = bulkEditableFields.filter((field) => enabledFields[field]).length;
+
   const handleSave = useCallback(async () => {
     const activeFields = bulkEditableFields.filter((f) => enabledFields[f]);
     if (activeFields.length === 0) {
-      setError('一括変更する項目を1つ以上有効にしてください。');
+      setError(resources.gameManagement.validation.enableBulkField);
       return;
     }
 
@@ -89,7 +92,7 @@ export default function BulkEditorDialog({
               patch[field] = value.trim() || null;
             }
           }
-          await updateResource(resourceKey, String(recordId), patch);
+          await updateResource(resourceKey, recordId, patch);
         }
       }, `${targetRecordIds.length} 件を一括更新中...`);
 
@@ -97,7 +100,7 @@ export default function BulkEditorDialog({
       onDataChanged();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '一括更新に失敗しました。');
+      setError(getGameManagementErrorMessage(err, { fallback: resources.gameManagement.errors.bulkUpdate }));
     }
   }, [bulkEditableFields, enabledFields, formState, onClose, onDataChanged, resourceKey, startLoading, targetRecordIds]);
 
@@ -222,12 +225,14 @@ export default function BulkEditorDialog({
     <Dialog
       open={open}
       onClose={onClose}
+      closeDisabled={isPending}
       title={`${definition.shortLabel} 一括編集（${targetRecordIds.length} 件）`}
       size="md"
       footer={
         <>
-          <CustomButton onClick={onClose}>キャンセル</CustomButton>
-          <CustomButton variant="accent" onClick={() => void handleSave()}>
+          {isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">更新中はダイアログを閉じられません。</span> : null}
+          <CustomButton onClick={onClose} disabled={isPending}>キャンセル</CustomButton>
+          <CustomButton variant="accent" disabled={activeFieldCount === 0 || isPending} onClick={() => void handleSave()}>
             一括更新
           </CustomButton>
         </>

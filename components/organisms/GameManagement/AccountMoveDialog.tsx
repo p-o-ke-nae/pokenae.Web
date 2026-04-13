@@ -6,10 +6,10 @@ import CustomMessageArea from '@/components/atoms/CustomMessageArea';
 import Dialog from '@/components/molecules/Dialog';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import {
-  ApiError,
-  getLocalizedErrorMessage,
+  getGameManagementErrorMessage,
   moveAccountBetweenConsoles,
 } from '@/lib/game-management/api';
+import resources from '@/lib/resources';
 import type { AccountDto, ManagementLookups } from '@/lib/game-management/types';
 import { getAccountDisplay, getAccountMoveTargetConsoles, getGameConsoleDisplay } from './helpers';
 import { SelectField } from './shared';
@@ -29,7 +29,7 @@ export default function AccountMoveDialog({
   lookups,
   onSuccess,
 }: AccountMoveDialogProps) {
-  const { startLoading } = useLoadingOverlay();
+  const { isPending, startLoading } = useLoadingOverlay();
   const [sourceGameConsoleId, setSourceGameConsoleId] = useState('');
   const [targetGameConsoleId, setTargetGameConsoleId] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -50,16 +50,17 @@ export default function AccountMoveDialog({
       value: String(gc.id),
       label: getGameConsoleDisplay(gc, lookups),
     }));
+  const canSubmit = !!sourceGameConsoleId && targetOptions.some((option) => option.value === targetGameConsoleId);
 
   const handleSubmit = useCallback(async () => {
     setError(null);
 
     if (!sourceGameConsoleId) {
-      setError('移行元のゲーム機を選択してください。');
+      setError(resources.gameManagement.validation.selectSourceConsole);
       return;
     }
     if (!targetGameConsoleId) {
-      setError('移行先のゲーム機を選択してください。');
+      setError(resources.gameManagement.validation.selectTargetConsole);
       return;
     }
 
@@ -73,11 +74,7 @@ export default function AccountMoveDialog({
         onSuccess();
         onClose();
       } catch (err) {
-        if (err instanceof ApiError) {
-          setError(getLocalizedErrorMessage(err.statusCode, err.details));
-        } else {
-          setError(err instanceof Error ? err.message : '移行中にエラーが発生しました。');
-        }
+        setError(getGameManagementErrorMessage(err, { fallback: resources.gameManagement.errors.accountMove }));
       }
     }, 'アカウントを移行中...');
   }, [account.id, sourceGameConsoleId, targetGameConsoleId, startLoading, onSuccess, onClose]);
@@ -93,14 +90,16 @@ export default function AccountMoveDialog({
     <Dialog
       open={open}
       onClose={handleClose}
+      closeDisabled={isPending}
       title="アカウントのゲーム機間移行"
       size="md"
       footer={
         <>
-          <CustomButton onClick={handleClose}>
+          {isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">移行中はダイアログを閉じられません。</span> : null}
+          <CustomButton onClick={handleClose} disabled={isPending}>
             キャンセル
           </CustomButton>
-          <CustomButton variant="accent" onClick={handleSubmit}>
+          <CustomButton variant="accent" disabled={!canSubmit || isPending} onClick={handleSubmit}>
             移行する
           </CustomButton>
         </>
@@ -118,7 +117,10 @@ export default function AccountMoveDialog({
           label="移行元ゲーム機"
           value={sourceGameConsoleId}
           options={sourceOptions}
-          onChange={(value) => setSourceGameConsoleId(value)}
+          onChange={(value) => {
+            setSourceGameConsoleId(value);
+            setTargetGameConsoleId('');
+          }}
           placeholder="選択してください"
         />
 
@@ -132,7 +134,7 @@ export default function AccountMoveDialog({
         />
 
         <CustomMessageArea variant="info">
-          移行先には、移行元と同一分類または互換関係にあり、かつこのアカウント種類で許可されたゲーム機のみ表示されます。移行すると、このアカウントに紐づくダウンロード版ゲームソフトのインストール先と、セーブデータの本体が自動的に移行先へ更新されます。
+          {resources.gameManagement.info.accountMove}
         </CustomMessageArea>
       </div>
     </Dialog>

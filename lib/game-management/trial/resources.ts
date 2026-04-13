@@ -33,6 +33,12 @@ import {
   writeList,
 } from './core';
 
+function resolveDisplayOrder(displayOrder: number | null | undefined, fallback: number): number {
+  return typeof displayOrder === 'number' && Number.isInteger(displayOrder) && displayOrder > 0
+    ? displayOrder
+    : fallback;
+}
+
 // ---------------------------------------------------------------------------
 // Accounts
 // ---------------------------------------------------------------------------
@@ -52,7 +58,7 @@ export function trialCreateAccount(payload: CreateAccountRequest): number {
     id: newId,
     ownerGoogleUserId: TRIAL_OWNER,
     accountTypeMasterId: payload.accountTypeMasterId,
-    displayOrder: payload.displayOrder,
+    displayOrder: resolveDisplayOrder(payload.displayOrder, newId),
     label: payload.label,
     memo: payload.memo,
     linkedGameConsoleIds: payload.linkedGameConsoleIds ?? [],
@@ -68,7 +74,6 @@ export function trialUpdateAccount(id: number, payload: UpdateAccountRequest): A
   if (idx === -1) throw new Error(`Account #${id} not found`);
   items[idx] = {
     ...items[idx],
-    displayOrder: payload.displayOrder,
     label: payload.label,
     memo: payload.memo,
     linkedGameConsoleIds: payload.linkedGameConsoleIds ?? [],
@@ -105,7 +110,7 @@ export function trialCreateGameConsole(payload: CreateGameConsoleRequest): numbe
     gameConsoleMasterId: payload.gameConsoleMasterId,
     gameConsoleEditionMasterId: payload.gameConsoleEditionMasterId,
     ownerGoogleUserId: TRIAL_OWNER,
-    displayOrder: payload.displayOrder,
+    displayOrder: resolveDisplayOrder(payload.displayOrder, newId),
     label: payload.label,
     memo: payload.memo,
     isDeleted: false,
@@ -124,7 +129,6 @@ export function trialUpdateGameConsole(id: number, payload: UpdateGameConsoleReq
   items[idx] = {
     ...items[idx],
     gameConsoleEditionMasterId: nextEditionMasterId,
-    displayOrder: payload.displayOrder,
     label: payload.label,
     memo: payload.memo,
   };
@@ -162,7 +166,7 @@ export function trialCreateGameSoftware(payload: CreateGameSoftwareRequest): num
     accountId: payload.accountId ?? null,
     installedGameConsoleId: payload.installedGameConsoleId ?? null,
     ownerGoogleUserId: TRIAL_OWNER,
-    displayOrder: payload.displayOrder,
+    displayOrder: resolveDisplayOrder(payload.displayOrder, newId),
     label: payload.label,
     memo: payload.memo,
     isDeleted: false,
@@ -177,7 +181,6 @@ export function trialUpdateGameSoftware(id: number, payload: UpdateGameSoftwareR
   if (idx === -1) throw new Error(`GameSoftware #${id} not found`);
   items[idx] = {
     ...items[idx],
-    displayOrder: payload.displayOrder,
     variant: payload.variant,
     accountId: payload.accountId ?? null,
     installedGameConsoleId: payload.installedGameConsoleId ?? null,
@@ -215,7 +218,7 @@ export function trialCreateMemoryCard(payload: CreateMemoryCardRequest): number 
     id: newId,
     memoryCardEditionMasterId: payload.memoryCardEditionMasterId,
     ownerGoogleUserId: TRIAL_OWNER,
-    displayOrder: payload.displayOrder,
+    displayOrder: resolveDisplayOrder(payload.displayOrder, newId),
     label: payload.label,
     memo: payload.memo,
     isDeleted: false,
@@ -231,7 +234,6 @@ export function trialUpdateMemoryCard(id: number, payload: UpdateMemoryCardReque
   items[idx] = {
     ...items[idx],
     memoryCardEditionMasterId: payload.memoryCardEditionMasterId,
-    displayOrder: payload.displayOrder,
     label: payload.label,
     memo: payload.memo,
   };
@@ -290,7 +292,7 @@ export function trialCreateSaveData(
   items.push({
     id: newId,
     ownerGoogleUserId: TRIAL_OWNER,
-    displayOrder: payload.displayOrder,
+    displayOrder: resolveDisplayOrder(payload.displayOrder, newId),
     memo: payload.memo,
     replacedBySaveDataId: null,
     saveStorageType,
@@ -319,7 +321,6 @@ export function trialUpdateSaveData(
   if (idx === -1) throw new Error(`SaveData #${id} not found`);
   items[idx] = {
     ...items[idx],
-    displayOrder: payload.displayOrder,
     memo: payload.memo,
     saveStorageType,
     gameSoftwareMasterId: payload.gameSoftwareMasterId,

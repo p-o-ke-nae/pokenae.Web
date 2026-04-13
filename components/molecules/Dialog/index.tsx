@@ -8,6 +8,7 @@ export type DialogProps = Omit<CustomModalProps, "children"> & {
 	title?: string;
 	children?: ReactNode;
 	footer?: ReactNode;
+	closeDisabled?: boolean;
 	/** Dialog width preset. Defaults to "sm" (28 rem). */
 	size?: "sm" | "md" | "lg";
 };
@@ -30,6 +31,7 @@ const Dialog = ({
 	title,
 	children,
 	footer,
+	closeDisabled = false,
 	size = "sm",
 	style,
 	...rest
@@ -42,11 +44,11 @@ const Dialog = ({
 
 	return (
 		<>
-			<CustomModal open={open} onClose={onClose} style={dialogStyle} {...rest}>
+			<CustomModal open={open} onClose={onClose} closeDisabled={closeDisabled} style={dialogStyle} {...rest}>
 				{title && (
 					<header className="dialog__header">
 						<h2 className="dialog__title">{title}</h2>
-						{onClose && (
+						{onClose && !closeDisabled ? (
 							<button
 								type="button"
 								className="dialog__close"
@@ -55,7 +57,7 @@ const Dialog = ({
 							>
 								✕
 							</button>
-						)}
+						) : null}
 					</header>
 				)}
 				<div className="dialog__body">{children}</div>

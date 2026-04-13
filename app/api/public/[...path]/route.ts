@@ -9,7 +9,7 @@
 
 import { NextRequest } from 'next/server';
 import { getApiClient } from '@/lib/api/client-factory';
-import { createSuccessResponse, createErrorResponse } from '@/lib/api/route-helpers';
+import { createSuccessResponse, createSafeErrorResponse } from '@/lib/api/route-helpers';
 
 /** 許可するパスプレフィックス（先頭スラッシュなし） */
 const ALLOWED_PREFIXES = [
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
     const { path } = await context.params;
 
     if (!isAllowedPath(path)) {
-      return createErrorResponse('NOT_FOUND', 'The requested public endpoint does not exist.', 404);
+      return createSafeErrorResponse('NOT_FOUND', 404);
     }
 
     const client = getApiClient('game-library-api');
@@ -75,18 +75,9 @@ export async function GET(request: NextRequest, context: RouteParams) {
       ? parseInt(response.error.code.replace('HTTP_', ''), 10)
       : 500;
 
-    return createErrorResponse(
-      response.error.code,
-      response.error.message,
-      statusCode,
-      response.error.details,
-    );
+    return createSafeErrorResponse(response.error.code, statusCode, response.error.details);
   } catch (error) {
     console.error('Public API Route Error:', error);
-    return createErrorResponse(
-      'INTERNAL_ERROR',
-      error instanceof Error ? error.message : 'Internal server error',
-      500,
-    );
+    return createSafeErrorResponse('INTERNAL_ERROR', 500);
   }
 }

@@ -1,10 +1,17 @@
 import type {
   AccountDto,
+  AccountTypeMasterDto,
+  GameConsoleCategoryDto,
   GameConsoleCategoryCompatibilityDto,
+  GameConsoleEditionMasterDto,
+  GameConsoleMasterDto,
   GameConsoleDto,
+  GameSoftwareContentGroupDto,
+  GameSoftwareMasterDto,
   GameSoftwareDto,
   ManagementLookups,
   MasterLookups,
+  MemoryCardEditionMasterDto,
   MemoryCardDto,
   SaveDataDto,
 } from '@/lib/game-management/types';

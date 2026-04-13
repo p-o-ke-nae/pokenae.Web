@@ -5,13 +5,10 @@ import type { SaveDataFieldDefinitionDto } from '../../../lib/game-management/ty
 function createDefinition(overrides: Partial<SaveDataFieldDefinitionDto>): SaveDataFieldDefinitionDto {
   return {
     id: 1,
-    contentGroupId: 10,
     fieldKey: 'field_key',
     label: 'Field Label',
     description: null,
     fieldType: 0,
-    displayOrder: 1,
-    isRequired: false,
     sharedChoiceSetId: null,
     isDeleted: false,
     ...overrides,
@@ -27,8 +24,6 @@ describe('createDefinitionUpdateRequest', () => {
       label: 'Field Label',
       description: null,
       fieldType: 'Integer',
-      displayOrder: 1,
-      isRequired: false,
       sharedChoiceSetId: null,
     });
   });
@@ -37,8 +32,8 @@ describe('createDefinitionUpdateRequest', () => {
 describe('buildBulkDefinitionTypeUpdateItems', () => {
   it('builds update items for all selected non-deleted definitions', () => {
     const definitions = [
-      createDefinition({ id: 1, fieldKey: 'field_a', label: 'A', fieldType: 0, displayOrder: 1 }),
-      createDefinition({ id: 2, fieldKey: 'field_b', label: 'B', fieldType: 1, displayOrder: 2 }),
+      createDefinition({ id: 1, fieldKey: 'field_a', label: 'A', fieldType: 0 }),
+      createDefinition({ id: 2, fieldKey: 'field_b', label: 'B', fieldType: 1 }),
       createDefinition({ id: 3, fieldKey: 'field_c', label: 'C', fieldType: 6, sharedChoiceSetId: 99, isDeleted: true }),
     ];
 
@@ -50,8 +45,6 @@ describe('buildBulkDefinitionTypeUpdateItems', () => {
           label: 'A',
           description: null,
           fieldType: 'SingleSelect',
-          displayOrder: 1,
-          isRequired: false,
           sharedChoiceSetId: 42,
         },
         rollbackPayload: {
@@ -59,8 +52,6 @@ describe('buildBulkDefinitionTypeUpdateItems', () => {
           label: 'A',
           description: null,
           fieldType: 'Text',
-          displayOrder: 1,
-          isRequired: false,
           sharedChoiceSetId: null,
         },
       },
@@ -71,8 +62,6 @@ describe('buildBulkDefinitionTypeUpdateItems', () => {
           label: 'B',
           description: null,
           fieldType: 'SingleSelect',
-          displayOrder: 2,
-          isRequired: false,
           sharedChoiceSetId: 42,
         },
         rollbackPayload: {
@@ -80,8 +69,6 @@ describe('buildBulkDefinitionTypeUpdateItems', () => {
           label: 'B',
           description: null,
           fieldType: 'MultilineText',
-          displayOrder: 2,
-          isRequired: false,
           sharedChoiceSetId: null,
         },
       },

@@ -42,7 +42,6 @@ export type UpdateAccountTypeMasterRequest = {
   name: string;
   abbreviation: string;
   gameConsoleCategoryIds: number[] | null;
-  displayOrder: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -69,7 +68,6 @@ export type CreateAccountRequest = {
 };
 
 export type UpdateAccountRequest = {
-  displayOrder: number;
   label: string | null;
   memo: string | null;
   linkedGameConsoleIds: number[] | null;
@@ -123,7 +121,6 @@ export type UpdateGameConsoleCategoryRequest = {
   abbreviation: string;
   manufacturer: string | null;
   saveStorageType: SaveStorageType;
-  displayOrder: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -150,7 +147,6 @@ export type UpdateGameConsoleMasterRequest = {
   gameConsoleCategoryId: number;
   name: string;
   abbreviation: string;
-  displayOrder: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -177,7 +173,6 @@ export type UpdateGameConsoleEditionMasterRequest = {
   gameConsoleMasterId: number;
   name: string;
   abbreviation: string;
-  displayOrder: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -205,7 +200,6 @@ export type CreateGameConsoleRequest = {
 
 export type UpdateGameConsoleRequest = {
   gameConsoleEditionMasterId?: number | null;
-  displayOrder: number;
   label: string | null;
   memo: string | null;
 };
@@ -234,7 +228,6 @@ export type CreateGameSoftwareContentGroupRequest = {
 
 export type UpdateGameSoftwareContentGroupRequest = {
   name: string;
-  displayOrder: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -264,7 +257,6 @@ export type UpdateGameSoftwareMasterRequest = {
   abbreviation: string;
   gameConsoleCategoryId: number;
   contentGroupId: number | null;
-  displayOrder: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -298,7 +290,6 @@ export type UpdateGameSoftwareRequest = {
   variant: GameSoftwareVariant | null;
   accountId: number | null;
   installedGameConsoleId: number | null;
-  displayOrder: number;
   label: string | null;
   memo: string | null;
 };
@@ -330,7 +321,6 @@ export type CreateMemoryCardEditionMasterRequest = {
 export type UpdateMemoryCardEditionMasterRequest = {
   name: string;
   blockCount: MemoryCardBlockCount;
-  displayOrder: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -356,7 +346,6 @@ export type CreateMemoryCardRequest = {
 
 export type UpdateMemoryCardRequest = {
   memoryCardEditionMasterId: number;
-  displayOrder: number;
   label: string | null;
   memo: string | null;
 };
@@ -428,7 +417,6 @@ export type UpdateSaveDataRequest = {
   storyProgressDefinitionId: number | null;
   replacedBySaveDataId: number | null;
   memo: string | null;
-  displayOrder: number;
   extendedFields: SaveDataFieldInputDto[] | null;
 };
 
@@ -443,6 +431,16 @@ export type DeleteSaveDataRequest = {
 
 export type SaveDataFieldDefinitionDto = {
   id: number;
+  fieldKey: string;
+  label: string;
+  description: string | null;
+  fieldType: SaveDataFieldType;
+  sharedChoiceSetId: number | null;
+  isDeleted: boolean;
+};
+
+export type SaveDataFieldDefinitionAssignmentDto = {
+  fieldDefinitionId: number;
   contentGroupId: number;
   fieldKey: string;
   label: string;
@@ -459,8 +457,6 @@ export type CreateSaveDataFieldDefinitionRequest = {
   label: string;
   description: string | null;
   fieldType: string;
-  displayOrder?: number | null;
-  isRequired: boolean;
   sharedChoiceSetId?: number | null;
 };
 
@@ -469,9 +465,11 @@ export type UpdateSaveDataFieldDefinitionRequest = {
   label: string;
   description: string | null;
   fieldType: string;
-  displayOrder: number;
-  isRequired: boolean;
   sharedChoiceSetId?: number | null;
+};
+
+export type UpsertSaveDataFieldDefinitionAssignmentRequest = {
+  isRequired: boolean;
 };
 
 export type BatchSaveDataFieldDefinitionTypeItem = {
@@ -501,7 +499,6 @@ export type UpdateSaveDataFieldOptionRequest = {
   optionKey: string;
   label: string;
   description: string | null;
-  displayOrder: number;
 };
 
 export type SaveDataFieldOverrideDto = {
@@ -567,7 +564,6 @@ export type UpdateSaveDataFieldChoiceOptionRequest = {
   optionKey: string;
   label: string;
   description: string | null;
-  displayOrder: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -623,7 +619,6 @@ export type UpdateStoryProgressDefinitionRequest = {
   progressKey: string;
   label: string;
   description: string | null;
-  displayOrder: number;
 };
 
 export type StoryProgressOverrideDto = {

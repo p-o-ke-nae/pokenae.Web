@@ -22,6 +22,7 @@ const meta = {
   args: {
     mode: 'view',
     disabled: false,
+    onChange: () => undefined,
   },
 } satisfies Meta<typeof PageModeToggle>;
 

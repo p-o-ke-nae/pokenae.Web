@@ -8,11 +8,13 @@ import type {
   ReorderItemRequest,
   SaveDataFieldChoiceOptionDto,
   SaveDataFieldChoiceSetDto,
+  SaveDataFieldDefinitionAssignmentDto,
   SaveDataFieldDefinitionDto,
   SaveDataFieldOptionDto,
   SaveDataFieldOverrideDto,
   StoryProgressDefinitionDto,
   StoryProgressOverrideDto,
+  UpsertSaveDataFieldDefinitionAssignmentRequest,
   UpdateSaveDataFieldChoiceOptionRequest,
   UpdateSaveDataFieldChoiceSetRequest,
   UpdateSaveDataFieldDefinitionRequest,
@@ -32,8 +34,12 @@ type BatchUpdateSaveDataFieldDefinitionTypesResponse = {
 // SaveDataFieldDefinitions
 // ---------------------------------------------------------------------------
 
-export async function fetchSaveDataFieldDefinitions(contentGroupId: number, includeDeleted = false): Promise<SaveDataFieldDefinitionDto[]> {
-  return unwrap(client.get<SaveDataFieldDefinitionDto[]>(`/api/GameSoftwareContentGroups/${contentGroupId}/SaveDataFieldDefinitions?includeDeleted=${includeDeleted}`));
+export async function fetchSaveDataFieldDefinitionCatalog(includeDeleted = false): Promise<SaveDataFieldDefinitionDto[]> {
+  return unwrap(client.get<SaveDataFieldDefinitionDto[]>(`/api/SaveDataFieldDefinitions?includeDeleted=${includeDeleted}`));
+}
+
+export async function fetchSaveDataFieldDefinitions(contentGroupId: number, includeDeleted = false): Promise<SaveDataFieldDefinitionAssignmentDto[]> {
+  return unwrap(client.get<SaveDataFieldDefinitionAssignmentDto[]>(`/api/GameSoftwareContentGroups/${contentGroupId}/SaveDataFieldDefinitions?includeDeleted=${includeDeleted}`));
 }
 
 export async function fetchSaveDataFieldDefinition(id: number): Promise<SaveDataFieldDefinitionDto> {
@@ -41,10 +47,9 @@ export async function fetchSaveDataFieldDefinition(id: number): Promise<SaveData
 }
 
 export async function createSaveDataFieldDefinition(
-  contentGroupId: number,
   payload: CreateSaveDataFieldDefinitionRequest,
 ): Promise<number> {
-  return unwrap(client.post<number>(`/api/GameSoftwareContentGroups/${contentGroupId}/SaveDataFieldDefinitions`, payload));
+  return unwrap(client.post<number>('/api/SaveDataFieldDefinitions', payload));
 }
 
 export async function updateSaveDataFieldDefinition(
@@ -52,6 +57,28 @@ export async function updateSaveDataFieldDefinition(
   payload: UpdateSaveDataFieldDefinitionRequest,
 ): Promise<SaveDataFieldDefinitionDto> {
   return unwrap(client.put<SaveDataFieldDefinitionDto>(`/api/SaveDataFieldDefinitions/${id}`, payload));
+}
+
+export async function upsertSaveDataFieldDefinitionAssignment(
+  contentGroupId: number,
+  fieldDefinitionId: number,
+  payload: UpsertSaveDataFieldDefinitionAssignmentRequest,
+): Promise<SaveDataFieldDefinitionAssignmentDto> {
+  return unwrap(
+    client.put<SaveDataFieldDefinitionAssignmentDto>(
+      `/api/GameSoftwareContentGroups/${contentGroupId}/SaveDataFieldDefinitionAssignments/${fieldDefinitionId}`,
+      payload,
+    ),
+  );
+}
+
+export async function deleteSaveDataFieldDefinitionAssignment(
+  contentGroupId: number,
+  fieldDefinitionId: number,
+): Promise<void> {
+  await unwrap(
+    client.delete<void>(`/api/GameSoftwareContentGroups/${contentGroupId}/SaveDataFieldDefinitionAssignments/${fieldDefinitionId}`),
+  );
 }
 
 export async function batchUpdateSaveDataFieldDefinitionTypes(
@@ -81,13 +108,13 @@ export async function batchUpdateSaveDataFieldDefinitionTypes(
   let data: {
     success?: boolean;
     data?: BatchUpdateSaveDataFieldDefinitionTypesResponse;
-    error?: { message?: string; details?: unknown };
+    error?: { code?: string; message?: string; details?: unknown };
   };
 
   try {
     data = await response.json();
   } catch {
-    throw new ApiError(response.status, 'サーバーからの応答を解析できませんでした。');
+    throw new ApiError(response.status, 'サーバーからの応答を解析できませんでした。', undefined, 'INVALID_RESPONSE');
   }
 
   if (data?.success) {
@@ -98,6 +125,7 @@ export async function batchUpdateSaveDataFieldDefinitionTypes(
     response.status,
     getErrorMessage(data?.error?.details, data?.error?.message ?? '項目定義の一括型変更に失敗しました。'),
     data?.error?.details,
+    data?.error?.code,
   );
 }
 

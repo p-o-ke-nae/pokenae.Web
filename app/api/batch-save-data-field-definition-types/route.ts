@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/lib/auth/auth-options';
 import { getApiClient } from '@/lib/api/client-factory';
-import { createErrorResponse, createSuccessResponse } from '@/lib/api/route-helpers';
+import { createErrorResponse, createSafeErrorResponse, createSuccessResponse, getSafeRouteErrorMessage } from '@/lib/api/route-helpers';
 import type { ApiServiceName } from '@/lib/config/api-config';
 import type { UpdateSaveDataFieldDefinitionRequest } from '@/lib/game-management/types';
 
@@ -46,10 +46,6 @@ function isValidUpdatePayload(payload: unknown): payload is UpdateSaveDataFieldD
     && (typeof candidate.description === 'string' || candidate.description == null)
     && typeof candidate.fieldType === 'string'
     && candidate.fieldType.length > 0
-    && typeof candidate.displayOrder === 'number'
-    && Number.isInteger(candidate.displayOrder)
-    && candidate.displayOrder >= 1
-    && typeof candidate.isRequired === 'boolean'
     && isValidSharedChoiceSetId(candidate.sharedChoiceSetId);
 }
 
@@ -121,13 +117,13 @@ export async function POST(request: NextRequest) {
             if (!rollbackResponse.success) {
               rollbackFailures.push({
                 id: rollbackItem.id,
-                error: rollbackResponse.error.message,
+                error: getSafeRouteErrorMessage(rollbackResponse.error.code),
               });
             }
-          } catch (rollbackError) {
+          } catch {
             rollbackFailures.push({
               id: rollbackItem.id,
-              error: rollbackError instanceof Error ? rollbackError.message : 'Unknown rollback error',
+              error: getSafeRouteErrorMessage('INTERNAL_ERROR', 500),
             });
           }
         }
@@ -135,7 +131,7 @@ export async function POST(request: NextRequest) {
         const errorResult: BatchErrorResult = {
           failedItemId: item.id,
           failedIndex: index,
-          error: response.error.message,
+          error: getSafeRouteErrorMessage(response.error.code, statusCode),
           rollbackSuccess: rollbackFailures.length === 0,
           rollbackFailures,
         };
@@ -155,10 +151,6 @@ export async function POST(request: NextRequest) {
     return createSuccessResponse(successResult);
   } catch (error) {
     console.error('Batch save data field definition type update error:', error);
-    return createErrorResponse(
-      'INTERNAL_ERROR',
-      error instanceof Error ? error.message : '項目定義の一括型変更中に予期せぬエラーが発生しました。',
-      500,
-    );
+    return createSafeErrorResponse('INTERNAL_ERROR', 500);
   }
 }

@@ -3,13 +3,20 @@ import {
 } from '../../../lib/game-management/save-data-fields';
 import type {
   BatchSaveDataFieldDefinitionTypeItem,
+  SaveDataFieldDefinitionAssignmentDto,
   SaveDataFieldDefinitionDto,
   SaveDataFieldType,
   UpdateSaveDataFieldDefinitionRequest,
 } from '../../../lib/game-management/types';
 
+type DefinitionTypeUpdateTarget = SaveDataFieldDefinitionDto | SaveDataFieldDefinitionAssignmentDto;
+
+function getDefinitionId(definition: DefinitionTypeUpdateTarget): number {
+  return 'id' in definition ? definition.id : definition.fieldDefinitionId;
+}
+
 export function createDefinitionUpdateRequest(
-  definition: SaveDataFieldDefinitionDto,
+  definition: DefinitionTypeUpdateTarget,
   overrides?: Partial<{ fieldType: SaveDataFieldType; sharedChoiceSetId: number | null }>,
 ): UpdateSaveDataFieldDefinitionRequest {
   const fieldType = overrides?.fieldType ?? definition.fieldType;
@@ -24,21 +31,19 @@ export function createDefinitionUpdateRequest(
     label: definition.label,
     description: definition.description,
     fieldType: SAVE_DATA_FIELD_TYPE_NAMES[fieldType],
-    displayOrder: definition.displayOrder,
-    isRequired: definition.isRequired,
     sharedChoiceSetId,
   };
 }
 
 export function buildBulkDefinitionTypeUpdateItems(
-  definitions: SaveDataFieldDefinitionDto[],
+  definitions: DefinitionTypeUpdateTarget[],
   nextFieldType: SaveDataFieldType,
   nextSharedChoiceSetId: number | null,
 ): BatchSaveDataFieldDefinitionTypeItem[] {
   return definitions
     .filter((definition) => !definition.isDeleted)
     .map((definition) => ({
-      id: definition.id,
+      id: getDefinitionId(definition),
       updatePayload: createDefinitionUpdateRequest(definition, {
         fieldType: nextFieldType,
         sharedChoiceSetId: nextSharedChoiceSetId,

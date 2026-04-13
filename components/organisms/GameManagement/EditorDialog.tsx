@@ -8,9 +8,10 @@ import CustomTextArea from '@/components/atoms/CustomTextArea';
 import Dialog from '@/components/molecules/Dialog';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import {
-  ApiError,
   fetchResourceById,
+  getGameManagementErrorMessage,
 } from '@/lib/game-management/api';
+import resources from '@/lib/resources';
 import {
   fetchPublicSaveDataSchema,
   fetchPublicStoryProgressSchema,
@@ -31,7 +32,7 @@ import type {
   StoryProgressSchemaDto,
 } from '@/lib/game-management/types';
 import { numberOrNull, getStoryProgressLabel } from './helpers';
-import { createSeededFormState, buildInitialFormState } from './form-state';
+import { createContinueFormState, createSeededFormState, buildInitialFormState } from './form-state';
 import { validateForm } from './validation';
 import { selectOptionsFromLookups, optionize } from './options';
 import { FormFields } from './form-fields';
@@ -127,10 +128,10 @@ export default function EditorDialog({
         }
       } catch (err) {
         if (cancelled) return;
-        const msg = err instanceof ApiError && err.statusCode === 403
-          ? '管理者権限が必要です。'
-          : err instanceof Error ? err.message : 'データの取得に失敗しました。';
-        setError(msg);
+        setError(getGameManagementErrorMessage(err, {
+          fallback: resources.gameManagement.errors.detailLoad,
+          adminFallback: resources.gameManagement.errors.adminRequired,
+        }));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -196,7 +197,7 @@ export default function EditorDialog({
         setSaveDataSchema(sdResult.value);
       } else {
         setSaveDataSchema(null);
-        setSaveDataSchemaError(sdResult.reason instanceof Error ? sdResult.reason.message : '可変項目 schema の取得に失敗しました。');
+        setSaveDataSchemaError(getGameManagementErrorMessage(sdResult.reason, { fallback: resources.gameManagement.errors.schemaLoad }));
       }
       setSaveDataSchemaLoading(false);
 
@@ -204,7 +205,7 @@ export default function EditorDialog({
         setStoryProgressSchema(spResult.value);
       } else {
         setStoryProgressSchema(null);
-        setStoryProgressSchemaError(spResult.reason instanceof Error ? spResult.reason.message : 'ストーリー進行度 schema の取得に失敗しました。');
+        setStoryProgressSchemaError(getGameManagementErrorMessage(spResult.reason, { fallback: resources.gameManagement.errors.schemaLoad }));
       }
       setStoryProgressSchemaLoading(false);
     };
@@ -251,7 +252,7 @@ export default function EditorDialog({
     setSuccess(null);
 
     if (resourceKey === 'save-datas' && formState.gameSoftwareMasterId && (saveDataSchemaLoading || storyProgressSchemaLoading)) {
-      setError('schema を読み込み中です。完了後に再度保存してください。');
+      setError(resources.gameManagement.validation.schemaLoading);
       return;
     }
     if (resourceKey === 'save-datas' && formState.gameSoftwareMasterId && (saveDataSchemaError || storyProgressSchemaError)) {
@@ -279,7 +280,7 @@ export default function EditorDialog({
 
       if (continueCreating) {
         setRecord(null);
-        setFormState(createSeededFormState(initialFormState));
+        setFormState(createContinueFormState(resourceKey, formState, initialFormState));
         setSaveDataSchema(null);
         setSaveDataSchemaLoading(false);
         setSaveDataSchemaError(null);
@@ -317,7 +318,7 @@ export default function EditorDialog({
 
       onDataChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存に失敗しました。');
+      setError(getGameManagementErrorMessage(err, { fallback: resources.gameManagement.errors.save }));
     }
   }, [
     focusFirstField,
@@ -343,7 +344,7 @@ export default function EditorDialog({
       onClose();
     } catch (err) {
       setDeleteDialogOpen(false);
-      setError(err instanceof Error ? err.message : '削除に失敗しました。');
+      setError(getGameManagementErrorMessage(err, { fallback: resources.gameManagement.errors.delete }));
     }
   }, [formState, isTrial, onClose, onDataChanged, recordId, resourceKey, startLoading]);
 
@@ -375,11 +376,17 @@ export default function EditorDialog({
       <Dialog
         open={open}
         onClose={onClose}
+        closeDisabled={isPending}
         title={`${definition.shortLabel}${isNew ? '作成' : isViewMode ? '詳細' : '編集'}`}
         size={resourceKey === 'save-datas' ? 'lg' : 'md'}
         footer={
           <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-3">
             <div className="flex flex-wrap items-center gap-2">
+              {isPending ? (
+                <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">
+                  保存中はダイアログを閉じられません。
+                </span>
+              ) : null}
               {!isNew && (
                 <>
                   <CustomButton
@@ -405,8 +412,8 @@ export default function EditorDialog({
             <div className="ml-auto flex flex-wrap items-center gap-2">
               {isViewMode && onPageModeChange ? (
                 <>
-                  <CustomButton onClick={onClose}>閉じる</CustomButton>
-                  <CustomButton variant="accent" onClick={() => onPageModeChange('edit')}>
+                  <CustomButton onClick={onClose} disabled={isPending}>閉じる</CustomButton>
+                  <CustomButton variant="accent" disabled={isPending} onClick={() => onPageModeChange('edit')}>
                     編集を有効化
                   </CustomButton>
                 </>
@@ -422,7 +429,7 @@ export default function EditorDialog({
                       読み取り専用に戻す
                     </CustomButton>
                   ) : null}
-                  <CustomButton onClick={onClose} disabled={isPending || loading}>キャンセル</CustomButton>
+                  <CustomButton onClick={onClose} disabled={isPending}>キャンセル</CustomButton>
                   {isNew ? (
                     <>
                       <CustomButton onClick={() => void handleSave('continue')} disabled={isPending || loading}>
@@ -513,11 +520,12 @@ export default function EditorDialog({
       <Dialog
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
+        closeDisabled={isPending}
         title={`${definition.shortLabel}を削除`}
         footer={
           <>
-            <CustomButton onClick={() => setDeleteDialogOpen(false)}>キャンセル</CustomButton>
-            <CustomButton variant="accent" onClick={() => void handleDelete()}>
+            <CustomButton onClick={() => setDeleteDialogOpen(false)} disabled={isPending}>キャンセル</CustomButton>
+            <CustomButton variant="accent" disabled={isPending} onClick={() => void handleDelete()}>
               削除する
             </CustomButton>
           </>

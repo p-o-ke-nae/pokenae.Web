@@ -28,6 +28,7 @@ async function fetchPublicList<T>(publicPath: string): Promise<T[]> {
       statusCode,
       getErrorMessage(data.error?.details, data.error?.message ?? 'Failed to fetch public master data'),
       data.error?.details,
+      data.error?.code,
     );
   }
   return data.data as T[];
@@ -44,6 +45,7 @@ async function fetchPublicData<T>(publicPath: string): Promise<T> {
       statusCode,
       getErrorMessage(data.error?.details, data.error?.message ?? 'Failed to fetch public data'),
       data.error?.details,
+      data.error?.code,
     );
   }
   return data.data as T;

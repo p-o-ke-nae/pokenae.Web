@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { ApiResponse } from '@/lib/types/api';
+import resources from '@/lib/resources';
 
 /**
  * 成功レスポンスを作成
@@ -45,6 +46,39 @@ export function createErrorResponse(
     },
     { status }
   );
+}
+
+export function getSafeRouteErrorMessage(code: string, status: number = 500): string {
+  const serverMessages = resources.apiError.server;
+
+  switch (code) {
+    case 'UNAUTHORIZED':
+      return serverMessages.unauthorized;
+    case 'INVALID_SERVICE':
+      return serverMessages.invalidService;
+    case 'METHOD_NOT_ALLOWED':
+      return serverMessages.methodNotAllowed;
+    case 'NOT_FOUND':
+      return serverMessages.publicEndpointNotFound;
+    case 'TIMEOUT':
+      return serverMessages.timeout;
+    case 'NETWORK_ERROR':
+      return serverMessages.network;
+    case 'UNKNOWN_ERROR':
+      return serverMessages.unknown;
+    case 'INTERNAL_ERROR':
+      return serverMessages.internalError;
+    default:
+      return resources.apiError.status[status] ?? serverMessages.internalError;
+  }
+}
+
+export function createSafeErrorResponse(
+  code: string,
+  status: number = 500,
+  details?: unknown,
+): NextResponse<ApiResponse> {
+  return createErrorResponse(code, getSafeRouteErrorMessage(code, status), status, details);
 }
 
 /**

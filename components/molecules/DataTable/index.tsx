@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import CustomCheckBox from "@/components/atoms/CustomCheckBox";
@@ -320,7 +321,7 @@ const {
   rowDrag,
 } = useRowReorder({ onRowMove });
 
-const effectiveRowReorderEnabled = rowReorderEnabled && !childrenKey && !isRowExpandable && !renderExpandedContent;
+const effectiveRowReorderEnabled = rowReorderEnabled && !childrenKey;
 
 // --- Pagination ---
 const effectivePaginated = paginated && !effectiveRowReorderEnabled;
@@ -461,7 +462,7 @@ onSelectionChange(selectedKeys.filter(k => !pageKeys.includes(k)));
 [onSelectionChange, processedData, paginatedData, pageStartIndex, selectedKeys, getRowKey, effectivePaginated]
 );
 
-const handleRowSelection = useCallback((row: T, rowIndex: number, nativeEvent: MouseEvent | ReactKeyboardEvent<HTMLTableRowElement>) => {
+const handleRowSelection = useCallback((row: T, rowIndex: number, nativeEvent: ReactMouseEvent<HTMLTableRowElement> | ReactKeyboardEvent<HTMLTableRowElement>) => {
 if (!selectable || !onSelectionChange) return;
 const key = getRowKey(row, rowIndex);
 const next = applySelectionInteraction({

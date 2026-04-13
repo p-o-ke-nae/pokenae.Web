@@ -8,11 +8,13 @@ import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
 import CustomTextBox from '@/components/atoms/CustomTextBox';
-import DataTable, { DATA_TABLE_DEFAULT_PAGE_HEIGHT, type DataTableColumn } from '@/components/molecules/DataTable';
+import DataTable, { DATA_TABLE_DEFAULT_PAGE_HEIGHT, type DataTableColumn, type SortState } from '@/components/molecules/DataTable';
 import Dialog from '@/components/molecules/Dialog';
+import { moveSelectedItemsByOne, moveSelectedItemsToTarget } from '@/components/molecules/DataTable/selection-utils';
 import RowMoveButtons from '@/components/organisms/GameManagement/RowMoveButtons';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
-import { ApiError } from '@/lib/game-management/api';
+import { getGameManagementErrorMessage } from '@/lib/game-management/api';
+import resources from '@/lib/resources';
 import {
   createSaveDataFieldChoiceOption,
   createSaveDataFieldChoiceSet,
@@ -53,6 +55,25 @@ function validateDisplayOrderInput(value: string, required: boolean): string {
 function nullIfBlank(value: string): string | null {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function mergeOrderedOptionRows<T extends { id: number }>(
+  rows: T[],
+  orderedIds: number[] | null,
+  isDeleted: (row: T) => boolean,
+): T[] {
+  if (!orderedIds) {
+    return rows;
+  }
+
+  const rowMap = new Map(rows.map((row) => [row.id, row]));
+  const orderedActiveRows = orderedIds
+    .map((id) => rowMap.get(id))
+    .filter((row): row is T => row !== undefined && !isDeleted(row));
+  const orderedActiveIds = new Set(orderedActiveRows.map((row) => row.id));
+  const remainingRows = rows.filter((row) => isDeleted(row) || !orderedActiveIds.has(row.id));
+
+  return [...orderedActiveRows, ...remainingRows];
 }
 
 // ---------------------------------------------------------------------------
@@ -148,6 +169,14 @@ function buildChoiceOptionRequest(form: ChoiceOptionFormState): CreateSaveDataFi
   };
 }
 
+function buildChoiceOptionUpdateRequest(form: ChoiceOptionFormState): UpdateSaveDataFieldChoiceOptionRequest {
+  return {
+    optionKey: form.optionKey.trim(),
+    label: form.label.trim(),
+    description: nullIfBlank(form.description),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // SectionCard (local, same pattern as SaveDataSchemaManager)
 // ---------------------------------------------------------------------------
@@ -200,6 +229,13 @@ export default function ChoiceSetManager() {
   const [optReorderDirty, setOptReorderDirty] = useState(false);
   const [optReorderSaving, setOptReorderSaving] = useState(false);
 
+  // Selection state for choice options
+  const [selectedOptionKeys, setSelectedOptionKeys] = useState<string[]>([]);
+
+  // Sort/filter state tracking for option table
+  const [optSortState, setOptSortState] = useState<SortState | null>(null);
+  const [optFilteredCount, setOptFilteredCount] = useState<number | null>(null);
+
   const selectedChoiceSet = useMemo(
     () => choiceSets.find((cs) => cs.id === Number(selectedChoiceSetId)) ?? null,
     [choiceSets, selectedChoiceSetId],
@@ -219,12 +255,10 @@ export default function ChoiceSetManager() {
         setSelectedChoiceSetId(String(nextSets[0].id));
       }
     } catch (loadError) {
-      const message = loadError instanceof ApiError && loadError.statusCode === 403
-        ? '管理者権限が必要です。バックエンドの AdminOnly ポリシーを確認してください。'
-        : loadError instanceof Error
-          ? loadError.message
-          : '共有選択肢セットの初期化に失敗しました。';
-      setError(message);
+      setError(getGameManagementErrorMessage(loadError, {
+        fallback: resources.gameManagement.errors.listLoad,
+        adminFallback: resources.gameManagement.errors.adminRequired,
+      }));
     } finally {
       setPageLoading(false);
     }
@@ -241,17 +275,20 @@ export default function ChoiceSetManager() {
   const loadChoiceOptions = useCallback(async () => {
     if (!selectedChoiceSetId) {
       setChoiceOptions([]);
+      setOptRowOrder([]);
+      setOptReorderDirty(false);
       return;
     }
     const nextOptions = await fetchSaveDataFieldChoiceOptions(Number(selectedChoiceSetId));
     setChoiceOptions(nextOptions);
-    setOptRowOrder(null);
+    setOptRowOrder(nextOptions.filter((item) => !item.isDeleted).map((item) => item.id));
     setOptReorderDirty(false);
+    setSelectedOptionKeys([]);
   }, [selectedChoiceSetId]);
 
   useEffect(() => {
     void loadChoiceOptions().catch((loadError) => {
-      setError(loadError instanceof Error ? loadError.message : '候補値の取得に失敗しました。');
+      setError(getGameManagementErrorMessage(loadError, { fallback: resources.gameManagement.errors.detailLoad }));
     });
   }, [loadChoiceOptions]);
 
@@ -339,7 +376,7 @@ export default function ChoiceSetManager() {
         setSuccess(editingChoiceSet ? '選択肢セットを更新しました。' : '選択肢セットを作成しました。');
       }
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : '選択肢セットの保存に失敗しました。');
+      setError(getGameManagementErrorMessage(saveError, { fallback: resources.gameManagement.errors.save }));
     }
   }, [choiceSetForm, closeChoiceSetDialog, editingChoiceSet, focusFirstField, loadChoiceSets, startLoading]);
 
@@ -358,7 +395,7 @@ export default function ChoiceSetManager() {
       }
       await loadChoiceSets();
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : '選択肢セットの削除に失敗しました。');
+      setError(getGameManagementErrorMessage(deleteError, { fallback: resources.gameManagement.errors.delete }));
     }
   }, [loadChoiceSets, selectedChoiceSetId, startLoading]);
 
@@ -394,21 +431,22 @@ export default function ChoiceSetManager() {
       setError('optionKey と表示名は必須です。');
       return;
     }
-    const displayOrderError = validateDisplayOrderInput(choiceOptionForm.displayOrder, editingChoiceOption != null);
-    if (displayOrderError) {
-      setError(displayOrderError);
-      return;
+    if (!editingChoiceOption) {
+      const displayOrderError = validateDisplayOrderInput(choiceOptionForm.displayOrder, false);
+      if (displayOrderError) {
+        setError(displayOrderError);
+        return;
+      }
     }
 
     try {
       setError(null);
       const continueCreating = afterSave === 'continue' && !editingChoiceOption;
       await startLoading(async () => {
-        const payload = buildChoiceOptionRequest(choiceOptionForm);
         if (editingChoiceOption) {
-          await updateSaveDataFieldChoiceOption(editingChoiceOption.id, payload as UpdateSaveDataFieldChoiceOptionRequest);
+          await updateSaveDataFieldChoiceOption(editingChoiceOption.id, buildChoiceOptionUpdateRequest(choiceOptionForm));
         } else {
-          await createSaveDataFieldChoiceOption(Number(selectedChoiceSetId), payload);
+          await createSaveDataFieldChoiceOption(Number(selectedChoiceSetId), buildChoiceOptionRequest(choiceOptionForm));
         }
       }, editingChoiceOption ? '候補値を保存中...' : '候補値を作成中...');
 
@@ -423,7 +461,7 @@ export default function ChoiceSetManager() {
         setSuccess(editingChoiceOption ? '候補値を更新しました。' : '候補値を作成しました。');
       }
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : '候補値の保存に失敗しました。');
+      setError(getGameManagementErrorMessage(saveError, { fallback: resources.gameManagement.errors.save }));
     }
   }, [choiceOptionForm, editingChoiceOption, focusFirstField, loadChoiceOptions, selectedChoiceSetId, startLoading]);
 
@@ -439,7 +477,7 @@ export default function ChoiceSetManager() {
       setSuccess('候補値を削除しました。');
       await loadChoiceOptions();
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : '候補値の削除に失敗しました。');
+      setError(getGameManagementErrorMessage(deleteError, { fallback: resources.gameManagement.errors.delete }));
     }
   }, [loadChoiceOptions, startLoading]);
 
@@ -447,42 +485,72 @@ export default function ChoiceSetManager() {
   // ChoiceOption reorder
   // -----------------------------------------------------------------------
 
-  const optReorderEnabled = optRowOrder !== null;
+  const optReorderEnabled = pageMode === 'edit';
+  const activeChoiceOptionCount = choiceOptions.filter((o) => !o.isDeleted).length;
 
-  const handleEnterOptReorder = useCallback(() => {
-    setOptRowOrder(choiceOptions.filter((o) => !o.isDeleted).map((o) => o.id));
-    setOptReorderDirty(false);
-  }, [choiceOptions]);
+  const optIsSortActive = optSortState !== null;
+  const optIsFilterActive = optFilteredCount !== null && optFilteredCount !== choiceOptionRows.length;
+  const effectiveOptReorderEnabled = optReorderEnabled && !optIsSortActive && !optIsFilterActive;
+  const optReorderDisabledReason = pageMode === 'view'
+    ? '編集モードを有効にすると並び替えできます'
+    : optIsSortActive
+      ? 'ソートを解除すると並び替えできます'
+      : optIsFilterActive
+        ? 'フィルタを解除すると並び替えできます'
+        : undefined;
 
-  const handleCancelOptReorder = useCallback(() => {
-    setOptRowOrder(null);
-    setOptReorderDirty(false);
+  const handleOptFilteredDataChange = useCallback((data: Record<string, unknown>[]) => {
+    setOptFilteredCount(data.length);
   }, []);
+
+  const selectedVisibleOptions = useMemo(() => {
+    return choiceOptions.filter((o) => !o.isDeleted && selectedOptionKeys.includes(String(o.id)));
+  }, [choiceOptions, selectedOptionKeys]);
 
   const handleMoveOption = useCallback((id: number, direction: 'up' | 'down') => {
     setOptRowOrder((prev) => {
       if (!prev) return prev;
-      const idx = prev.indexOf(id);
-      if (idx === -1) return prev;
-      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-      if (swapIdx < 0 || swapIdx >= prev.length) return prev;
-      const next = [...prev];
-      [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+      const selectedIds = selectedVisibleOptions
+        .map((item) => item.id)
+        .filter((selectedId) => prev.includes(selectedId));
+      const moveIds = selectedOptionKeys.includes(String(id)) && selectedIds.length > 0
+        ? selectedIds
+        : [id];
+      const next = moveSelectedItemsByOne(prev, moveIds, direction);
+      if (next.every((value, index) => value === prev[index])) {
+        return prev;
+      }
+      setOptReorderDirty(true);
       return next;
     });
-    setOptReorderDirty(true);
-  }, []);
+  }, [selectedOptionKeys, selectedVisibleOptions]);
 
   const handleOptRowMove = useCallback((fromIndex: number, toIndex: number) => {
     setOptRowOrder((prev) => {
       if (!prev) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
+      const selectedIds = selectedVisibleOptions
+        .map((item) => item.id)
+        .filter((selectedId) => prev.includes(selectedId));
+      const draggedId = prev[fromIndex];
+      const moveIds = draggedId !== undefined && selectedOptionKeys.includes(String(draggedId)) && selectedIds.length > 1
+        ? selectedIds
+        : [];
+      const next = moveIds.length > 1
+        ? moveSelectedItemsToTarget(prev, moveIds, fromIndex, toIndex)
+        : (() => {
+            const arr = [...prev];
+            const [moved] = arr.splice(fromIndex, 1);
+            if (moved == null) return prev;
+            arr.splice(toIndex, 0, moved);
+            return arr;
+          })();
+      if (next.every((value, index) => value === prev[index])) {
+        return prev;
+      }
+      setOptReorderDirty(true);
       return next;
     });
-    setOptReorderDirty(true);
-  }, []);
+  }, [selectedOptionKeys, selectedVisibleOptions]);
 
   const handleSaveOptReorder = useCallback(async () => {
     if (!optRowOrder || !optReorderDirty || !selectedChoiceSetId) return;
@@ -503,12 +571,11 @@ export default function ChoiceSetManager() {
           await reorderSaveDataFieldChoiceOptions(Number(selectedChoiceSetId), items);
         }, '候補値の表示順を保存中...');
       }
-      setOptRowOrder(null);
       setOptReorderDirty(false);
       setSuccess('候補値の表示順を保存しました。');
       await loadChoiceOptions();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : '候補値の表示順保存に失敗しました。');
+      setError(getGameManagementErrorMessage(saveError, { fallback: resources.gameManagement.errors.reorder }));
     } finally {
       setOptReorderSaving(false);
     }
@@ -529,10 +596,11 @@ export default function ChoiceSetManager() {
   }), [choiceOptionRows, choiceOptions]);
 
   const sortedOptionRows = useMemo(() => {
-    if (!optRowOrder) return choiceOptionRowsWithActions;
-    const rowMap = new Map(choiceOptionRowsWithActions.map((r) => [r.id, r]));
-    return optRowOrder.map((id) => rowMap.get(id)).filter((r): r is typeof choiceOptionRowsWithActions[number] => r !== undefined);
-  }, [choiceOptionRowsWithActions, optRowOrder]);
+    return mergeOrderedOptionRows(choiceOptionRowsWithActions, optRowOrder, (row) => {
+      const option = choiceOptions.find((item) => item.id === row.id);
+      return option?.isDeleted ?? false;
+    });
+  }, [choiceOptionRowsWithActions, optRowOrder, choiceOptions]);
 
   // -----------------------------------------------------------------------
   // Render
@@ -605,67 +673,69 @@ export default function ChoiceSetManager() {
               description={selectedChoiceSet ? `「${selectedChoiceSet.label}」の候補値を管理します。` : '選択肢セットを選択してください。'}
               actions={selectedChoiceSet ? (
                 <>
-                  {optReorderEnabled ? (
-                    <>
-                      <CustomButton variant="accent" disabled={!optReorderDirty || optReorderSaving} onClick={() => void handleSaveOptReorder()}>表示順を保存</CustomButton>
-                      <CustomButton onClick={handleCancelOptReorder}>キャンセル</CustomButton>
-                    </>
-                  ) : pageMode === 'edit' ? (
-                    <>
-                      <CustomButton variant="accent" onClick={openCreateChoiceOptionDialog}>候補値を追加</CustomButton>
-                      {choiceOptions.filter((o) => !o.isDeleted).length > 1 ? (
-                        <CustomButton onClick={handleEnterOptReorder}>表示順の変更</CustomButton>
-                      ) : null}
-                    </>
+                  {pageMode === 'edit' ? (
+                    <CustomButton variant="accent" onClick={openCreateChoiceOptionDialog}>候補値を追加</CustomButton>
                   ) : null}
+                  <CustomButton variant="accent" disabled={!optReorderDirty || optReorderSaving || pageMode === 'view' || activeChoiceOptionCount <= 1} onClick={() => void handleSaveOptReorder()}>表示順を保存</CustomButton>
                 </>
               ) : null}
             >
               {selectedChoiceSet ? (
-                <DataTable
-                  key={`options:${selectedChoiceSet?.id ?? 'none'}:${optReorderEnabled ? 'reorder' : 'default'}`}
-                  columns={[
-                    ...choiceOptionColumns.map((column) =>
-                      optReorderEnabled
-                        ? { ...column, sortable: false, filterable: false }
-                        : column
-                    ),
-                    {
-                      key: 'actions',
-                      header: '操作',
-                      render: (_, row) => {
-                        const opt = choiceOptions.find((item) => item.id === row.id)!;
-                        if (optReorderEnabled) {
-                          const idx = optRowOrder!.indexOf(row.id);
+                <div className="space-y-4">
+                  <div className="flex items-center justify-end gap-3 text-sm">
+                    {selectedVisibleOptions.length > 0 && effectiveOptReorderEnabled ? (
+                      <span className="text-xs text-zinc-500 dark:text-zinc-300">
+                        選択中: {selectedVisibleOptions.length} 件（Shift+クリックで範囲選択、上下移動でまとめて並び替え）
+                      </span>
+                    ) : null}
+                    {!effectiveOptReorderEnabled && optReorderDisabledReason && (
+                      <span className="text-xs text-amber-600 dark:text-amber-400">{optReorderDisabledReason}</span>
+                    )}
+                  </div>
+                  <DataTable
+                    key={`options:${selectedChoiceSet?.id ?? 'none'}`}
+                    columns={[
+                      ...choiceOptionColumns,
+                      {
+                        key: 'actions',
+                        header: '操作',
+                        render: (_, row) => {
+                          const opt = choiceOptions.find((item) => item.id === row.id)!;
+                          const idx = optRowOrder?.indexOf(row.id) ?? -1;
                           return (
-                            <RowMoveButtons
-                              isFirst={idx === 0}
-                              isLast={idx === optRowOrder!.length - 1}
-                              disabled={optReorderSaving}
-                              onMoveUp={() => handleMoveOption(row.id, 'up')}
-                              onMoveDown={() => handleMoveOption(row.id, 'down')}
-                            />
+                            <div className="flex flex-wrap gap-2">
+                              <RowMoveButtons
+                                isFirst={idx <= 0}
+                                isLast={idx === (optRowOrder?.length ?? 0) - 1}
+                                disabled={!effectiveOptReorderEnabled || optReorderSaving}
+                                onMoveUp={() => handleMoveOption(row.id, 'up')}
+                                onMoveDown={() => handleMoveOption(row.id, 'down')}
+                              />
+                              <CustomButton onClick={() => openEditChoiceOptionDialog(opt)}>{pageMode === 'view' ? '詳細' : '編集'}</CustomButton>
+                              {pageMode === 'edit' && (
+                                <CustomButton variant="ghost" onClick={() => void handleDeleteChoiceOption(opt)}>削除</CustomButton>
+                              )}
+                            </div>
                           );
-                        }
-                        return (
-                          <div className="flex flex-wrap gap-2">
-                            <CustomButton onClick={() => openEditChoiceOptionDialog(opt)}>{pageMode === 'view' ? '詳細' : '編集'}</CustomButton>
-                            {pageMode === 'edit' && (
-                              <CustomButton variant="ghost" onClick={() => void handleDeleteChoiceOption(opt)}>削除</CustomButton>
-                            )}
-                          </div>
-                        );
+                        },
                       },
-                    },
-                  ]}
-                  data={sortedOptionRows}
-                  height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
-                  rowKey="id"
-                  emptyMessage="候補値がありません。"
-                  paginated
-                  rowReorderEnabled={optReorderEnabled}
-                  onRowMove={handleOptRowMove}
-                />
+                    ]}
+                    data={sortedOptionRows}
+                    height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
+                    rowKey="id"
+                    selectable
+                    selectedKeys={selectedOptionKeys}
+                    onSelectionChange={setSelectedOptionKeys}
+                    emptyMessage="候補値がありません。"
+                    paginated
+                    rowReorderEnabled={effectiveOptReorderEnabled}
+                    rowReorderDisabledReason={optReorderDisabledReason}
+                    onRowMove={handleOptRowMove}
+                    sortState={optSortState}
+                    onSortChange={setOptSortState}
+                    onFilteredDataChange={handleOptFilteredDataChange}
+                  />
+                </div>
               ) : (
                 <p className="text-sm text-zinc-500">上の一覧から選択肢セットを選んでください。</p>
               )}
@@ -677,6 +747,7 @@ export default function ChoiceSetManager() {
         <Dialog
           open={choiceSetDialogOpen}
           onClose={closeChoiceSetDialog}
+          closeDisabled={isPending}
           title={editingChoiceSet ? (pageMode === 'view' ? '選択肢セットの詳細' : '選択肢セットを編集') : '選択肢セットを追加'}
           footer={
             pageMode === 'view' && editingChoiceSet ? (
@@ -722,6 +793,7 @@ export default function ChoiceSetManager() {
         <Dialog
           open={choiceOptionDialogOpen}
           onClose={() => setChoiceOptionDialogOpen(false)}
+          closeDisabled={isPending}
           title={editingChoiceOption ? (pageMode === 'view' ? '候補値の詳細' : '候補値を編集') : '候補値を追加'}
           footer={
             pageMode === 'view' && editingChoiceOption ? (
@@ -760,10 +832,12 @@ export default function ChoiceSetManager() {
               <CustomLabel htmlFor="choice-option-description">説明</CustomLabel>
               <CustomTextArea id="choice-option-description" value={choiceOptionForm.description} onChange={(event) => setChoiceOptionForm((current) => ({ ...current, description: event.target.value }))} displayOnly={pageMode === 'view' && !!editingChoiceOption} />
             </div>
-            <div className="space-y-2">
-              <CustomLabel htmlFor="choice-option-order">{editingChoiceOption ? '表示順' : '表示順（任意）'}</CustomLabel>
-              <CustomTextBox id="choice-option-order" type="number" min={1} step="1" value={choiceOptionForm.displayOrder} placeholder={editingChoiceOption ? '1' : '未入力で末尾に追加'} onChange={(event) => setChoiceOptionForm((current) => ({ ...current, displayOrder: event.target.value }))} displayOnly={pageMode === 'view' && !!editingChoiceOption} />
-            </div>
+            {!editingChoiceOption ? (
+              <div className="space-y-2">
+                <CustomLabel htmlFor="choice-option-order">表示順（任意）</CustomLabel>
+                <CustomTextBox id="choice-option-order" type="number" min={1} step="1" value={choiceOptionForm.displayOrder} placeholder="未入力で末尾に追加" onChange={(event) => setChoiceOptionForm((current) => ({ ...current, displayOrder: event.target.value }))} displayOnly={false} />
+              </div>
+            ) : null}
           </div>
         </Dialog>
       </div>

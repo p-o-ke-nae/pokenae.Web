@@ -1,4 +1,4 @@
-import type { ResourceKey, SelectOption } from '@/lib/game-management/types';
+import type { ResourceKey, SelectOption } from '../../../lib/game-management/types';
 
 export type ManagementTableRow = {
   tableRowKey: string;

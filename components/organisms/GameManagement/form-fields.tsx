@@ -75,9 +75,9 @@ export function FormFields({
       ? [{ value: formState.storyProgressDefinitionId, label: `現在の値 #${formState.storyProgressDefinitionId}（利用不可）`, disabled: true }]
       : []),
   ], true);
-  const displayOrderField = (
+  const displayOrderField = isNew ? (
     <div className="space-y-2">
-      <CustomLabel htmlFor="displayOrder">{isNew ? '表示順（任意）' : '表示順'}</CustomLabel>
+      <CustomLabel htmlFor="displayOrder">表示順（任意）</CustomLabel>
       <CustomTextBox
         id="displayOrder"
         type="number"
@@ -90,7 +90,7 @@ export function FormFields({
         displayOnly={displayOnly}
       />
     </div>
-  );
+  ) : null;
 
   switch (resourceKey) {
     case 'account-type-masters': {

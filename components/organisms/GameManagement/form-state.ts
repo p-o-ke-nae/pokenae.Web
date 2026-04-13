@@ -1,4 +1,4 @@
-import { createDynamicFieldValueMapFromSaveData } from '@/lib/game-management/save-data-fields';
+import { createDynamicFieldValueMapFromSaveData } from '../../../lib/game-management/save-data-fields';
 import type {
   AccountDto,
   AccountTypeMasterDto,
@@ -13,7 +13,7 @@ import type {
   MemoryCardEditionMasterDto,
   ResourceKey,
   SaveDataDto,
-} from '@/lib/game-management/types';
+} from '../../../lib/game-management/types';
 import type { FormState } from './view-types';
 
 export function createEmptyFormState(): FormState {
@@ -60,6 +60,22 @@ export function createSeededFormState(initialValues?: Partial<FormState>): FormS
     gameConsoleCategoryIds: initialValues.gameConsoleCategoryIds ?? base.gameConsoleCategoryIds,
     linkedGameConsoleIds: initialValues.linkedGameConsoleIds ?? base.linkedGameConsoleIds,
     dynamicFieldValues: initialValues.dynamicFieldValues ?? base.dynamicFieldValues,
+  };
+}
+
+export function createContinueFormState(
+  resourceKey: ResourceKey,
+  currentFormState: FormState,
+  initialValues?: Partial<FormState>,
+): FormState {
+  if (resourceKey !== 'game-softwares') {
+    return createSeededFormState(initialValues);
+  }
+
+  return {
+    ...createEmptyFormState(),
+    gameSoftwareMasterId: currentFormState.gameSoftwareMasterId,
+    variant: currentFormState.variant,
   };
 }
 

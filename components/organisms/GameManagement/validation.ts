@@ -21,7 +21,9 @@ export function validateForm(
   saveDataSchema: SaveDataSchemaDto | null,
   storyProgressSchema: StoryProgressSchemaDto | null,
 ): string[] {
-  const displayOrderError = validateDisplayOrder(formState.displayOrder, { required: !isNew });
+  const displayOrderError = isNew
+    ? validateDisplayOrder(formState.displayOrder, { required: false })
+    : '';
 
   switch (resourceKey) {
     case 'account-type-masters':

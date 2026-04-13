@@ -9,11 +9,12 @@ import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import {
-  ApiError,
   fetchCompatibilities,
   setCompatibilities,
   fetchMasterLookups,
+  getGameManagementErrorMessage,
 } from '@/lib/game-management/api';
+import resources from '@/lib/resources';
 import type {
   GameConsoleCategoryCompatibilityDto,
   GameConsoleCategoryDto,
@@ -50,10 +51,10 @@ export default function CompatibilityManager() {
         }
       } catch (err) {
         if (!cancelled) {
-          const msg = err instanceof ApiError && err.statusCode === 403
-            ? '管理者権限が必要です。このリソースへのアクセスにはバックエンドの Admin ロールが必要です。'
-            : err instanceof Error ? err.message : 'マスタデータの取得に失敗しました。';
-          setError(msg);
+          setError(getGameManagementErrorMessage(err, {
+            fallback: resources.gameManagement.errors.listLoad,
+            adminFallback: resources.gameManagement.errors.adminRequired,
+          }));
         }
       } finally {
         if (!cancelled) setPageLoading(false);
@@ -77,8 +78,7 @@ export default function CompatibilityManager() {
       setCurrentCompatibilities(data);
       setSelectedSupportedIds(data.map((c) => c.supportedGameConsoleCategoryId));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '互換設定の取得に失敗しました。';
-      setError(msg);
+      setError(getGameManagementErrorMessage(err, { fallback: resources.gameManagement.errors.detailLoad }));
       setCurrentCompatibilities([]);
       setSelectedSupportedIds([]);
     } finally {
@@ -126,8 +126,7 @@ export default function CompatibilityManager() {
       }, '互換設定を保存中...');
       setSuccess('互換設定を保存しました。');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '互換設定の保存に失敗しました。';
-      setError(msg);
+      setError(getGameManagementErrorMessage(err, { fallback: resources.gameManagement.errors.save }));
     } finally {
       setSaving(false);
     }

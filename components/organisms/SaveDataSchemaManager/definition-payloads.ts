@@ -12,7 +12,6 @@ export type DefinitionPayloadInput = {
   label: string;
   description: string;
   fieldType: string;
-  isRequired: boolean;
   sharedChoiceSetId: string;
 };
 
@@ -58,7 +57,6 @@ export function parseDefinitionFieldType(value: string): SaveDataFieldType {
 
 export function createDefinitionCreateRequest(
   input: DefinitionPayloadInput,
-  displayOrder: number | null,
 ): CreateSaveDataFieldDefinitionRequest {
   const fieldType = parseDefinitionFieldType(input.fieldType);
   const sharedChoiceSetId = resolveSharedChoiceSetId(fieldType, input.sharedChoiceSetId);
@@ -68,20 +66,19 @@ export function createDefinitionCreateRequest(
     label: input.label.trim(),
     description: nullIfBlank(input.description),
     fieldType: SAVE_DATA_FIELD_TYPE_NAMES[fieldType],
-    ...(displayOrder != null ? { displayOrder } : {}),
-    isRequired: input.isRequired,
     sharedChoiceSetId,
   };
 }
 
 export function createDefinitionUpdateRequestFromForm(
   input: DefinitionPayloadInput,
-  displayOrder: number,
 ): UpdateSaveDataFieldDefinitionRequest {
   const fieldType = parseDefinitionFieldType(input.fieldType);
   return {
-    ...createDefinitionCreateRequest(input, displayOrder),
+    fieldKey: input.fieldKey.trim(),
+    label: input.label.trim(),
+    description: nullIfBlank(input.description),
     fieldType: SAVE_DATA_FIELD_TYPE_NAMES[fieldType],
-    displayOrder,
+    sharedChoiceSetId: resolveSharedChoiceSetId(fieldType, input.sharedChoiceSetId),
   };
 }

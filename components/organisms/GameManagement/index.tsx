@@ -16,12 +16,13 @@ import {
 import RowMoveButtons from '@/components/organisms/GameManagement/RowMoveButtons';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import {
-  ApiError,
   fetchMasterLookups,
   fetchPublicMasterLookups,
   fetchAuthenticatedUserLookups,
+  getGameManagementErrorMessage,
   reorderResource,
 } from '@/lib/game-management/api';
+import resources from '@/lib/resources';
 import {
   fetchPublicSaveDataSchema,
   fetchPublicStoryProgressSchema,
@@ -134,6 +135,226 @@ function mergeVisibleRowIdsIntoOrder(
 
 function ordersEqual(left: number[], right: number[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+// ---------------------------------------------------------------------------
+// Child table (game-software-masters inside expanded content groups)
+// ---------------------------------------------------------------------------
+
+type ContentGroupChildTableProps = {
+  contentGroupId: number;
+  childRows: SaveDataListRow[];
+  parentReorderEnabled: boolean;
+  parentReorderDisabledReason: string | undefined;
+  canCreateSoftware: boolean;
+  openEditorDialog: (options: OpenEditorDialogOptions) => void;
+  onDataChanged: () => void;
+};
+
+function ContentGroupChildTable({
+  contentGroupId,
+  childRows,
+  parentReorderEnabled,
+  parentReorderDisabledReason,
+  canCreateSoftware,
+  openEditorDialog,
+  onDataChanged,
+}: ContentGroupChildTableProps) {
+  const { startLoading } = useLoadingOverlay();
+
+  const [localRowOrder, setLocalRowOrder] = useState<number[]>(() => childRows.map((r) => r.id));
+  const [isDirty, setIsDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [sortState, setSortState] = useState<SortState | null>(null);
+  const [filteredCount, setFilteredCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!isDirty) {
+      setLocalRowOrder(childRows.map((r) => r.id));
+    }
+  }, [childRows, isDirty]);
+
+  const orderedChildRows = useMemo<SaveDataListRow[]>(() => {
+    const rowMap = new Map(childRows.map((r) => [r.id, r]));
+    return localRowOrder.map((id) => rowMap.get(id)).filter((r): r is SaveDataListRow => r !== undefined);
+  }, [childRows, localRowOrder]);
+
+  const isSortActive = sortState !== null;
+  const isFilterActive = filteredCount !== null && filteredCount !== childRows.length;
+  const effectiveReorderEnabled = parentReorderEnabled && !isSortActive && !isFilterActive;
+  const reorderDisabledReason = !parentReorderEnabled
+    ? parentReorderDisabledReason
+    : isSortActive
+      ? 'ソートを解除すると並び替えできます'
+      : isFilterActive
+        ? 'フィルタを解除すると並び替えできます'
+        : undefined;
+
+  const handleFilteredDataChange = useCallback((data: Record<string, unknown>[]) => {
+    setFilteredCount(data.length);
+  }, []);
+
+  const selectedVisibleCount = useMemo(
+    () => orderedChildRows.filter((row) => selectedKeys.includes(row.tableRowKey)).length,
+    [orderedChildRows, selectedKeys],
+  );
+
+  const handleSelectionAwareMove = useCallback((rowKey: string, rowId: number, direction: 'up' | 'down') => {
+    setLocalRowOrder((prev) => {
+      const selectedVisibleIds = orderedChildRows
+        .filter((row) => selectedKeys.includes(row.tableRowKey))
+        .map((row) => row.id);
+      const moveIds = selectedKeys.includes(rowKey) && selectedVisibleIds.length > 0
+        ? selectedVisibleIds
+        : [rowId];
+      const next = moveSelectedItemsByOne(prev, moveIds, direction);
+      if (ordersEqual(prev, next)) return prev;
+      setIsDirty(true);
+      return next;
+    });
+  }, [orderedChildRows, selectedKeys]);
+
+  const handleRowMove = useCallback((fromIndex: number, toIndex: number) => {
+    setLocalRowOrder((prev) => {
+      const draggedRow = orderedChildRows[fromIndex];
+      if (!draggedRow) return prev;
+      const selectedVisibleIds = orderedChildRows
+        .filter((row) => selectedKeys.includes(row.tableRowKey))
+        .map((row) => row.id);
+      const next = selectedKeys.includes(draggedRow.tableRowKey) && selectedVisibleIds.length > 1
+        ? moveSelectedItemsToTarget(prev, selectedVisibleIds, fromIndex, toIndex)
+        : (() => {
+            const arr = [...prev];
+            const [moved] = arr.splice(fromIndex, 1);
+            if (moved == null) return prev;
+            arr.splice(toIndex, 0, moved);
+            return arr;
+          })();
+      if (ordersEqual(prev, next)) return prev;
+      setIsDirty(true);
+      return next;
+    });
+  }, [orderedChildRows, selectedKeys]);
+
+  const handleSave = useCallback(async () => {
+    if (!isDirty || saving) return;
+    setSaving(true);
+    try {
+      const dtoMap = new Map(childRows.map((r) => [r.id, r]));
+      const items = localRowOrder
+        .map((id, index) => {
+          const newDisplayOrder = index + 1;
+          const dto = dtoMap.get(id);
+          if ((dto as { displayOrder?: number } | undefined)?.displayOrder === newDisplayOrder) return null;
+          return { id, displayOrder: newDisplayOrder };
+        })
+        .filter((item): item is { id: number; displayOrder: number } => item !== null);
+
+      if (items.length > 0) {
+        await startLoading(async () => {
+          await reorderResource('game-software-masters', items);
+        }, 'ゲームソフトマスタの表示順を保存中...');
+      }
+      setIsDirty(false);
+      onDataChanged();
+    } catch {
+      // Error handled by parent via reload
+    } finally {
+      setSaving(false);
+    }
+  }, [isDirty, saving, childRows, localRowOrder, startLoading, onDataChanged]);
+
+  const columns = useMemo<DataTableColumn<SaveDataListRow>[]>(() => {
+    return getGameSoftwareMasterChildTableColumns().map((column) => {
+      if (column.key !== 'edit') {
+        return column as DataTableColumn<SaveDataListRow>;
+      }
+
+      return {
+        ...column,
+        width: '11rem',
+        render: (_: unknown, row: SaveDataListRow, rowIndex: number) => (
+          <span className="inline-flex items-center gap-2">
+            <RowMoveButtons
+              isFirst={rowIndex === 0}
+              isLast={rowIndex === orderedChildRows.length - 1}
+              disabled={!effectiveReorderEnabled}
+              onMoveUp={() => handleSelectionAwareMove(row.tableRowKey, row.id, 'up')}
+              onMoveDown={() => handleSelectionAwareMove(row.tableRowKey, row.id, 'down')}
+            />
+            <button
+              type="button"
+              onClick={() => openEditorDialog({
+                resourceKey: 'game-software-masters',
+                recordId: row.id,
+                parentContentGroupId: row.parentContentGroupId ?? null,
+              })}
+              className="text-sm font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+            >
+              編集
+            </button>
+          </span>
+        ),
+      } satisfies DataTableColumn<SaveDataListRow>;
+    });
+  }, [effectiveReorderEnabled, handleSelectionAwareMove, openEditorDialog, orderedChildRows.length]);
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-zinc-200/80 bg-white/85 p-3 dark:border-zinc-800/80 dark:bg-zinc-950/70">
+      <DataTable
+        title="ゲームソフトマスタ"
+        titleActions={
+          <span className="inline-flex items-center gap-2">
+            {canCreateSoftware ? (
+              <CustomButton
+                variant="neutral"
+                onClick={() => openEditorDialog({
+                  resourceKey: 'game-software-masters',
+                  initialFormState: { contentGroupId: String(contentGroupId) },
+                  parentContentGroupId: contentGroupId,
+                })}
+              >
+                ソフト追加
+              </CustomButton>
+            ) : null}
+            <CustomButton
+              onClick={() => void handleSave()}
+              disabled={!isDirty || saving}
+            >
+              表示順を保存
+            </CustomButton>
+          </span>
+        }
+        columns={columns}
+        data={orderedChildRows}
+        height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
+        rowKey="tableRowKey"
+        selectable
+        selectedKeys={selectedKeys}
+        onSelectionChange={setSelectedKeys}
+        resizable
+        emptyMessage="子データがありません。"
+        className="game-management__child-table"
+        rowReorderEnabled={effectiveReorderEnabled}
+        rowReorderDisabledReason={reorderDisabledReason}
+        onRowMove={handleRowMove}
+        sortState={sortState}
+        onSortChange={setSortState}
+        onFilteredDataChange={handleFilteredDataChange}
+      />
+      <div className="flex items-center justify-end gap-3 text-sm">
+        {selectedVisibleCount > 0 && effectiveReorderEnabled ? (
+          <span className="text-xs text-zinc-500 dark:text-zinc-300">
+            選択中: {selectedVisibleCount} 件（Shift+クリックで範囲選択、上下移動でまとめて並び替え）
+          </span>
+        ) : null}
+        {!effectiveReorderEnabled && reorderDisabledReason && (
+          <span className="text-xs text-amber-600 dark:text-amber-400">{reorderDisabledReason}</span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function GameManagementDashboard({
@@ -266,10 +487,10 @@ export function GameManagementDashboard({
       }
       setLookups(result);
     } catch (loadError) {
-      const msg = loadError instanceof ApiError && loadError.statusCode === 403
-        ? '管理者権限が必要です。このリソースへのアクセスにはバックエンドの Admin ロールが必要です。'
-        : loadError instanceof Error ? loadError.message : '一覧の取得に失敗しました。';
-      setError(msg);
+      setError(getGameManagementErrorMessage(loadError, {
+        fallback: resources.gameManagement.errors.listLoad,
+        adminFallback: resources.gameManagement.errors.adminRequired,
+      }));
     } finally {
       setLoading(false);
     }
@@ -585,6 +806,7 @@ export function GameManagementDashboard({
   const selectedVisibleRowCount = useMemo(() => (
     rows.filter((row) => selectedRowKeys.includes(row.tableRowKey)).length
   ), [rows, selectedRowKeys]);
+  const bulkEditAvailable = pageMode === 'edit' && !!definition.bulkEditableFields && definition.bulkEditableFields.length > 0;
 
   const editorRowIds = useMemo(() => {
     if (!editorContext || !lookups) {
@@ -685,6 +907,7 @@ export function GameManagementDashboard({
       case 'memory-cards': return lk.memoryCards as Array<{ id: number } & Record<string, unknown>>;
       case 'memory-card-edition-masters': return lk.memoryCardEditionMasters as Array<{ id: number } & Record<string, unknown>>;
       case 'save-datas': return lk.saveDatas as Array<{ id: number } & Record<string, unknown>>;
+      default: return [];
     }
   }, []);
 
@@ -728,7 +951,7 @@ export function GameManagementDashboard({
         setLocalRowOrder(null);
         await load();
       } catch (saveErr) {
-        setSaveError(saveErr instanceof Error ? saveErr.message : '表示順の保存に失敗しました。');
+        setSaveError(getGameManagementErrorMessage(saveErr, { fallback: resources.gameManagement.errors.reorder }));
       } finally {
         setSaving(false);
       }
@@ -902,30 +1125,7 @@ export function GameManagementDashboard({
     });
   }, [expandedRowKeys, handleSelectionAwareRowMove, isTrial, lookups, openEditorDialog, reorderEnabled, resourceKey, rows.length, saveDataFieldHeaders, selectedContentGroupIdNumber, softwareMasterDefinition.canCreate]);
 
-  const childTableColumns = useMemo((): DataTableColumn<SaveDataListRow>[] => {
-    return getGameSoftwareMasterChildTableColumns().map((column) => {
-      if (column.key !== 'edit') {
-        return column as DataTableColumn<SaveDataListRow>;
-      }
 
-      return {
-        ...column,
-        render: (_: unknown, row: SaveDataListRow) => (
-          <button
-            type="button"
-            onClick={() => openEditorDialog({
-              resourceKey: 'game-software-masters',
-              recordId: row.id,
-              parentContentGroupId: row.parentContentGroupId ?? null,
-            })}
-            className="text-sm font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
-          >
-            編集
-          </button>
-        ),
-      } satisfies DataTableColumn<SaveDataListRow>;
-    });
-  }, [openEditorDialog]);
 
   const dataTableKey = resourceKey === 'save-datas'
     ? `${resourceKey}:${selectedContentGroupId || 'all'}:${dynamicColumnSignature}`
@@ -996,8 +1196,9 @@ export function GameManagementDashboard({
                     選択中: {selectedVisibleRowCount} 件（Shift+クリックで範囲選択、上下移動でまとめて並び替え）
                   </span>
                 ) : null}
-                {selectedVisibleRowCount >= 2 && definition.bulkEditableFields && definition.bulkEditableFields.length > 0 && pageMode === 'edit' ? (
+                {bulkEditAvailable ? (
                   <CustomButton
+                    disabled={selectedVisibleRowCount < 2}
                     onClick={() => {
                       const ids = rows
                         .filter((row) => selectedRowKeys.includes(row.tableRowKey))
@@ -1039,39 +1240,23 @@ export function GameManagementDashboard({
               renderExpandedContent={resourceKey === 'game-software-content-groups'
                 ? (row) => {
                   const childRows = (row.children ?? []) as SaveDataListRow[];
-
                   return (
-                    <div className="space-y-3 rounded-2xl border border-zinc-200/80 bg-white/85 p-3 dark:border-zinc-800/80 dark:bg-zinc-950/70">
-                      <DataTable
-                        title="ゲームソフトマスタ"
-                        titleActions={softwareMasterDefinition.canCreate ? (
-                          <CustomButton
-                            variant="neutral"
-                            onClick={() => openEditorDialog({
-                              resourceKey: 'game-software-masters',
-                              initialFormState: { contentGroupId: String(row.id) },
-                              parentContentGroupId: row.id,
-                            })}
-                          >
-                            ソフト追加
-                          </CustomButton>
-                        ) : undefined}
-                        columns={childTableColumns}
-                        data={childRows}
-                        height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
-                        rowKey="tableRowKey"
-                        resizable
-                        emptyMessage="子データがありません。"
-                        className="game-management__child-table"
-                      />
-                    </div>
+                    <ContentGroupChildTable
+                      contentGroupId={row.id}
+                      childRows={childRows}
+                      parentReorderEnabled={reorderEnabled}
+                      parentReorderDisabledReason={reorderDisabledReason}
+                      canCreateSoftware={softwareMasterDefinition.canCreate}
+                      openEditorDialog={openEditorDialog}
+                      onDataChanged={load}
+                    />
                   );
                 }
                 : undefined}
               expandedKeys={resourceKey === 'game-software-content-groups' ? expandedRowKeys : undefined}
               onExpandChange={resourceKey === 'game-software-content-groups' ? setExpandedRowKeys : undefined}
               emptyMessage="データがありません。"
-              rowReorderEnabled={resourceKey === 'game-software-content-groups' ? false : reorderEnabled}
+              rowReorderEnabled={reorderEnabled}
               rowReorderDisabledReason={reorderDisabledReason}
               onRowMove={handleRowMove}
               sortState={sortState}

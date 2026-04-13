@@ -11,7 +11,7 @@ import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/lib/auth/auth-options';
 import { getApiClient } from '@/lib/api/client-factory';
 import type { ApiServiceName } from '@/lib/config/api-config';
-import { createSuccessResponse, createErrorResponse } from '@/lib/api/route-helpers';
+import { createSuccessResponse, createErrorResponse, createSafeErrorResponse, getSafeRouteErrorMessage } from '@/lib/api/route-helpers';
 import { RESOURCE_DEFINITIONS } from '@/lib/game-management/resources';
 
 /** 許可されたバックエンド API パスのセット（ResourceDefinition.apiPath からビルド） */
@@ -124,13 +124,13 @@ export async function POST(request: NextRequest) {
             if (!rbResponse.success) {
               rollbackFailures.push({
                 id: rbItem.id,
-                error: rbResponse.error.message,
+                error: getSafeRouteErrorMessage(rbResponse.error.code),
               });
             }
-          } catch (rbError) {
+          } catch {
             rollbackFailures.push({
               id: rbItem.id,
-              error: rbError instanceof Error ? rbError.message : 'Unknown rollback error',
+              error: getSafeRouteErrorMessage('INTERNAL_ERROR', 500),
             });
           }
         }
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
         const errorResult: BatchErrorResult = {
           failedItemId: item.id,
           failedIndex: i,
-          error: response.error.message,
+          error: getSafeRouteErrorMessage(response.error.code, statusCode),
           rollbackSuccess: rollbackFailures.length === 0,
           rollbackFailures,
         };
@@ -167,10 +167,6 @@ export async function POST(request: NextRequest) {
     return createSuccessResponse(successResult);
   } catch (error) {
     console.error('Batch display order update error:', error);
-    return createErrorResponse(
-      'INTERNAL_ERROR',
-      error instanceof Error ? error.message : '表示順の一括更新中に予期せぬエラーが発生しました。',
-      500,
-    );
+    return createSafeErrorResponse('INTERNAL_ERROR', 500);
   }
 }

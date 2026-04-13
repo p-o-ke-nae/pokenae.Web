@@ -41,10 +41,7 @@ export async function dispatchSave(
   recordId: string | undefined,
   saveDataSchema: SaveDataSchemaDto | null,
 ): Promise<number | null> {
-  const displayOrder = parsePositiveInteger(formState.displayOrder);
-  if (!isNew && !displayOrder) {
-    throw new Error('表示順は1以上の整数で入力してください。');
-  }
+  const displayOrder = isNew ? parsePositiveInteger(formState.displayOrder) : null;
 
   if (isTrial) {
     return dispatchSaveTrial(resourceKey, formState, lookups, isNew, recordId, displayOrder, saveDataSchema);
@@ -77,7 +74,6 @@ function dispatchSaveTrial(
         });
       }
       trialUpdateAccount(Number(recordId), {
-        displayOrder: displayOrder!,
         label: nullIfBlank(formState.label),
         memo: nullIfBlank(formState.memo),
         linkedGameConsoleIds: formState.linkedGameConsoleIds.length > 0 ? formState.linkedGameConsoleIds.map(Number) : null,
@@ -96,7 +92,6 @@ function dispatchSaveTrial(
       }
       trialUpdateGameConsole(Number(recordId), {
         gameConsoleEditionMasterId: numberOrNull(formState.gameConsoleEditionMasterId),
-        displayOrder: displayOrder!,
         label: nullIfBlank(formState.label),
         memo: nullIfBlank(formState.memo),
       });
@@ -118,7 +113,6 @@ function dispatchSaveTrial(
         });
       }
       trialUpdateGameSoftware(Number(recordId), {
-        displayOrder: displayOrder!,
         variant: variantValue,
         accountId: trialAccountId,
         installedGameConsoleId: trialInstalledConsoleId,
@@ -139,7 +133,6 @@ function dispatchSaveTrial(
       }
       trialUpdateMemoryCard(Number(recordId), {
         memoryCardEditionMasterId,
-        displayOrder: displayOrder!,
         label: nullIfBlank(formState.label),
         memo: nullIfBlank(formState.memo),
       });
@@ -153,7 +146,6 @@ function dispatchSaveTrial(
       }
       trialUpdateSaveData(Number(recordId), {
         ...savePayloadBase,
-        displayOrder: displayOrder!,
         replacedBySaveDataId: numberOrNull(formState.replacedBySaveDataId),
       }, derivedType ?? 0, saveDataSchema);
       return null;
@@ -187,7 +179,7 @@ async function dispatchSaveApi(
         ...(displayOrder != null ? { displayOrder } : {}),
       };
       if (isNew) return await createResource('account-type-masters', payload);
-      await updateResource('account-type-masters', id, { ...payload, displayOrder: displayOrder! });
+      await updateResource('account-type-masters', id, payload);
       return null;
     }
     case 'accounts': {
@@ -201,7 +193,6 @@ async function dispatchSaveApi(
         });
       }
       await updateResource('accounts', id, {
-        displayOrder: displayOrder!,
         label: nullIfBlank(formState.label),
         memo: nullIfBlank(formState.memo),
         linkedGameConsoleIds: formState.linkedGameConsoleIds.length > 0 ? formState.linkedGameConsoleIds.map(Number) : null,
@@ -217,7 +208,7 @@ async function dispatchSaveApi(
         ...(displayOrder != null ? { displayOrder } : {}),
       };
       if (isNew) return await createResource('game-console-categories', payload);
-      await updateResource('game-console-categories', id, { ...payload, displayOrder: displayOrder! });
+      await updateResource('game-console-categories', id, payload);
       return null;
     }
     case 'game-console-masters': {
@@ -228,7 +219,7 @@ async function dispatchSaveApi(
         ...(displayOrder != null ? { displayOrder } : {}),
       };
       if (isNew) return await createResource('game-console-masters', payload);
-      await updateResource('game-console-masters', id, { ...payload, displayOrder: displayOrder! });
+      await updateResource('game-console-masters', id, payload);
       return null;
     }
     case 'game-console-edition-masters': {
@@ -239,7 +230,7 @@ async function dispatchSaveApi(
         ...(displayOrder != null ? { displayOrder } : {}),
       };
       if (isNew) return await createResource('game-console-edition-masters', payload);
-      await updateResource('game-console-edition-masters', id, { ...payload, displayOrder: displayOrder! });
+      await updateResource('game-console-edition-masters', id, payload);
       return null;
     }
     case 'game-consoles': {
@@ -254,7 +245,6 @@ async function dispatchSaveApi(
       }
       await updateResource('game-consoles', id, {
         gameConsoleEditionMasterId: numberOrNull(formState.gameConsoleEditionMasterId),
-        displayOrder: displayOrder!,
         label: nullIfBlank(formState.label),
         memo: nullIfBlank(formState.memo),
       });
@@ -266,7 +256,7 @@ async function dispatchSaveApi(
         ...(displayOrder != null ? { displayOrder } : {}),
       };
       if (isNew) return await createResource('game-software-content-groups', payload);
-      await updateResource('game-software-content-groups', id, { ...payload, displayOrder: displayOrder! });
+      await updateResource('game-software-content-groups', id, payload);
       return null;
     }
     case 'game-software-masters': {
@@ -278,7 +268,7 @@ async function dispatchSaveApi(
         ...(displayOrder != null ? { displayOrder } : {}),
       };
       if (isNew) return await createResource('game-software-masters', payload);
-      await updateResource('game-software-masters', id, { ...payload, displayOrder: displayOrder! });
+      await updateResource('game-software-masters', id, payload);
       return null;
     }
     case 'game-softwares': {
@@ -300,7 +290,6 @@ async function dispatchSaveApi(
         variant: variantValue,
         accountId: apiAccountId,
         installedGameConsoleId: apiInstalledConsoleId,
-        displayOrder: displayOrder!,
         label: nullIfBlank(formState.label),
         memo: nullIfBlank(formState.memo),
       });
@@ -318,7 +307,6 @@ async function dispatchSaveApi(
       }
       await updateResource('memory-cards', id, {
         memoryCardEditionMasterId,
-        displayOrder: displayOrder!,
         label: nullIfBlank(formState.label),
         memo: nullIfBlank(formState.memo),
       });
@@ -331,7 +319,7 @@ async function dispatchSaveApi(
         ...(displayOrder != null ? { displayOrder } : {}),
       };
       if (isNew) return await createResource('memory-card-edition-masters', payload);
-      await updateResource('memory-card-edition-masters', id, { ...payload, displayOrder: displayOrder! });
+      await updateResource('memory-card-edition-masters', id, payload);
       return null;
     }
     case 'save-datas': {
@@ -339,7 +327,6 @@ async function dispatchSaveApi(
       if (isNew) return await createResource('save-datas', savePayloadBase);
       await updateResource('save-datas', id, {
         ...savePayloadBase,
-        displayOrder: displayOrder!,
         replacedBySaveDataId: numberOrNull(formState.replacedBySaveDataId),
       });
       return null;
