@@ -34,14 +34,11 @@ function useAsyncResource<T>(
   });
 
   useEffect(() => {
-    let cancelled = false;
-
     if (!enabled) {
-      setState({ data: null, error: null, loading: false });
-      return () => {
-        cancelled = true;
-      };
+      return;
     }
+
+    let cancelled = false;
 
     setState((current) => ({ ...current, loading: true, error: null }));
 
@@ -63,6 +60,10 @@ function useAsyncResource<T>(
       cancelled = true;
     };
   }, [enabled, load]);
+
+  if (!enabled) {
+    return { data: null, error: null, loading: false };
+  }
 
   return state;
 }
