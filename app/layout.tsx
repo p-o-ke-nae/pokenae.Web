@@ -4,6 +4,7 @@ import "./globals.css";
 import NavigationBar from "@/components/organisms/NavigationBar";
 import SessionProvider from "@/components/organisms/SessionProvider";
 import Footer from "@/components/organisms/Footer";
+import TrialImportDialog from "@/components/molecules/TrialImportDialog";
 import { LoadingOverlayProvider } from "@/contexts/LoadingOverlayContext";
 
 const geistSans = Geist({
@@ -41,6 +42,7 @@ export default function RootLayout({
             <NavigationBar />
             {children}
             <Footer />
+            <TrialImportDialog />
           </LoadingOverlayProvider>
         </SessionProvider>
       </body>

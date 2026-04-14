@@ -36,6 +36,8 @@ const CustomLoader = forwardRef<HTMLSpanElement, CustomLoaderProps>(
 						align-items: center;
 						justify-content: center;
 						position: relative;
+						cursor: default;
+						user-select: none;
 					}
 
 					.custom-loader__ring {

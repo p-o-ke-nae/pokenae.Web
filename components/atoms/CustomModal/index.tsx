@@ -6,11 +6,12 @@ import type { HTMLAttributes, ReactNode } from "react";
 export type CustomModalProps = HTMLAttributes<HTMLDialogElement> & {
 	open: boolean;
 	onClose?: () => void;
+	closeDisabled?: boolean;
 	children?: ReactNode;
 };
 
 const CustomModal = forwardRef<HTMLDialogElement, CustomModalProps>(
-	({ open, onClose, children, className = "", ...rest }, ref) => {
+	({ open, onClose, closeDisabled = false, children, className = "", ...rest }, ref) => {
 		const localRef = useRef<HTMLDialogElement>(null);
 
 		const setRef = useCallback(
@@ -35,11 +36,29 @@ const CustomModal = forwardRef<HTMLDialogElement, CustomModalProps>(
 			}
 		}, [open]);
 
+		const handleCancel = useCallback((event: React.SyntheticEvent<HTMLDialogElement, Event>) => {
+			if (closeDisabled) {
+				event.preventDefault();
+			}
+		}, [closeDisabled]);
+
+		const handleClose = useCallback(() => {
+			if (closeDisabled) {
+				const dialog = localRef.current;
+				if (dialog && open && !dialog.open) {
+					dialog.showModal();
+				}
+				return;
+			}
+
+			onClose?.();
+		}, [closeDisabled, onClose, open]);
+
 		const classes = ["custom-modal", className].filter(Boolean).join(" ");
 
 		return (
 			<>
-				<dialog ref={setRef} className={classes} onClose={onClose} {...rest}>
+				<dialog ref={setRef} className={classes} onCancel={handleCancel} onClose={handleClose} {...rest}>
 					{children}
 				</dialog>
 

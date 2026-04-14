@@ -1,6 +1,7 @@
-'use client';
+ 'use client';
 
 import { useRef, useState } from 'react';
+import { getSession } from 'next-auth/react';
 import CustomButton from '@/components/atoms/CustomButton';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomHeader from '@/components/atoms/CustomHeader';
@@ -17,7 +18,7 @@ import CheckboxField from '@/components/molecules/CheckboxField';
 import Dialog from '@/components/molecules/Dialog';
 import RadioField from '@/components/molecules/RadioField';
 import SearchField, { type SearchOption, type SearchFieldColumn } from '@/components/molecules/SearchField';
-import DataTable, { type DataTableColumn, type SortState } from '@/components/molecules/DataTable';
+import DataTable, { DATA_TABLE_DEFAULT_PAGE_HEIGHT, type DataTableColumn, type SortState } from '@/components/molecules/DataTable';
 import { useTableData, omitTrackedFields } from '@/lib/hooks/useTableData';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 
@@ -64,6 +65,7 @@ function AddRowDemo() {
       <DataTable<AddRowPokemon>
         columns={ADD_ROW_COLUMNS}
         data={tableData.rows as AddRowPokemon[]}
+        height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
         rowKey="id"
         onAddRow={tableData.addRow}
       />
@@ -161,6 +163,7 @@ function EditableDemo() {
       <DataTable<EditablePokemon>
         columns={columns}
         data={tableData.rows as EditablePokemon[]}
+        height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
         rowKey="id"
         onAddRow={tableData.addRow}
       />
@@ -228,6 +231,43 @@ export default function ComponentsPage() {
     { key: 'label', header: '名前', searchable: true },
     { key: 'type', header: 'タイプ', width: '6rem', searchable: true },
   ];
+
+  // Debug: サーバー側で受信したヘッダを表示するための状態と実行関数
+  const [dbgHeaders, setDbgHeaders] = useState<Record<string, string> | null>(null);
+  const [dbgLoading, setDbgLoading] = useState(false);
+
+  const fetchDebugHeaders = async (includeToken: boolean) => {
+    setDbgLoading(true);
+    setDbgHeaders(null);
+    try {
+      const headers: Record<string, string> = {};
+      if (includeToken) {
+        try {
+          const session = await getSession();
+          if (session?.accessToken) {
+            headers['Authorization'] = `Bearer ${session.accessToken}`;
+            headers['X-Google-Access-Token'] = session.accessToken;
+          }
+        } catch (err) {
+          console.warn('getSession failed', err);
+        }
+      }
+
+      const res = await fetch('/api/debug/inspect-headers', {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
+
+      const json = await res.json();
+      if (json && json.headers) setDbgHeaders(json.headers);
+      else setDbgHeaders(json);
+    } catch (err) {
+      setDbgHeaders({ error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setDbgLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black p-8">
@@ -552,6 +592,7 @@ export default function ComponentsPage() {
                   { id: '133', name: 'イーブイ', type: 'ノーマル', active: false, score: '60' },
                 ]}
                 rowKey="id"
+                height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
                 selectable
                 selectedKeys={dataTableSelectedKeys}
                 onSelectionChange={setDataTableSelectedKeys}
@@ -588,6 +629,7 @@ export default function ComponentsPage() {
                   { id: '133', name: 'イーブイ', type: 'ノーマル', active: false, score: '60' },
                 ]}
                 rowKey="id"
+                height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
                 resizable
                 sortState={dataTableSortState}
                 onSortChange={setDataTableSortState}
@@ -626,6 +668,7 @@ export default function ComponentsPage() {
                   { id: 'cat-electric', name: '電気タイプ（子なし）', type: '電気系', active: false },
                 ]}
                 rowKey="id"
+                height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
                 childrenKey="children"
               />
             </div>
@@ -646,6 +689,32 @@ export default function ComponentsPage() {
               <EditableDemo />
             </div>
 
+          </div>
+        </section>
+
+        {/* Debug: Auth ヘッダ確認 */}
+        <section className="space-y-4">
+          <CustomHeader level={2}>認証ヘッダ確認（デバッグ）</CustomHeader>
+          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">ボタンを押すと /api/debug/inspect-headers にリクエストを送り、サーバー側で受信したヘッダを表示します。</p>
+            <div className="flex gap-3 mb-4">
+              <CustomButton
+                variant="accent"
+                onClick={async () => await fetchDebugHeaders(true)}
+              >
+                ヘッダ取得（トークン付与）
+              </CustomButton>
+              <CustomButton
+                variant="neutral"
+                onClick={async () => await fetchDebugHeaders(false)}
+              >
+                ヘッダ取得（トークン未付与）
+              </CustomButton>
+            </div>
+            {dbgLoading && <div className="mb-3"><CustomLoader /></div>}
+            {dbgHeaders && (
+              <pre className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded text-sm overflow-auto">{JSON.stringify(dbgHeaders, null, 2)}</pre>
+            )}
           </div>
         </section>
       </div>

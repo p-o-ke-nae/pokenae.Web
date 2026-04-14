@@ -5,6 +5,7 @@
 
 import type { ApiServiceConfig } from '../config/api-config';
 import type { ApiResponse, ApiRequestOptions } from '../types/api';
+import resources from '@/lib/resources';
 
 export class ApiClient {
   private baseUrl: string;
@@ -74,11 +75,12 @@ export class ApiClient {
           data: data as T,
         };
       } else {
+        const safeMessage = resources.apiError.status[response.status] ?? resources.apiError.server.internalError;
         return {
           success: false,
           error: {
             code: `HTTP_${response.status}`,
-            message: data?.message || response.statusText || 'Request failed',
+            message: safeMessage,
             details: data,
           },
         };
@@ -93,7 +95,7 @@ export class ApiClient {
             success: false,
             error: {
               code: 'TIMEOUT',
-              message: 'Request timeout',
+              message: resources.apiError.server.timeout,
               details: { timeout },
             },
           };
@@ -103,7 +105,7 @@ export class ApiClient {
           success: false,
           error: {
             code: 'NETWORK_ERROR',
-            message: error.message,
+            message: resources.apiError.server.network,
             details: error,
           },
         };
@@ -113,7 +115,7 @@ export class ApiClient {
         success: false,
         error: {
           code: 'UNKNOWN_ERROR',
-          message: 'An unknown error occurred',
+          message: resources.apiError.server.unknown,
           details: error,
         },
       };

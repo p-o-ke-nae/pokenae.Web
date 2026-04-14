@@ -6,6 +6,7 @@
 import type { ApiResponse, HttpMethod } from '@/lib/types/api';
 import type { ApiServiceName } from '@/lib/config/api-config';
 import { getSession } from 'next-auth/react';
+import resources from '@/lib/resources';
 
 export interface FrontendApiClientOptions {
   method?: HttpMethod;
@@ -61,6 +62,7 @@ export class FrontendApiClient {
         method,
         headers,
         signal: options.signal,
+        cache: 'no-store',
       };
 
       // GET以外のメソッドでbodyを追加
@@ -80,7 +82,7 @@ export class FrontendApiClient {
         success: false,
         error: {
           code: 'FETCH_ERROR',
-          message: error instanceof Error ? error.message : 'Failed to fetch',
+          message: resources.apiError.generic.network,
           details: error,
         },
       };

@@ -3,15 +3,27 @@
 import { forwardRef } from "react";
 import type { InputHTMLAttributes } from "react";
 
-export type CustomCheckBoxProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type">;
+export type CustomCheckBoxProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
+	displayOnly?: boolean;
+};
 
 const CustomCheckBox = forwardRef<HTMLInputElement, CustomCheckBoxProps>(
-	({ className = "", ...rest }, ref) => {
-		const classes = ["custom-checkbox", className].filter(Boolean).join(" ");
+	({ displayOnly = false, className = "", ...rest }, ref) => {
+		const classes = [
+			"custom-checkbox",
+			displayOnly ? "custom-checkbox--display-only" : "",
+			className,
+		].filter(Boolean).join(" ");
 
 		return (
 			<>
-				<input ref={ref} type="checkbox" className={classes} {...rest} />
+				<input
+					ref={ref}
+					type="checkbox"
+					className={classes}
+					{...rest}
+					{...(displayOnly ? { disabled: true, tabIndex: -1, "aria-disabled": true } : {})}
+				/>
 
 				<style jsx>{`
 					.custom-checkbox {
@@ -58,6 +70,12 @@ const CustomCheckBox = forwardRef<HTMLInputElement, CustomCheckBoxProps>(
 					.custom-checkbox:disabled {
 						opacity: 0.5;
 						cursor: not-allowed;
+					}
+
+					.custom-checkbox--display-only {
+						opacity: 1;
+						cursor: default;
+						pointer-events: none;
 					}
 				`}</style>
 			</>

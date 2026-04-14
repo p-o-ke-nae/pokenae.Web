@@ -5,13 +5,15 @@ import type { TextareaHTMLAttributes } from "react";
 
 export type CustomTextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
 	isError?: boolean;
+	displayOnly?: boolean;
 };
 
 const CustomTextArea = forwardRef<HTMLTextAreaElement, CustomTextAreaProps>(
-	({ isError = false, className = "", ...rest }, ref) => {
+	({ isError = false, displayOnly = false, className = "", ...rest }, ref) => {
 		const classes = [
 			"custom-textarea",
 			isError ? "custom-textarea--error" : "",
+			displayOnly ? "custom-textarea--display-only" : "",
 			className,
 		]
 			.filter(Boolean)
@@ -19,7 +21,13 @@ const CustomTextArea = forwardRef<HTMLTextAreaElement, CustomTextAreaProps>(
 
 		return (
 			<>
-				<textarea ref={ref} className={classes} aria-invalid={isError} {...rest} />
+				<textarea
+					ref={ref}
+					className={classes}
+					aria-invalid={isError}
+					{...rest}
+					{...(displayOnly ? { readOnly: true, tabIndex: -1, "aria-readonly": true } : {})}
+				/>
 
 				<style jsx>{`
 					.custom-textarea {
@@ -34,6 +42,7 @@ const CustomTextArea = forwardRef<HTMLTextAreaElement, CustomTextAreaProps>(
 						line-height: 1.65;
 						resize: vertical;
 						min-height: 6rem;
+						cursor: text;
 						transition:
 							border-color 140ms ease,
 							box-shadow 140ms ease,
@@ -53,6 +62,19 @@ const CustomTextArea = forwardRef<HTMLTextAreaElement, CustomTextAreaProps>(
 						border-color: var(--color-accent-25);
 						background-color: color-mix(in srgb, var(--color-accent-25) 4%, var(--color-base-70-light));
 						box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-25) 20%, transparent);
+					}
+
+					.custom-textarea:read-only {
+						cursor: default;
+						caret-color: transparent;
+					}
+
+					.custom-textarea--display-only {
+						cursor: default;
+						caret-color: transparent;
+						pointer-events: none;
+						user-select: text;
+						resize: none;
 					}
 
 					.custom-textarea--error {

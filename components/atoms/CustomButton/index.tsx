@@ -8,6 +8,7 @@ type Variant = "neutral" | "accent" | "ghost";
 export type CustomButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 	variant?: Variant;
 	isLoading?: boolean;
+	loadingLabel?: ReactNode;
 	icon?: ReactNode;
 	iconPosition?: "left" | "right";
 };
@@ -16,6 +17,7 @@ const CustomButton = forwardRef<HTMLButtonElement, CustomButtonProps>(
 	({
 		variant = "neutral",
 		isLoading = false,
+		loadingLabel,
 		disabled,
 		icon,
 		iconPosition = "left",
@@ -48,7 +50,7 @@ const CustomButton = forwardRef<HTMLButtonElement, CustomButtonProps>(
 						</span>
 					) : null}
 					<span className="custom-button__label">
-						{isLoading ? "Loading..." : children}
+						{isLoading ? (loadingLabel ?? children) : children}
 					</span>
 					{icon && iconPosition === "right" ? (
 						<span className="custom-button__icon" aria-hidden="true">

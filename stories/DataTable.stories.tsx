@@ -204,6 +204,39 @@ export const WithColumnManagement: Story = {
   },
 };
 
+const longContentColumns: DataTableColumn<SampleRow>[] = [
+  { key: 'id', header: 'ID', width: '5rem' },
+  { key: 'name', header: '名前', width: '12rem' },
+  { key: 'category', header: 'カテゴリ', width: '10rem', filterable: true, filterMode: 'select' },
+  { key: 'score', header: 'メモ', width: '12rem' },
+];
+
+const longContentData: SampleRow[] = [
+  {
+    id: '101',
+    name: 'とても長い表示名を持つサンプルデータその1',
+    category: 'かなり長い分類名のサンプル',
+    active: true,
+    score: '横幅を超える値は省略記号付きで表示され、ダブルクリックで自動調整できます。',
+  },
+  {
+    id: '102',
+    name: '別の長文サンプルデータで列幅の追従を確認する',
+    category: '分類候補の長文その2',
+    active: false,
+    score: 'フィルタ列とレコード列の位置が一致することを Storybook 上でも確認するためのデータです。',
+  },
+];
+
+export const WithLongContent: Story = {
+  args: {
+    columns: longContentColumns,
+    data: longContentData,
+    rowKey: 'id',
+    resizable: true,
+  },
+};
+
 // 外部ソート管理
 const ExternalSortDemo = () => {
   const [sortState, setSortState] = useState<SortState | null>(null);

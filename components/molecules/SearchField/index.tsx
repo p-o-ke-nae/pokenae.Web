@@ -180,11 +180,10 @@ const SearchField = ({
 				<div className="search-field__label-row">
 					<CustomTextBox
 						value={displayLabelValue}
-						readOnly
 						placeholder={resources.searchField.labelPlaceholder}
 						isError={hasNoMatch}
 						disabled={disabled}
-						tabIndex={-1}
+						displayOnly
 						className="search-field__label-textbox"
 						aria-label={resources.searchField.labelPlaceholder}
 					/>
