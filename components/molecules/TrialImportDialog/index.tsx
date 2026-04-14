@@ -174,7 +174,7 @@ export default function TrialImportDialog() {
         open
         onClose={handleConfirmNo}
         title="トライアルデータの反映"
-        style={{ width: 'min(90vw, 36rem)', maxHeight: '80vh' }}
+        size="md"
         footer={
           <>
             <CustomButton onClick={handleConfirmNo}>いいえ</CustomButton>
@@ -184,7 +184,7 @@ export default function TrialImportDialog() {
           </>
         }
       >
-        <div className="space-y-4 max-h-[50vh] overflow-y-auto">
+        <div className="space-y-4 max-h-[45dvh] overflow-y-auto sm:max-h-[50vh]">
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
             ブラウザに保存されているトライアルデータが見つかりました。サーバへ反映するデータを選択してください。
           </p>
@@ -254,7 +254,7 @@ export default function TrialImportDialog() {
           </div>
 
           {importResult.items.filter((i) => i.status !== 'success').length > 0 && (
-            <div className="space-y-1 max-h-[30vh] overflow-y-auto">
+            <div className="space-y-1 max-h-[28dvh] overflow-y-auto sm:max-h-[30vh]">
               {importResult.items
                 .filter((i) => i.status !== 'success')
                 .map((item) => (

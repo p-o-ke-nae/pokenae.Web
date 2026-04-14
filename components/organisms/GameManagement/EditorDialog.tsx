@@ -5,7 +5,7 @@ import CustomButton from '@/components/atoms/CustomButton';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
-import Dialog from '@/components/molecules/Dialog';
+import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import {
   fetchResourceById,
@@ -380,37 +380,39 @@ export default function EditorDialog({
         title={`${definition.shortLabel}${isNew ? '作成' : isViewMode ? '詳細' : '編集'}`}
         size={resourceKey === 'save-datas' ? 'lg' : 'md'}
         footer={
-          <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              {isPending ? (
-                <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">
-                  保存中はダイアログを閉じられません。
-                </span>
-              ) : null}
-              {!isNew && (
-                <>
-                  <CustomButton
-                    disabled={!canGoPrev || loading}
-                    onClick={() => navigate('prev')}
-                  >
-                    ← 前へ
-                  </CustomButton>
-                  <CustomButton
-                    disabled={!canGoNext || loading}
-                    onClick={() => navigate('next')}
-                  >
-                    次へ →
-                  </CustomButton>
-                  {currentIndex >= 0 && (
-                    <span className="text-xs text-zinc-500">
-                      {currentIndex + 1} / {rowIds.length}
-                    </span>
-                  )}
-                </>
-              )}
-            </div>
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              {isViewMode && onPageModeChange ? (
+          <DialogFooterLayout
+            leading={
+              <>
+                {isPending ? (
+                  <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">
+                    保存中はダイアログを閉じられません。
+                  </span>
+                ) : null}
+                {!isNew && (
+                  <>
+                    <CustomButton
+                      disabled={!canGoPrev || loading}
+                      onClick={() => navigate('prev')}
+                    >
+                      ← 前へ
+                    </CustomButton>
+                    <CustomButton
+                      disabled={!canGoNext || loading}
+                      onClick={() => navigate('next')}
+                    >
+                      次へ →
+                    </CustomButton>
+                    {currentIndex >= 0 && (
+                      <span className="text-xs text-zinc-500">
+                        {currentIndex + 1} / {rowIds.length}
+                      </span>
+                    )}
+                  </>
+                )}
+              </>
+            }
+            trailing={
+              isViewMode && onPageModeChange ? (
                 <>
                   <CustomButton onClick={onClose} disabled={isPending}>閉じる</CustomButton>
                   <CustomButton variant="accent" disabled={isPending} onClick={() => onPageModeChange('edit')}>
@@ -445,9 +447,9 @@ export default function EditorDialog({
                     </CustomButton>
                   ) : null}
                 </>
-              )}
-            </div>
-          </div>
+              )
+            }
+          />
         }
       >
         <div ref={bodyRef} className="space-y-4">
