@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import Dialog from '../components/molecules/Dialog';
+import Dialog, { DialogFooterLayout } from '../components/molecules/Dialog';
 import CustomButton from '../components/atoms/CustomButton';
 import { useState } from 'react';
 
@@ -146,20 +146,24 @@ const SplitFooterDemo = () => {
         title="セーブデータ編集"
         size="md"
         footer={
-          <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <CustomButton disabled>← 前へ</CustomButton>
-              <CustomButton>次へ →</CustomButton>
-              <span className="text-xs text-zinc-500">2 / 15</span>
-            </div>
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              <CustomButton variant="ghost" onClick={() => setOpen(false)}>削除</CustomButton>
-              <CustomButton onClick={() => setOpen(false)}>キャンセル</CustomButton>
-              <CustomButton variant="accent" onClick={() => setOpen(false)}>
-                保存する
-              </CustomButton>
-            </div>
-          </div>
+          <DialogFooterLayout
+            leading={
+              <>
+                <CustomButton disabled>← 前へ</CustomButton>
+                <CustomButton>次へ →</CustomButton>
+                <span className="text-xs text-zinc-500">2 / 15</span>
+              </>
+            }
+            trailing={
+              <>
+                <CustomButton variant="ghost" onClick={() => setOpen(false)}>削除</CustomButton>
+                <CustomButton onClick={() => setOpen(false)}>キャンセル</CustomButton>
+                <CustomButton variant="accent" onClick={() => setOpen(false)}>
+                  保存する
+                </CustomButton>
+              </>
+            }
+          />
         }
       >
         <p>ナビゲーション（左）と操作（右）が分離した footer です。狭い幅では 2 段に折り返します。</p>
