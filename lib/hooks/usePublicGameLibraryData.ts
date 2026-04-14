@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   fetchPublicMasterLookups,
@@ -19,6 +19,17 @@ type AsyncState<T> = {
   loading: boolean;
 };
 
+type ResolvedState<T> = {
+  data: T | null;
+  error: string | null;
+  requestKey: symbol | null;
+};
+
+type AsyncRequest<T> = {
+  key: symbol;
+  load: () => Promise<T>;
+};
+
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'データの取得に失敗しました。';
 }
@@ -27,45 +38,52 @@ function useAsyncResource<T>(
   enabled: boolean,
   load: () => Promise<T>,
 ): AsyncState<T> {
-  const [state, setState] = useState<AsyncState<T>>({
+  const [state, setState] = useState<ResolvedState<T>>({
     data: null,
     error: null,
-    loading: enabled,
+    requestKey: null,
   });
+  const request = useMemo<AsyncRequest<T> | null>(() => (
+    enabled ? { key: Symbol('async-resource'), load } : null
+  ), [enabled, load]);
 
   useEffect(() => {
-    if (!enabled) {
+    if (request == null) {
       return;
     }
 
     let cancelled = false;
 
-    setState((current) => ({ ...current, loading: true, error: null }));
-
-    void load()
+    void request.load()
       .then((data) => {
         if (cancelled) {
           return;
         }
-        setState({ data, error: null, loading: false });
+        setState({ data, error: null, requestKey: request.key });
       })
       .catch((error) => {
         if (cancelled) {
           return;
         }
-        setState({ data: null, error: toErrorMessage(error), loading: false });
+        setState({ data: null, error: toErrorMessage(error), requestKey: request.key });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [enabled, load]);
+  }, [request]);
 
-  if (!enabled) {
+  if (request == null) {
     return { data: null, error: null, loading: false };
   }
 
-  return state;
+  const loading = state.requestKey !== request.key;
+
+  return {
+    data: state.data,
+    error: loading ? null : state.error,
+    loading,
+  };
 }
 
 export function usePublicMasterLookups(enabled = true): AsyncState<MasterLookups> {
