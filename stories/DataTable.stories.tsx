@@ -237,6 +237,62 @@ export const WithLongContent: Story = {
   },
 };
 
+const horizontalScrollColumns: DataTableColumn<SampleRow>[] = [
+  { key: 'id', header: 'ID', width: '5rem' },
+  { key: 'name', header: '名前', width: '12rem', filterable: true },
+  { key: 'category', header: 'カテゴリ', width: '10rem', filterable: true, filterMode: 'select' },
+  { key: 'score', header: 'スコア', width: '8rem', sortable: true, sortValue: (value) => Number(value) },
+  { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
+  { key: 'memo1', header: 'メモ 1', width: '12rem' },
+  { key: 'memo2', header: 'メモ 2', width: '12rem' },
+  { key: 'memo3', header: 'メモ 3', width: '12rem' },
+  { key: 'memo4', header: 'メモ 4', width: '12rem' },
+];
+
+const horizontalScrollData = Array.from({ length: 18 }, (_, index) => ({
+  id: String(index + 1).padStart(3, '0'),
+  name: `横スクロール確認データ ${index + 1}`,
+  category: index % 2 === 0 ? '長いカテゴリ名 A' : '長いカテゴリ名 B',
+  score: String(60 + index),
+  active: index % 3 !== 0,
+  memo1: 'ヘッダ位置と横スクロール同期を確認する列',
+  memo2: 'ページャーが固定表示されることを確認する列',
+  memo3: '狭い幅でも records のみが横スクロールする想定',
+  memo4: 'フィルタ行も header と同じ表示領域に残す',
+})) as SampleRow[];
+
+export const WithFixedHeaderAndPagination: Story = {
+  render: () => (
+    <div style={{ width: '52rem' }}>
+      <DataTable<SampleRow>
+        columns={horizontalScrollColumns}
+        data={horizontalScrollData}
+        rowKey="id"
+        height="24rem"
+        paginated
+        pageSize={8}
+        resizable
+      />
+    </div>
+  ),
+};
+
+export const WithFooterWithoutPager: Story = {
+  render: () => (
+    <div style={{ width: '52rem' }}>
+      <DataTable<SampleRow>
+        columns={horizontalScrollColumns}
+        data={horizontalScrollData.slice(0, 5)}
+        rowKey="id"
+        height="20rem"
+        paginated
+        pageSize={20}
+        resizable
+      />
+    </div>
+  ),
+};
+
 // 外部ソート管理
 const ExternalSortDemo = () => {
   const [sortState, setSortState] = useState<SortState | null>(null);
