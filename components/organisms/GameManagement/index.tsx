@@ -9,6 +9,7 @@ import CustomComboBox from '@/components/atoms/CustomComboBox';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
 import DataTable, { DATA_TABLE_DEFAULT_PAGE_HEIGHT, type DataTableColumn, type SortState } from '@/components/molecules/DataTable';
+import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
 import {
   moveSelectedItemsByOne,
   moveSelectedItemsToTarget,
@@ -37,6 +38,7 @@ import {
   buildTrialUserData,
   trialBatchUpdateDisplayOrder,
 } from '@/lib/game-management/trial';
+import { useResponsiveLayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
 import type {
   ManagementLookups,
   ResourceKey,
@@ -458,6 +460,7 @@ export function GameManagementDashboard({
     const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>([]);
     const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
     const [pageMode, setPageMode] = useState<PageMode>('view');
+    const layoutMode = useResponsiveLayoutMode();
     const [bulkEditorOpen, setBulkEditorOpen] = useState(false);
     const [bulkEditorTargetIds, setBulkEditorTargetIds] = useState<number[]>([]);
     const [accountMoveTarget, setAccountMoveTarget] = useState<AccountDto | null>(null);
@@ -1135,18 +1138,23 @@ export function GameManagementDashboard({
     <PageFrame
       title={definition.label}
       description={definition.description}
+      layoutMode={layoutMode}
       actions={
         <>
-          <Link href={basePath} className="text-sm font-medium text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-300">
-            ダッシュボードへ戻る
-          </Link>
-          <PageModeToggle mode={pageMode} onChange={setPageMode} />
-          {definition.canCreate ? (
-            <CustomButton variant="accent" onClick={() => { setPageMode('edit'); openEditorDialog(); }}>
-              新規作成
-            </CustomButton>
-          ) : null}
-          <CustomButton onClick={() => void load()}>再読み込み</CustomButton>
+          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
+            <Link href={basePath} className="text-sm font-medium text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-300">
+              ダッシュボードへ戻る
+            </Link>
+            <PageModeToggle mode={pageMode} onChange={setPageMode} />
+          </ResponsiveActionGroup>
+          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
+            {definition.canCreate ? (
+              <CustomButton variant="accent" onClick={() => { setPageMode('edit'); openEditorDialog(); }}>
+                新規作成
+              </CustomButton>
+            ) : null}
+            <CustomButton onClick={() => void load()}>再読み込み</CustomButton>
+          </ResponsiveActionGroup>
         </>
       }
     >
@@ -1188,37 +1196,39 @@ export function GameManagementDashboard({
                 ) : null}
               </div>
             ) : null}
-            <div className="flex items-center justify-between text-sm text-zinc-500">
+            <div className="flex flex-col gap-3 text-sm text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
               <span>表示件数: {rows.length} 件</span>
-              <div className="flex items-center gap-3">
+              <div className="space-y-2 sm:flex sm:items-center sm:gap-3 sm:space-y-0">
                 {selectedVisibleRowCount > 0 && reorderEnabled ? (
                   <span className="text-xs text-zinc-500 dark:text-zinc-300">
                     選択中: {selectedVisibleRowCount} 件（Shift+クリックで範囲選択、上下移動でまとめて並び替え）
                   </span>
                 ) : null}
-                {bulkEditAvailable ? (
-                  <CustomButton
-                    disabled={selectedVisibleRowCount < 2}
-                    onClick={() => {
-                      const ids = rows
-                        .filter((row) => selectedRowKeys.includes(row.tableRowKey))
-                        .map((row) => row.id);
-                      setBulkEditorTargetIds(ids);
-                      setBulkEditorOpen(true);
-                    }}
-                  >
-                    一括編集（{selectedVisibleRowCount} 件）
-                  </CustomButton>
-                ) : null}
                 {!reorderEnabled && reorderDisabledReason && (
                   <span className="text-xs text-amber-600 dark:text-amber-400">{reorderDisabledReason}</span>
                 )}
-                <CustomButton
-                  onClick={() => void handleSaveDisplayOrder()}
-                  disabled={!isDirty || saving || pageMode === 'view'}
-                >
-                  表示順を保存
-                </CustomButton>
+                <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                  {bulkEditAvailable ? (
+                    <CustomButton
+                      disabled={selectedVisibleRowCount < 2}
+                      onClick={() => {
+                        const ids = rows
+                          .filter((row) => selectedRowKeys.includes(row.tableRowKey))
+                          .map((row) => row.id);
+                        setBulkEditorTargetIds(ids);
+                        setBulkEditorOpen(true);
+                      }}
+                    >
+                      一括編集（{selectedVisibleRowCount} 件）
+                    </CustomButton>
+                  ) : null}
+                  <CustomButton
+                    onClick={() => void handleSaveDisplayOrder()}
+                    disabled={!isDirty || saving || pageMode === 'view'}
+                  >
+                    表示順を保存
+                  </CustomButton>
+                </ResponsiveActionGroup>
               </div>
             </div>
             <DataTable
@@ -1281,6 +1291,7 @@ export function GameManagementDashboard({
           onDataChanged={handleEditorDataChanged}
           pageMode={pageMode}
           onPageModeChange={setPageMode}
+          layoutMode={layoutMode}
         />
       ) : null}
       {lookups && bulkEditorOpen && definition.bulkEditableFields ? (
@@ -1293,6 +1304,7 @@ export function GameManagementDashboard({
           targetRecordIds={bulkEditorTargetIds}
           bulkEditableFields={definition.bulkEditableFields}
           onDataChanged={handleEditorDataChanged}
+          layoutMode={layoutMode}
         />
       ) : null}
       {lookups && accountMoveTarget ? (
@@ -1302,6 +1314,7 @@ export function GameManagementDashboard({
           account={accountMoveTarget}
           lookups={lookups}
           onSuccess={() => { setAccountMoveTarget(null); void load(); }}
+          layoutMode={layoutMode}
         />
       ) : null}
     </PageFrame>

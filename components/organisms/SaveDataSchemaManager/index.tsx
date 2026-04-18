@@ -11,8 +11,9 @@ import CustomMessageArea from '@/components/atoms/CustomMessageArea';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
 import CustomTextBox from '@/components/atoms/CustomTextBox';
 import DataTable, { DATA_TABLE_DEFAULT_PAGE_HEIGHT, type DataTableColumn, type SortState } from '@/components/molecules/DataTable';
+import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
 import { moveSelectedItemsByOne, moveSelectedItemsToTarget } from '@/components/molecules/DataTable/selection-utils';
-import Dialog from '@/components/molecules/Dialog';
+import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
 import RowMoveButtons from '@/components/organisms/GameManagement/RowMoveButtons';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import {
@@ -32,6 +33,7 @@ import {
   fetchMasterLookups,
   getGameManagementErrorMessage,
 } from '@/lib/game-management/api';
+import { useResponsiveLayoutMode, type LayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
 import type { SaveDataSchemaManagerTexts } from '@/lib/resources/game-management-pages';
 import resources from '@/lib/resources';
 import {
@@ -435,15 +437,21 @@ function SelectField({
   );
 }
 
-function SectionCard({ title, description, actions, children }: { title: string; description: string; actions?: React.ReactNode; children: React.ReactNode }) {
+function SectionCard({ title, description, actions, layoutMode, children }: { title: string; description: string; actions?: React.ReactNode; layoutMode: LayoutMode; children: React.ReactNode }) {
+  const headerLayoutClasses = 'mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between';
+
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <div className={headerLayoutClasses}>
         <div className="space-y-2">
           <CustomHeader level={2}>{title}</CustomHeader>
           <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">{description}</p>
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
+        {actions ? (
+          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end" className="w-full sm:w-auto">
+            {actions}
+          </ResponsiveActionGroup>
+        ) : null}
       </div>
       {children}
     </section>
@@ -481,6 +489,7 @@ function createOverrideRequest(formState: OverrideFormState): UpsertSaveDataFiel
 
 export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchemaManagerTexts }) {
   const { isPending, startLoading } = useLoadingOverlay();
+  const layoutMode = useResponsiveLayoutMode();
   const definitionDialogBodyRef = useRef<HTMLDivElement | null>(null);
   const optionDialogBodyRef = useRef<HTMLDivElement | null>(null);
   const [lookups, setLookups] = useState<MasterLookups | null>(null);
@@ -1661,7 +1670,7 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
         }
 
         return (
-          <div className="flex flex-wrap gap-2">
+          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2}>
             <CustomButton onClick={() => openEditDefinitionDialog(definition)}>
               {pageMode === 'view' ? texts.common.detail : texts.common.edit}
             </CustomButton>
@@ -1672,11 +1681,11 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
                 <CustomButton variant="ghost" onClick={() => void handleDeleteDefinition(definition)}>{texts.common.delete}</CustomButton>
               </>
             ) : null}
-          </div>
+          </ResponsiveActionGroup>
         );
       },
     },
-  ], [catalogDefinitions, catalogColumns, handleDeleteDefinition, openAssignDialog, openCloneDefinitionDialog, openEditDefinitionDialog, pageMode, texts.buttons.assign, texts.common.actionsColumn, texts.common.clone, texts.common.delete, texts.common.detail, texts.common.edit, texts.statuses.deleted]);
+  ], [catalogDefinitions, catalogColumns, handleDeleteDefinition, layoutMode, openAssignDialog, openCloneDefinitionDialog, openEditDefinitionDialog, pageMode, texts.buttons.assign, texts.common.actionsColumn, texts.common.clone, texts.common.delete, texts.common.detail, texts.common.edit, texts.statuses.deleted]);
 
   const definitionRowsWithActions = useMemo(() => definitionRows.map((row) => {
     const definition = definitions.find((item) => item.fieldDefinitionId === row.id)!;
@@ -1719,7 +1728,7 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
         const definition = definitions.find((item) => item.fieldDefinitionId === row.id)!;
         const idx = defRowOrder?.indexOf(row.id) ?? -1;
         return (
-          <div className="flex flex-wrap gap-2">
+          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2}>
             <RowMoveButtons
               isFirst={idx <= 0}
               isLast={idx === (defRowOrder?.length ?? 0) - 1}
@@ -1736,11 +1745,11 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
             {definition.fieldType === 6 && definition.sharedChoiceSetId == null ? (
               <CustomButton onClick={() => setSelectedFieldDefinitionId(String(definition.fieldDefinitionId))}>{texts.buttons.manageOptions}</CustomButton>
             ) : null}
-          </div>
+          </ResponsiveActionGroup>
         );
       },
     },
-  ], [defReorderEnabled, defReorderSaving, defRowOrder, definitionColumns, definitions, handleMoveDefinition, openAssignmentSettingsDialog, openEditDefinitionDialog, pageMode, texts.buttons.assignmentSettings, texts.buttons.definitionDetail, texts.buttons.definitionEdit, texts.buttons.manageOptions, texts.common.actionsColumn]);
+  ], [defReorderEnabled, defReorderSaving, defRowOrder, definitionColumns, definitions, handleMoveDefinition, layoutMode, openAssignmentSettingsDialog, openEditDefinitionDialog, pageMode, texts.buttons.assignmentSettings, texts.buttons.definitionDetail, texts.buttons.definitionEdit, texts.buttons.manageOptions, texts.common.actionsColumn]);
 
   const optionTableColumns = useMemo<DataTableColumn<typeof sortedOptionRows[number]>[]>(() => [
     ...optionColumns,
@@ -1751,7 +1760,7 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
         const option = options.find((item) => item.id === row.id)!;
         const idx = optRowOrder?.indexOf(row.id) ?? -1;
         return (
-          <div className="flex flex-wrap gap-2">
+          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2}>
             <RowMoveButtons
               isFirst={idx <= 0}
               isLast={idx === (optRowOrder?.length ?? 0) - 1}
@@ -1765,11 +1774,11 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
             {pageMode === 'edit' ? (
               <CustomButton variant="ghost" onClick={() => void handleDeleteOption(option)}>{texts.common.delete}</CustomButton>
             ) : null}
-          </div>
+          </ResponsiveActionGroup>
         );
       },
     },
-  ], [handleDeleteOption, handleMoveOption, openEditOptionDialog, optReorderEnabled, optReorderSaving, optRowOrder, optionColumns, options, pageMode, texts.common.actionsColumn, texts.common.delete, texts.common.detail, texts.common.edit]);
+  ], [handleDeleteOption, handleMoveOption, layoutMode, openEditOptionDialog, optReorderEnabled, optReorderSaving, optRowOrder, optionColumns, options, pageMode, texts.common.actionsColumn, texts.common.delete, texts.common.detail, texts.common.edit]);
 
   const overrideRowsWithActions = useMemo(() => overrideRows.map((row) => {
     const field = overrideDefinitions.find((item) => item.fieldDefinitionId === row.id)!;
@@ -1796,7 +1805,7 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
     <main className="min-h-screen bg-zinc-50 px-4 py-8 dark:bg-black sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <div className="rounded-3xl bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(241,245,249,0.95))] p-6 shadow-sm ring-1 ring-zinc-200 dark:bg-[linear-gradient(135deg,rgba(24,24,27,0.95),rgba(9,9,11,0.95))] dark:ring-zinc-800">
-          <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">{texts.hero.eyebrow}</p>
               <CustomHeader level={1}>{texts.hero.title}</CustomHeader>
@@ -1818,19 +1827,18 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
         ) : (
           <>
             <SectionCard
+              layoutMode={layoutMode}
               title={texts.sections.catalog.title}
               description={texts.sections.catalog.description}
               actions={
-                <>
-                  {pageMode === 'edit' ? (
+                pageMode === 'edit' ? (
+                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
                     <CustomButton variant="accent" onClick={openCreateDefinitionDialog}>{texts.buttons.addGlobalDefinition}</CustomButton>
-                  ) : null}
-                  {pageMode === 'edit' ? (
                     <CustomButton variant="accent" disabled={!hasCatalogSelection} onClick={() => openAssignDialog()}>
                       {texts.buttons.assignSelectedSchemas}
                     </CustomButton>
-                  ) : null}
-                </>
+                  </ResponsiveActionGroup>
+                ) : null
               }
             >
               <div className="space-y-4">
@@ -1854,6 +1862,7 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
             </SectionCard>
 
             <SectionCard
+              layoutMode={layoutMode}
               title={texts.sections.assignedDefinitions.title}
               description={texts.sections.assignedDefinitions.description}
               actions={
@@ -1867,12 +1876,14 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
                     onChange={setSelectedContentGroupId}
                   />
                   {pageMode === 'edit' ? (
-                    <>
+                    <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
                       <CustomButton disabled={selectedAssignedDefinitionCount === 0} onClick={openCopyDialog}>{texts.buttons.updateAssignmentSettings}</CustomButton>
                       <CustomButton disabled={selectedAssignedDefinitionCount === 0} onClick={openBulkDefinitionTypeDialog}>{texts.buttons.bulkChangeType}</CustomButton>
-                    </>
+                    </ResponsiveActionGroup>
                   ) : null}
-                  <CustomButton variant="accent" disabled={!defReorderDirty || defReorderSaving || pageMode === 'view' || activeDefinitionCount <= 1} onClick={() => void handleSaveDefReorder()}>{texts.buttons.saveDefinitionReorder}</CustomButton>
+                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                    <CustomButton variant="accent" disabled={!defReorderDirty || defReorderSaving || pageMode === 'view' || activeDefinitionCount <= 1} onClick={() => void handleSaveDefReorder()}>{texts.buttons.saveDefinitionReorder}</CustomButton>
+                  </ResponsiveActionGroup>
                 </>
               }
             >
@@ -1920,15 +1931,16 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
             </SectionCard>
 
             <SectionCard
+              layoutMode={layoutMode}
               title={texts.sections.options.title}
               description={texts.sections.options.description}
               actions={canManageOptions ? (
-                <>
+                <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
                   {pageMode === 'edit' ? (
                     <CustomButton variant="accent" onClick={openCreateOptionDialog}>{texts.buttons.addOption}</CustomButton>
                   ) : null}
                   <CustomButton variant="accent" disabled={!optReorderDirty || optReorderSaving || pageMode === 'view' || activeOptionCount <= 1} onClick={() => void handleSaveOptReorder()}>{texts.buttons.saveOptionReorder}</CustomButton>
-                </>
+                </ResponsiveActionGroup>
               ) : null}
             >
               {canManageOptions ? (
@@ -1970,6 +1982,7 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
             </SectionCard>
 
             <SectionCard
+              layoutMode={layoutMode}
               title={texts.sections.overrides.title}
               description={texts.sections.overrides.description}
               actions={
@@ -1996,12 +2009,12 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
                         const field = overrideDefinitions.find((item) => item.fieldDefinitionId === row.id)!;
                         const hasOverride = overrides.some((item) => item.fieldDefinitionId === row.id);
                         return (
-                          <div className="flex flex-wrap gap-2">
+                          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2}>
                             <CustomButton onClick={() => openOverrideDialog(field)}>{hasOverride ? texts.common.edit : texts.buttons.createOverride}</CustomButton>
                             {hasOverride ? (
                               <CustomButton variant="ghost" onClick={() => void handleDeleteOverride(field)}>{texts.common.delete}</CustomButton>
                             ) : null}
-                          </div>
+                          </ResponsiveActionGroup>
                         );
                       },
                     },
@@ -2015,6 +2028,7 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
             </SectionCard>
 
             <SectionCard
+              layoutMode={layoutMode}
               title={texts.sections.resolvedSchema.title}
               description={texts.sections.resolvedSchema.description}
             >
@@ -2035,13 +2049,18 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
           closeDisabled={isPending}
           title={assignmentDialogIsUnassignMode ? texts.dialogs.assignment.unassignTitle : assignmentDialogIsUpdateMode ? texts.dialogs.assignment.updateTitle : texts.dialogs.assignment.createTitle}
           footer={
-            <>
-              {isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">{texts.dialogs.assignment.pendingHint}</span> : null}
-              <CustomButton onClick={closeAssignDialog} disabled={isPending}>{texts.common.cancel}</CustomButton>
-              <CustomButton variant="accent" disabled={isPending || assignmentTargets.length === 0 || (!assignmentDialogIsUnassignMode && effectiveSelectedAssignmentContentGroupIds.length === 0)} onClick={() => void handleSaveAssignment()}>
-                {assignmentDialogIsUnassignMode ? texts.dialogs.assignment.submitUnassign : assignmentDialogIsUpdateMode ? texts.dialogs.assignment.submitUpdate : texts.dialogs.assignment.submitCreate}
-              </CustomButton>
-            </>
+            <DialogFooterLayout
+              layoutMode={layoutMode}
+              status={isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">{texts.dialogs.assignment.pendingHint}</span> : null}
+              trailing={
+                <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
+                  <CustomButton onClick={closeAssignDialog} disabled={isPending}>{texts.common.cancel}</CustomButton>
+                  <CustomButton variant="accent" disabled={isPending || assignmentTargets.length === 0 || (!assignmentDialogIsUnassignMode && effectiveSelectedAssignmentContentGroupIds.length === 0)} onClick={() => void handleSaveAssignment()}>
+                    {assignmentDialogIsUnassignMode ? texts.dialogs.assignment.submitUnassign : assignmentDialogIsUpdateMode ? texts.dialogs.assignment.submitUpdate : texts.dialogs.assignment.submitCreate}
+                  </CustomButton>
+                </ResponsiveActionGroup>
+              }
+            />
           }
         >
           <div className="space-y-4">
@@ -2124,25 +2143,40 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
           title={editingDefinition ? (pageMode === 'view' ? texts.dialogs.definition.viewTitle : texts.dialogs.definition.editTitle) : isCloningDefinition ? texts.dialogs.definition.cloneTitle : texts.dialogs.definition.createTitle}
           footer={
             pageMode === 'view' && editingDefinition ? (
-              <>
-                <CustomButton onClick={closeDefinitionDialog}>{texts.common.close}</CustomButton>
-                <CustomButton variant="accent" onClick={() => setPageMode('edit')}>{texts.buttons.enableEdit}</CustomButton>
-              </>
+              <DialogFooterLayout
+                layoutMode={layoutMode}
+                trailing={
+                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                    <CustomButton onClick={closeDefinitionDialog}>{texts.common.close}</CustomButton>
+                    <CustomButton variant="accent" onClick={() => setPageMode('edit')}>{texts.buttons.enableEdit}</CustomButton>
+                  </ResponsiveActionGroup>
+                }
+              />
             ) : (
-              <>
-                {pageMode === 'edit' && editingDefinition ? (
-                  <CustomButton onClick={() => setPageMode('view')}>{texts.buttons.backToReadonly}</CustomButton>
-                ) : null}
-                <CustomButton onClick={closeDefinitionDialog} disabled={isPending}>{texts.common.cancel}</CustomButton>
-                {!editingDefinition && !isCloningDefinition ? (
+              <DialogFooterLayout
+                layoutMode={layoutMode}
+                status={isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">保存中はダイアログを閉じられません。</span> : null}
+                trailing={
                   <>
-                    <CustomButton onClick={() => void handleSaveDefinition('continue')} disabled={isPending}>{texts.buttons.createAndContinue}</CustomButton>
-                    <CustomButton variant="accent" onClick={() => void handleSaveDefinition('close')} disabled={isPending}>{texts.buttons.createAndClose}</CustomButton>
+                    {pageMode === 'edit' && editingDefinition ? (
+                      <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
+                        <CustomButton onClick={() => setPageMode('view')}>{texts.buttons.backToReadonly}</CustomButton>
+                      </ResponsiveActionGroup>
+                    ) : null}
+                    <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                      <CustomButton onClick={closeDefinitionDialog} disabled={isPending}>{texts.common.cancel}</CustomButton>
+                      {!editingDefinition && !isCloningDefinition ? (
+                        <>
+                          <CustomButton onClick={() => void handleSaveDefinition('continue')} disabled={isPending}>{texts.buttons.createAndContinue}</CustomButton>
+                          <CustomButton variant="accent" onClick={() => void handleSaveDefinition('close')} disabled={isPending}>{texts.buttons.createAndClose}</CustomButton>
+                        </>
+                      ) : (
+                        <CustomButton variant="accent" onClick={() => void handleSaveDefinition('close')} disabled={isPending}>{texts.common.save}</CustomButton>
+                      )}
+                    </ResponsiveActionGroup>
                   </>
-                ) : (
-                  <CustomButton variant="accent" onClick={() => void handleSaveDefinition('close')} disabled={isPending}>{texts.common.save}</CustomButton>
-                )}
-              </>
+                }
+              />
             )
           }
         >
@@ -2196,25 +2230,40 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
           title={editingOption ? (pageMode === 'view' ? texts.dialogs.option.viewTitle : texts.dialogs.option.editTitle) : texts.dialogs.option.createTitle}
           footer={
             pageMode === 'view' && editingOption ? (
-              <>
-                <CustomButton onClick={() => setOptionDialogOpen(false)}>{texts.common.close}</CustomButton>
-                <CustomButton variant="accent" onClick={() => setPageMode('edit')}>{texts.buttons.enableEdit}</CustomButton>
-              </>
+              <DialogFooterLayout
+                layoutMode={layoutMode}
+                trailing={
+                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                    <CustomButton onClick={() => setOptionDialogOpen(false)}>{texts.common.close}</CustomButton>
+                    <CustomButton variant="accent" onClick={() => setPageMode('edit')}>{texts.buttons.enableEdit}</CustomButton>
+                  </ResponsiveActionGroup>
+                }
+              />
             ) : (
-              <>
-                {pageMode === 'edit' && editingOption ? (
-                  <CustomButton onClick={() => setPageMode('view')}>{texts.buttons.backToReadonly}</CustomButton>
-                ) : null}
-                <CustomButton onClick={() => setOptionDialogOpen(false)} disabled={isPending}>{texts.common.cancel}</CustomButton>
-                {!editingOption ? (
+              <DialogFooterLayout
+                layoutMode={layoutMode}
+                status={isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">保存中はダイアログを閉じられません。</span> : null}
+                trailing={
                   <>
-                    <CustomButton onClick={() => void handleSaveOption('continue')} disabled={isPending}>{texts.buttons.createAndContinue}</CustomButton>
-                    <CustomButton variant="accent" onClick={() => void handleSaveOption('close')} disabled={isPending}>{texts.buttons.createAndClose}</CustomButton>
+                    {pageMode === 'edit' && editingOption ? (
+                      <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
+                        <CustomButton onClick={() => setPageMode('view')}>{texts.buttons.backToReadonly}</CustomButton>
+                      </ResponsiveActionGroup>
+                    ) : null}
+                    <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                      <CustomButton onClick={() => setOptionDialogOpen(false)} disabled={isPending}>{texts.common.cancel}</CustomButton>
+                      {!editingOption ? (
+                        <>
+                          <CustomButton onClick={() => void handleSaveOption('continue')} disabled={isPending}>{texts.buttons.createAndContinue}</CustomButton>
+                          <CustomButton variant="accent" onClick={() => void handleSaveOption('close')} disabled={isPending}>{texts.buttons.createAndClose}</CustomButton>
+                        </>
+                      ) : (
+                        <CustomButton variant="accent" onClick={() => void handleSaveOption('close')} disabled={isPending}>{texts.common.save}</CustomButton>
+                      )}
+                    </ResponsiveActionGroup>
                   </>
-                ) : (
-                  <CustomButton variant="accent" onClick={() => void handleSaveOption('close')} disabled={isPending}>{texts.common.save}</CustomButton>
-                )}
-              </>
+                }
+              />
             )
           }
         >
@@ -2248,10 +2297,16 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
           closeDisabled={isPending}
           title={texts.dialogs.bulkType.title}
           footer={
-            <>
-              <CustomButton onClick={closeBulkDefinitionTypeDialog} disabled={isPending}>{texts.common.cancel}</CustomButton>
-              <CustomButton variant="accent" disabled={isPending} onClick={() => void handleBulkUpdateDefinitionType()}>{texts.common.update}</CustomButton>
-            </>
+            <DialogFooterLayout
+              layoutMode={layoutMode}
+              status={isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">更新中はダイアログを閉じられません。</span> : null}
+              trailing={
+                <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
+                  <CustomButton onClick={closeBulkDefinitionTypeDialog} disabled={isPending}>{texts.common.cancel}</CustomButton>
+                  <CustomButton variant="accent" disabled={isPending} onClick={() => void handleBulkUpdateDefinitionType()}>{texts.common.update}</CustomButton>
+                </ResponsiveActionGroup>
+              }
+            />
           }
         >
           <div className="space-y-4">
@@ -2299,16 +2354,31 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
             : texts.dialogs.override.editTitle}
           footer={
             pageMode === 'view' ? (
-              <>
-                <CustomButton onClick={() => setOverrideDialogOpen(false)}>{texts.common.close}</CustomButton>
-                <CustomButton variant="accent" onClick={() => setPageMode('edit')}>{texts.buttons.enableEdit}</CustomButton>
-              </>
+              <DialogFooterLayout
+                layoutMode={layoutMode}
+                trailing={
+                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                    <CustomButton onClick={() => setOverrideDialogOpen(false)}>{texts.common.close}</CustomButton>
+                    <CustomButton variant="accent" onClick={() => setPageMode('edit')}>{texts.buttons.enableEdit}</CustomButton>
+                  </ResponsiveActionGroup>
+                }
+              />
             ) : (
-              <>
-                <CustomButton onClick={() => setPageMode('view')}>{texts.buttons.backToReadonly}</CustomButton>
-                <CustomButton onClick={() => setOverrideDialogOpen(false)} disabled={isPending}>{texts.common.cancel}</CustomButton>
-                <CustomButton variant="accent" disabled={isPending} onClick={() => void handleSaveOverride()}>{texts.common.save}</CustomButton>
-              </>
+              <DialogFooterLayout
+                layoutMode={layoutMode}
+                status={isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">保存中はダイアログを閉じられません。</span> : null}
+                trailing={
+                  <>
+                    <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
+                      <CustomButton onClick={() => setPageMode('view')}>{texts.buttons.backToReadonly}</CustomButton>
+                    </ResponsiveActionGroup>
+                    <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
+                      <CustomButton onClick={() => setOverrideDialogOpen(false)} disabled={isPending}>{texts.common.cancel}</CustomButton>
+                      <CustomButton variant="accent" disabled={isPending} onClick={() => void handleSaveOverride()}>{texts.common.save}</CustomButton>
+                    </ResponsiveActionGroup>
+                  </>
+                }
+              />
             )
           }
         >

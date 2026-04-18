@@ -9,11 +9,13 @@ import CustomMessageArea from '@/components/atoms/CustomMessageArea';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
 import CustomTextBox from '@/components/atoms/CustomTextBox';
 import DataTable, { DATA_TABLE_DEFAULT_PAGE_HEIGHT, type DataTableColumn, type SortState } from '@/components/molecules/DataTable';
-import Dialog from '@/components/molecules/Dialog';
+import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
+import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
 import { moveSelectedItemsByOne, moveSelectedItemsToTarget } from '@/components/molecules/DataTable/selection-utils';
 import RowMoveButtons from '@/components/organisms/GameManagement/RowMoveButtons';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import { getGameManagementErrorMessage } from '@/lib/game-management/api';
+import { useResponsiveLayoutMode, type LayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
 import resources from '@/lib/resources';
 import {
   createSaveDataFieldChoiceOption,
@@ -181,15 +183,21 @@ function buildChoiceOptionUpdateRequest(form: ChoiceOptionFormState): UpdateSave
 // SectionCard (local, same pattern as SaveDataSchemaManager)
 // ---------------------------------------------------------------------------
 
-function SectionCard({ title, description, actions, children }: { title: string; description: string; actions?: React.ReactNode; children: React.ReactNode }) {
+function SectionCard({ title, description, actions, layoutMode, children }: { title: string; description: string; actions?: React.ReactNode; layoutMode: LayoutMode; children: React.ReactNode }) {
+  const headerLayoutClasses = 'mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between';
+
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <div className={headerLayoutClasses}>
         <div className="space-y-2">
           <CustomHeader level={2}>{title}</CustomHeader>
           <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">{description}</p>
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
+        {actions ? (
+          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end" className="w-full sm:w-auto">
+            {actions}
+          </ResponsiveActionGroup>
+        ) : null}
       </div>
       {children}
     </section>
@@ -202,6 +210,7 @@ function SectionCard({ title, description, actions, children }: { title: string;
 
 export default function ChoiceSetManager() {
   const { isPending, startLoading } = useLoadingOverlay();
+  const layoutMode = useResponsiveLayoutMode();
   const choiceSetDialogBodyRef = useRef<HTMLDivElement | null>(null);
   const choiceOptionDialogBodyRef = useRef<HTMLDivElement | null>(null);
   const [pageMode, setPageMode] = useState<PageMode>('view');
@@ -632,6 +641,7 @@ export default function ChoiceSetManager() {
         ) : (
           <>
             <SectionCard
+              layoutMode={layoutMode}
               title="選択肢セット一覧"
               description="共有選択肢セットの一覧です。セットを選択すると配下の候補値を管理できます。"
               actions={
@@ -649,13 +659,13 @@ export default function ChoiceSetManager() {
                     render: (_, row) => {
                       const cs = choiceSets.find((item) => item.id === row.id)!;
                       return (
-                        <div className="flex flex-wrap gap-2">
+                        <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2}>
                           <CustomButton onClick={() => openEditChoiceSetDialog(cs)}>{pageMode === 'view' ? '詳細' : '編集'}</CustomButton>
                           <CustomButton onClick={() => setSelectedChoiceSetId(String(cs.id))}>候補値</CustomButton>
                           {pageMode === 'edit' && (
                             <CustomButton variant="ghost" onClick={() => void handleDeleteChoiceSet(cs)}>削除</CustomButton>
                           )}
-                        </div>
+                        </ResponsiveActionGroup>
                       );
                     },
                   },
@@ -669,15 +679,16 @@ export default function ChoiceSetManager() {
             </SectionCard>
 
             <SectionCard
+              layoutMode={layoutMode}
               title="候補値"
               description={selectedChoiceSet ? `「${selectedChoiceSet.label}」の候補値を管理します。` : '選択肢セットを選択してください。'}
               actions={selectedChoiceSet ? (
-                <>
+                <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
                   {pageMode === 'edit' ? (
                     <CustomButton variant="accent" onClick={openCreateChoiceOptionDialog}>候補値を追加</CustomButton>
                   ) : null}
                   <CustomButton variant="accent" disabled={!optReorderDirty || optReorderSaving || pageMode === 'view' || activeChoiceOptionCount <= 1} onClick={() => void handleSaveOptReorder()}>表示順を保存</CustomButton>
-                </>
+                </ResponsiveActionGroup>
               ) : null}
             >
               {selectedChoiceSet ? (
@@ -703,7 +714,7 @@ export default function ChoiceSetManager() {
                           const opt = choiceOptions.find((item) => item.id === row.id)!;
                           const idx = optRowOrder?.indexOf(row.id) ?? -1;
                           return (
-                            <div className="flex flex-wrap gap-2">
+                            <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2}>
                               <RowMoveButtons
                                 isFirst={idx <= 0}
                                 isLast={idx === (optRowOrder?.length ?? 0) - 1}
@@ -715,7 +726,7 @@ export default function ChoiceSetManager() {
                               {pageMode === 'edit' && (
                                 <CustomButton variant="ghost" onClick={() => void handleDeleteChoiceOption(opt)}>削除</CustomButton>
                               )}
-                            </div>
+                            </ResponsiveActionGroup>
                           );
                         },
                       },
@@ -751,23 +762,40 @@ export default function ChoiceSetManager() {
           title={editingChoiceSet ? (pageMode === 'view' ? '選択肢セットの詳細' : '選択肢セットを編集') : '選択肢セットを追加'}
           footer={
             pageMode === 'view' && editingChoiceSet ? (
-              <>
-                <CustomButton onClick={closeChoiceSetDialog}>閉じる</CustomButton>
-                <CustomButton variant="accent" onClick={() => setPageMode('edit')}>編集を有効化</CustomButton>
-              </>
+              <DialogFooterLayout
+                layoutMode={layoutMode}
+                trailing={
+                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                    <CustomButton onClick={closeChoiceSetDialog}>閉じる</CustomButton>
+                    <CustomButton variant="accent" onClick={() => setPageMode('edit')}>編集を有効化</CustomButton>
+                  </ResponsiveActionGroup>
+                }
+              />
             ) : (
-              <>
-                {editingChoiceSet && <CustomButton onClick={() => setPageMode('view')}>読み取り専用に戻す</CustomButton>}
-                  <CustomButton onClick={closeChoiceSetDialog} disabled={isPending}>キャンセル</CustomButton>
-                  {!editingChoiceSet ? (
-                    <>
-                      <CustomButton onClick={() => void handleSaveChoiceSet('continue')} disabled={isPending}>作成して続ける</CustomButton>
-                      <CustomButton variant="accent" onClick={() => void handleSaveChoiceSet('close')} disabled={isPending}>作成して閉じる</CustomButton>
-                    </>
-                  ) : (
-                    <CustomButton variant="accent" onClick={() => void handleSaveChoiceSet('close')} disabled={isPending}>保存</CustomButton>
-                  )}
-              </>
+              <DialogFooterLayout
+                layoutMode={layoutMode}
+                status={isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">保存中はダイアログを閉じられません。</span> : null}
+                trailing={
+                  <>
+                    {editingChoiceSet ? (
+                      <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
+                        <CustomButton onClick={() => setPageMode('view')}>読み取り専用に戻す</CustomButton>
+                      </ResponsiveActionGroup>
+                    ) : null}
+                    <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                      <CustomButton onClick={closeChoiceSetDialog} disabled={isPending}>キャンセル</CustomButton>
+                      {!editingChoiceSet ? (
+                        <>
+                          <CustomButton onClick={() => void handleSaveChoiceSet('continue')} disabled={isPending}>作成して続ける</CustomButton>
+                          <CustomButton variant="accent" onClick={() => void handleSaveChoiceSet('close')} disabled={isPending}>作成して閉じる</CustomButton>
+                        </>
+                      ) : (
+                        <CustomButton variant="accent" onClick={() => void handleSaveChoiceSet('close')} disabled={isPending}>保存</CustomButton>
+                      )}
+                    </ResponsiveActionGroup>
+                  </>
+                }
+              />
             )
           }
         >
@@ -797,23 +825,40 @@ export default function ChoiceSetManager() {
           title={editingChoiceOption ? (pageMode === 'view' ? '候補値の詳細' : '候補値を編集') : '候補値を追加'}
           footer={
             pageMode === 'view' && editingChoiceOption ? (
-              <>
-                <CustomButton onClick={() => setChoiceOptionDialogOpen(false)}>閉じる</CustomButton>
-                <CustomButton variant="accent" onClick={() => setPageMode('edit')}>編集を有効化</CustomButton>
-              </>
+              <DialogFooterLayout
+                layoutMode={layoutMode}
+                trailing={
+                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                    <CustomButton onClick={() => setChoiceOptionDialogOpen(false)}>閉じる</CustomButton>
+                    <CustomButton variant="accent" onClick={() => setPageMode('edit')}>編集を有効化</CustomButton>
+                  </ResponsiveActionGroup>
+                }
+              />
             ) : (
-              <>
-                {editingChoiceOption && <CustomButton onClick={() => setPageMode('view')}>読み取り専用に戻す</CustomButton>}
-                  <CustomButton onClick={() => setChoiceOptionDialogOpen(false)} disabled={isPending}>キャンセル</CustomButton>
-                  {!editingChoiceOption ? (
-                    <>
-                      <CustomButton onClick={() => void handleSaveChoiceOption('continue')} disabled={isPending}>作成して続ける</CustomButton>
-                      <CustomButton variant="accent" onClick={() => void handleSaveChoiceOption('close')} disabled={isPending}>作成して閉じる</CustomButton>
-                    </>
-                  ) : (
-                    <CustomButton variant="accent" onClick={() => void handleSaveChoiceOption('close')} disabled={isPending}>保存</CustomButton>
-                  )}
-              </>
+              <DialogFooterLayout
+                layoutMode={layoutMode}
+                status={isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">保存中はダイアログを閉じられません。</span> : null}
+                trailing={
+                  <>
+                    {editingChoiceOption ? (
+                      <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
+                        <CustomButton onClick={() => setPageMode('view')}>読み取り専用に戻す</CustomButton>
+                      </ResponsiveActionGroup>
+                    ) : null}
+                    <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                      <CustomButton onClick={() => setChoiceOptionDialogOpen(false)} disabled={isPending}>キャンセル</CustomButton>
+                      {!editingChoiceOption ? (
+                        <>
+                          <CustomButton onClick={() => void handleSaveChoiceOption('continue')} disabled={isPending}>作成して続ける</CustomButton>
+                          <CustomButton variant="accent" onClick={() => void handleSaveChoiceOption('close')} disabled={isPending}>作成して閉じる</CustomButton>
+                        </>
+                      ) : (
+                        <CustomButton variant="accent" onClick={() => void handleSaveChoiceOption('close')} disabled={isPending}>保存</CustomButton>
+                      )}
+                    </ResponsiveActionGroup>
+                  </>
+                }
+              />
             )
           }
         >

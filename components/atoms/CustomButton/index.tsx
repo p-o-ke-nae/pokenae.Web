@@ -11,6 +11,7 @@ export type CustomButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 	loadingLabel?: ReactNode;
 	icon?: ReactNode;
 	iconPosition?: "left" | "right";
+	fullWidth?: boolean;
 };
 
 const CustomButton = forwardRef<HTMLButtonElement, CustomButtonProps>(
@@ -21,6 +22,7 @@ const CustomButton = forwardRef<HTMLButtonElement, CustomButtonProps>(
 		disabled,
 		icon,
 		iconPosition = "left",
+		fullWidth = false,
 		className = "",
 		children,
 		...rest
@@ -29,6 +31,7 @@ const CustomButton = forwardRef<HTMLButtonElement, CustomButtonProps>(
 		const classes = [
 			"custom-button",
 			`custom-button--${variant}`,
+			fullWidth ? 'custom-button--full-width' : '',
 			computedDisabled ? "custom-button--disabled" : "",
 			className,
 		]
@@ -71,13 +74,20 @@ const CustomButton = forwardRef<HTMLButtonElement, CustomButtonProps>(
 						font-weight: 600;
 						font-size: 0.95rem;
 						line-height: 1.3;
+						white-space: nowrap;
 						transition:
 							transform 120ms ease,
 							box-shadow 120ms ease,
 							background-color 120ms ease,
 							color 120ms ease;
 						cursor: pointer;
+						min-height: 2.75rem;
+						min-width: 0;
 					}
+
+						.custom-button--full-width {
+							width: 100%;
+						}
 
 					.custom-button:focus-visible {
 						outline: 2px solid var(--color-accent-25);
@@ -130,10 +140,15 @@ const CustomButton = forwardRef<HTMLButtonElement, CustomButtonProps>(
 						display: inline-flex;
 						align-items: center;
 						justify-content: center;
+						min-width: 0;
+						overflow: hidden;
+						text-overflow: ellipsis;
+						white-space: nowrap;
 					}
 
 					.custom-button__icon {
 						display: inline-flex;
+						flex-shrink: 0;
 					}
 				`}</style>
 			</>
