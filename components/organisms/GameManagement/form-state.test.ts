@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createContinueFormState } from './form-state';
+import { buildInitialFormState, createContinueFormState } from './form-state';
 
 describe('createContinueFormState', () => {
   it('keeps only game software master and variant for game-softwares', () => {
@@ -125,5 +125,41 @@ describe('createContinueFormState', () => {
     expect(continued.memo).toBe('seeded memo');
     expect(continued.dynamicFieldValues).toEqual({ seeded: 'yes' });
     expect(continued.gameConsoleId).toBe('');
+  });
+
+  it('keeps explicit boolean false values when initializing save-datas', () => {
+    const initial = buildInitialFormState('save-datas', {
+      id: 10,
+      ownerGoogleUserId: 'google-user-1',
+      displayOrder: 3,
+      memo: null,
+      replacedBySaveDataId: null,
+      saveStorageType: 1,
+      gameSoftwareMasterId: 100,
+      gameSoftwareId: null,
+      gameConsoleId: 12,
+      accountId: null,
+      memoryCardId: null,
+      storyProgressDefinitionId: null,
+      extendedFields: [
+        {
+          fieldKey: 'is-cleared',
+          label: 'クリア済み',
+          fieldType: 4,
+          isRequired: false,
+          displayOrder: 1,
+          stringValue: null,
+          intValue: null,
+          decimalValue: null,
+          boolValue: false,
+          dateValue: null,
+          selectedOptionKey: null,
+        },
+      ],
+      isDeleted: false,
+      deleteReason: null,
+    });
+
+    expect(initial.dynamicFieldValues).toEqual({ 'is-cleared': 'false' });
   });
 });

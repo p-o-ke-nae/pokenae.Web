@@ -497,7 +497,7 @@ export default function EditorDialog({
                 if (mergedFields.length > 0) {
                   return (
                     <div className="select-none space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-                      <p className="font-semibold text-zinc-800 dark:text-zinc-100">可変項目の現在値</p>
+                      <p className="font-semibold text-zinc-800 dark:text-zinc-100">セーブデータスキーマ項目の現在値</p>
                       <div className="space-y-2">
                         {mergedFields.filter((field) => !field.isDisabled).map((field) => (
                           <p key={field.fieldKey}>
@@ -511,7 +511,7 @@ export default function EditorDialog({
                 if (saveData.extendedFields.length > 0) {
                   return (
                     <div className="select-none space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-                      <p className="font-semibold text-zinc-800 dark:text-zinc-100">可変項目の現在値</p>
+                      <p className="font-semibold text-zinc-800 dark:text-zinc-100">セーブデータスキーマ項目の現在値</p>
                       <div className="space-y-2">
                         {saveData.extendedFields.map((field) => (
                           <p key={field.fieldKey}>

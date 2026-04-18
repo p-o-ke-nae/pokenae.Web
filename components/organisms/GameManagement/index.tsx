@@ -640,7 +640,7 @@ export function GameManagementDashboard({
       setSaveDataSchemas({});
       setSaveDataFieldHeaders([]);
       setSaveDataSchemaLoading(false);
-      setSaveDataSchemaError('トライアルモードでは可変項目の元定義を取得できないため、可変項目列は表示されません。');
+      setSaveDataSchemaError('トライアルモードではセーブデータスキーマ定義を取得できないため、セーブデータスキーマ列は表示されません。');
       return;
     }
 
@@ -685,8 +685,8 @@ export function GameManagementDashboard({
         failedSchemaCount === 0
           ? null
           : failedSchemaCount === masterIds.length
-            ? '可変項目 schema の取得に失敗したため、可変項目列は表示されません。'
-            : '一部の可変項目 schema の取得に失敗したため、該当レコードは空欄表示になります。',
+            ? 'セーブデータスキーマの取得に失敗したため、セーブデータスキーマ列は表示されません。'
+            : '一部のセーブデータスキーマの取得に失敗したため、該当レコードは空欄表示になります。',
       );
     };
 
@@ -1184,12 +1184,12 @@ export function GameManagementDashboard({
                   </div>
                   <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-300">
                     {isTrial
-                      ? '分類指定による一覧絞り込みは利用できます。可変項目列はログイン済み環境でのみ表示されます。'
-                      : '分類を指定すると、その分類のセーブデータのみを表示し、ストーリー進行度の右側に可変項目列を展開します。'}
+                      ? '分類指定による一覧絞り込みは利用できます。セーブデータスキーマ列はログイン済み環境でのみ表示されます。'
+                      : '分類を指定すると、その分類のセーブデータのみを表示し、ストーリー進行度の右側にセーブデータスキーマ列を展開します。'}
                   </p>
                 </div>
                 {selectedContentGroupIdNumber != null && saveDataSchemaLoading ? (
-                  <p className="text-sm text-zinc-500">可変項目列を読み込んでいます...</p>
+                  <p className="text-sm text-zinc-500">セーブデータスキーマ列を読み込んでいます...</p>
                 ) : null}
                 {selectedContentGroupIdNumber != null && saveDataSchemaError ? (
                   <CustomMessageArea variant="error">{saveDataSchemaError}</CustomMessageArea>

@@ -1,7 +1,6 @@
 'use client';
 
 import CustomCheckBox from '@/components/atoms/CustomCheckBox';
-import CustomHeader from '@/components/atoms/CustomHeader';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
@@ -560,30 +559,22 @@ export function FormFields({
             <CustomTextArea id="memo" value={formState.memo} onChange={(event) => onChange({ memo: event.target.value })} placeholder="補足メモ" displayOnly={displayOnly} />
           </div>
           {displayOrderField}
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <CustomHeader level={3}>ストーリー進行度</CustomHeader>
-              <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                公開 story-progress-schema API をもとに、この作品で有効な進行度候補を表示します。未設定に戻すこともできます。
-              </p>
-            </div>
-            {!formState.gameSoftwareMasterId ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">ゲームソフトマスタを選択すると候補が表示されます。</p>
-            ) : storyProgressSchemaLoading ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">ストーリー進行度候補を読み込み中です...</p>
-            ) : storyProgressSchemaError ? (
-              <CustomMessageArea variant="error">{storyProgressSchemaError}</CustomMessageArea>
-            ) : (
-              <SelectField
-                id="storyProgressDefinitionId"
-                label="進行度"
-                value={formState.storyProgressDefinitionId}
-                options={storyProgressOptions}
-                onChange={(value) => onChange({ storyProgressDefinitionId: value })}
-                displayOnly={displayOnly}
-              />
-            )}
-          </div>
+          {!formState.gameSoftwareMasterId ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">ゲームソフトマスタを選択するとストーリー進行度候補が表示されます。</p>
+          ) : storyProgressSchemaLoading ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">ストーリー進行度候補を読み込み中です...</p>
+          ) : storyProgressSchemaError ? (
+            <CustomMessageArea variant="error">{storyProgressSchemaError}</CustomMessageArea>
+          ) : (
+            <SelectField
+              id="storyProgressDefinitionId"
+              label="ストーリー進行度"
+              value={formState.storyProgressDefinitionId}
+              options={storyProgressOptions}
+              onChange={(value) => onChange({ storyProgressDefinitionId: value })}
+              displayOnly={displayOnly}
+            />
+          )}
           {!isNew ? (
             <SelectField
               id="replacedBySaveDataId"
@@ -594,24 +585,19 @@ export function FormFields({
               displayOnly={displayOnly}
             />
           ) : null}
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <CustomHeader level={3}>チェック項目</CustomHeader>
-            </div>
-            <SaveDataDynamicFields
-              schema={saveDataSchema}
-              values={formState.dynamicFieldValues}
-              onChange={(fieldKey, value) => onChange({
-                dynamicFieldValues: {
-                  ...formState.dynamicFieldValues,
-                  [fieldKey]: value,
-                },
-              })}
-              loading={saveDataSchemaLoading}
-              error={saveDataSchemaError}
-              displayOnly={displayOnly}
-            />
-          </div>
+          <SaveDataDynamicFields
+            schema={saveDataSchema}
+            values={formState.dynamicFieldValues}
+            onChange={(fieldKey, value) => onChange({
+              dynamicFieldValues: {
+                ...formState.dynamicFieldValues,
+                [fieldKey]: value,
+              },
+            })}
+            loading={saveDataSchemaLoading}
+            error={saveDataSchemaError}
+            displayOnly={displayOnly}
+          />
         </div>
       );
   }

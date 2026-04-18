@@ -6,6 +6,7 @@ import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
 import CustomTextBox from '@/components/atoms/CustomTextBox';
 import type { SaveDataSchemaDto } from '@/lib/game-management/types';
+import { resolveDynamicFieldRawValue } from '@/lib/game-management/save-data-fields';
 
 type Props = {
   schema: SaveDataSchemaDto | null;
@@ -32,7 +33,7 @@ function FieldHint({ description, required }: { description: string | null; requ
 
 export default function SaveDataDynamicFields({ schema, values, onChange, loading, error, displayOnly = false }: Props) {
   if (loading) {
-    return <p className="text-sm text-zinc-500">可変項目を読み込んでいます...</p>;
+    return <p className="text-sm text-zinc-500">セーブデータスキーマ項目を読み込んでいます...</p>;
   }
 
   if (error) {
@@ -40,21 +41,21 @@ export default function SaveDataDynamicFields({ schema, values, onChange, loadin
   }
 
   if (!schema) {
-    return <p className="text-sm text-zinc-500">ゲームソフトを選択すると可変項目を表示します。</p>;
+    return <p className="text-sm text-zinc-500">ゲームソフトを選択するとセーブデータスキーマ項目を表示します。</p>;
   }
 
   const visibleFields = schema.fields.filter((field) => !field.isDisabled);
 
   if (visibleFields.length === 0) {
-    return <p className="text-sm text-zinc-500">このゲームソフトに追加の可変項目はありません。</p>;
+    return <p className="text-sm text-zinc-500">このゲームソフトに追加のセーブデータスキーマ項目はありません。</p>;
   }
 
   return (
     <div className="space-y-5">
       {visibleFields.map((field) => {
-        const value = values[field.fieldKey] ?? '';
+        const value = resolveDynamicFieldRawValue(field, values[field.fieldKey]);
         return (
-          <div key={field.fieldKey} className="space-y-2 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+          <div key={field.fieldKey} className="space-y-2">
             <div className="space-y-1">
               <CustomLabel htmlFor={`dynamic-${field.fieldKey}`}>{field.label}</CustomLabel>
               <FieldHint description={field.description} required={field.isRequired} />
