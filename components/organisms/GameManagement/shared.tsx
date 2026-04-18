@@ -25,6 +25,7 @@ import {
   getGameConsoleMasterName,
   getGameSoftwareMasterName,
 } from './helpers';
+import { shouldRenderSelectPlaceholder } from './select-utils';
 
 // ---------------------------------------------------------------------------
 // SelectField
@@ -49,11 +50,13 @@ export function SelectField({
   disabled?: boolean;
   displayOnly?: boolean;
 }) {
+  const renderPlaceholder = shouldRenderSelectPlaceholder(options, placeholder);
+
   return (
     <div className="space-y-2">
       <CustomLabel htmlFor={id}>{label}</CustomLabel>
       <CustomComboBox id={id} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} displayOnly={displayOnly}>
-        {placeholder ? <option value="">{placeholder}</option> : null}
+        {renderPlaceholder ? <option value="">{placeholder}</option> : null}
         {options.map((option) => (
           <option key={option.value} value={option.value} disabled={option.disabled}>
             {option.label}

@@ -362,7 +362,7 @@ export function FormFields({
     case 'game-softwares': {
       const isDigital = formState.variant === '1';
       const digitalAccountOptions = optionize(accountCandidates, true);
-      const compatibleConsoleOptions = optionize(consoleCandidates, true);
+      const compatibleConsoleOptions = consoleCandidates;
       const selectedAccountForSoftware = isDigital && formState.accountId
         ? lookups.accounts.find((a) => String(a.id) === formState.accountId)
         : null;
