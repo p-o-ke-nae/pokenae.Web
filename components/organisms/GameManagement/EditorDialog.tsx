@@ -5,8 +5,10 @@ import CustomButton from '@/components/atoms/CustomButton';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
+import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
 import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
+import type { LayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
 import {
   fetchResourceById,
   getGameManagementErrorMessage,
@@ -61,6 +63,7 @@ export type EditorDialogProps = {
   pageMode?: PageMode;
   /** Callback to change page mode (e.g. when user enables editing from dialog) */
   onPageModeChange?: (mode: PageMode) => void;
+  layoutMode?: LayoutMode;
 };
 
 export default function EditorDialog({
@@ -77,6 +80,7 @@ export default function EditorDialog({
   onDataChanged,
   pageMode = 'edit',
   onPageModeChange,
+  layoutMode = 'desktop',
 }: EditorDialogProps) {
   const { isPending, startLoading } = useLoadingOverlay();
   const isNew = recordId === null;
@@ -381,15 +385,16 @@ export default function EditorDialog({
         size={resourceKey === 'save-datas' ? 'lg' : 'md'}
         footer={
           <DialogFooterLayout
+            layoutMode={layoutMode}
+            status={isPending ? (
+              <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">
+                保存中はダイアログを閉じられません。
+              </span>
+            ) : null}
             leading={
-              <>
-                {isPending ? (
-                  <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">
-                    保存中はダイアログを閉じられません。
-                  </span>
-                ) : null}
-                {!isNew && (
-                  <>
+              !isNew ? (
+                <div className="space-y-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3 sm:space-y-0">
+                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2}>
                     <CustomButton
                       disabled={!canGoPrev || loading}
                       onClick={() => navigate('prev')}
@@ -402,50 +407,56 @@ export default function EditorDialog({
                     >
                       次へ →
                     </CustomButton>
-                    {currentIndex >= 0 && (
-                      <span className="text-xs text-zinc-500">
-                        {currentIndex + 1} / {rowIds.length}
-                      </span>
-                    )}
-                  </>
-                )}
-              </>
+                  </ResponsiveActionGroup>
+                  {currentIndex >= 0 ? (
+                    <span className="text-xs text-zinc-500">
+                      {currentIndex + 1} / {rowIds.length}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null
             }
             trailing={
               isViewMode && onPageModeChange ? (
-                <>
+                <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
                   <CustomButton onClick={onClose} disabled={isPending}>閉じる</CustomButton>
                   <CustomButton variant="accent" disabled={isPending} onClick={() => onPageModeChange('edit')}>
                     編集を有効化
                   </CustomButton>
-                </>
+                </ResponsiveActionGroup>
               ) : (
                 <>
-                  {!isNew && definition.canDelete ? (
-                    <CustomButton variant="ghost" onClick={() => setDeleteDialogOpen(true)}>
-                      削除
-                    </CustomButton>
+                  {!isNew && (definition.canDelete || (!isViewMode && onPageModeChange)) ? (
+                    <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
+                      {definition.canDelete ? (
+                        <CustomButton variant="ghost" onClick={() => setDeleteDialogOpen(true)}>
+                          削除
+                        </CustomButton>
+                      ) : null}
+                      {!isViewMode && onPageModeChange ? (
+                        <CustomButton onClick={() => onPageModeChange('view')}>
+                          読み取り専用に戻す
+                        </CustomButton>
+                      ) : null}
+                    </ResponsiveActionGroup>
                   ) : null}
-                  {!isNew && !isViewMode && onPageModeChange ? (
-                    <CustomButton onClick={() => onPageModeChange('view')}>
-                      読み取り専用に戻す
-                    </CustomButton>
-                  ) : null}
-                  <CustomButton onClick={onClose} disabled={isPending}>キャンセル</CustomButton>
-                  {isNew ? (
-                    <>
-                      <CustomButton onClick={() => void handleSave('continue')} disabled={isPending || loading}>
-                        作成して続ける
-                      </CustomButton>
+                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                    <CustomButton onClick={onClose} disabled={isPending}>キャンセル</CustomButton>
+                    {isNew ? (
+                      <>
+                        <CustomButton onClick={() => void handleSave('continue')} disabled={isPending || loading}>
+                          作成して続ける
+                        </CustomButton>
+                        <CustomButton variant="accent" onClick={() => void handleSave('close')} disabled={isPending || loading}>
+                          作成して閉じる
+                        </CustomButton>
+                      </>
+                    ) : definition.canEdit ? (
                       <CustomButton variant="accent" onClick={() => void handleSave('close')} disabled={isPending || loading}>
-                        作成して閉じる
+                        保存する
                       </CustomButton>
-                    </>
-                  ) : definition.canEdit ? (
-                    <CustomButton variant="accent" onClick={() => void handleSave('close')} disabled={isPending || loading}>
-                      保存する
-                    </CustomButton>
-                  ) : null}
+                    ) : null}
+                  </ResponsiveActionGroup>
                 </>
               )
             }
@@ -486,7 +497,7 @@ export default function EditorDialog({
                 if (mergedFields.length > 0) {
                   return (
                     <div className="select-none space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-                      <p className="font-semibold text-zinc-800 dark:text-zinc-100">可変項目の現在値</p>
+                      <p className="font-semibold text-zinc-800 dark:text-zinc-100">セーブデータスキーマ項目の現在値</p>
                       <div className="space-y-2">
                         {mergedFields.filter((field) => !field.isDisabled).map((field) => (
                           <p key={field.fieldKey}>
@@ -500,7 +511,7 @@ export default function EditorDialog({
                 if (saveData.extendedFields.length > 0) {
                   return (
                     <div className="select-none space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-                      <p className="font-semibold text-zinc-800 dark:text-zinc-100">可変項目の現在値</p>
+                      <p className="font-semibold text-zinc-800 dark:text-zinc-100">セーブデータスキーマ項目の現在値</p>
                       <div className="space-y-2">
                         {saveData.extendedFields.map((field) => (
                           <p key={field.fieldKey}>
@@ -525,12 +536,17 @@ export default function EditorDialog({
         closeDisabled={isPending}
         title={`${definition.shortLabel}を削除`}
         footer={
-          <>
-            <CustomButton onClick={() => setDeleteDialogOpen(false)} disabled={isPending}>キャンセル</CustomButton>
-            <CustomButton variant="accent" disabled={isPending} onClick={() => void handleDelete()}>
-              削除する
-            </CustomButton>
-          </>
+          <DialogFooterLayout
+            layoutMode={layoutMode}
+            trailing={
+              <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
+                <CustomButton onClick={() => setDeleteDialogOpen(false)} disabled={isPending}>キャンセル</CustomButton>
+                <CustomButton variant="accent" disabled={isPending} onClick={() => void handleDelete()}>
+                  削除する
+                </CustomButton>
+              </ResponsiveActionGroup>
+            }
+          />
         }
       >
         <div className="space-y-4">

@@ -56,6 +56,17 @@ export function createDynamicFieldValueMap(fields: SaveDataFieldValueDto[]): Dyn
   return Object.fromEntries(fields.map((field) => [field.fieldKey, getFieldDisplayValue(field)]));
 }
 
+export function resolveDynamicFieldRawValue(
+  field: Pick<ResolvedSaveDataFieldSchemaDto, 'fieldType'>,
+  rawValue: string | null | undefined,
+): string {
+  if (field.fieldType === 4) {
+    return rawValue === 'true' || rawValue === 'false' ? rawValue : 'false';
+  }
+
+  return rawValue ?? '';
+}
+
 export function getFieldDisplayValue(field: Pick<SaveDataFieldValueDto, 'fieldType' | 'stringValue' | 'intValue' | 'decimalValue' | 'boolValue' | 'dateValue' | 'selectedOptionKey'>): string {
   switch (field.fieldType) {
     case 0:
@@ -121,7 +132,7 @@ export function buildExtendedFieldInputs(
 
   const inputs = schema.fields
     .filter((field) => !field.isDisabled)
-    .map((field) => buildFieldInput(field, values[field.fieldKey] ?? ''))
+    .map((field) => buildFieldInput(field, resolveDynamicFieldRawValue(field, values[field.fieldKey])))
     .filter((field): field is SaveDataFieldInputDto => Boolean(field));
 
   return inputs.length > 0 ? inputs : null;
@@ -223,7 +234,7 @@ export function validateDynamicFieldInputs(
 
   return schema.fields
     .filter((field) => !field.isDisabled)
-    .flatMap((field) => validateDynamicField(field, values[field.fieldKey] ?? ''));
+    .flatMap((field) => validateDynamicField(field, resolveDynamicFieldRawValue(field, values[field.fieldKey])));
 }
 
 function validateDynamicField(field: ResolvedSaveDataFieldSchemaDto, rawValue: string): string[] {
@@ -280,7 +291,7 @@ export function mergeSchemaWithSaveData(
         stringValue: currentValue?.stringValue ?? null,
         intValue: currentValue?.intValue ?? null,
         decimalValue: currentValue?.decimalValue ?? null,
-        boolValue: currentValue?.boolValue ?? null,
+        boolValue: field.fieldType === 4 ? (currentValue?.boolValue ?? false) : (currentValue?.boolValue ?? null),
         dateValue: currentValue?.dateValue ?? null,
         selectedOptionKey: currentValue?.selectedOptionKey ?? null,
       };
@@ -298,9 +309,6 @@ export function formatMergedFieldValue(field: MergedSaveDataField): string {
     case 3:
       return field.decimalValue == null ? '未入力' : String(field.decimalValue);
     case 4:
-      if (field.boolValue == null) {
-        return '未入力';
-      }
       return field.boolValue ? 'はい' : 'いいえ';
     case 5:
       return field.dateValue ?? '未入力';
@@ -326,9 +334,6 @@ export function formatSaveDataFieldValueForList(field: SaveDataFieldValueDto): s
     case 3:
       return field.decimalValue == null ? '未入力' : String(field.decimalValue);
     case 4:
-      if (field.boolValue == null) {
-        return '未入力';
-      }
       return field.boolValue ? 'はい' : 'いいえ';
     case 5:
       return field.dateValue ?? '未入力';

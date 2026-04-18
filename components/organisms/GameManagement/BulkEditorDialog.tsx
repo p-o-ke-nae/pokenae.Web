@@ -5,9 +5,11 @@ import CustomButton from '@/components/atoms/CustomButton';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
-import Dialog from '@/components/molecules/Dialog';
+import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
+import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import { getGameManagementErrorMessage, updateResource } from '@/lib/game-management/api';
+import type { LayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
 import resources from '@/lib/resources';
 import type { ResourceDefinition } from '@/lib/game-management/resources';
 import type { ManagementLookups, ResourceKey } from '@/lib/game-management/types';
@@ -25,6 +27,7 @@ export type BulkEditorDialogProps = {
   targetRecordIds: number[];
   bulkEditableFields: string[];
   onDataChanged: () => void;
+  layoutMode?: LayoutMode;
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -45,6 +48,7 @@ export default function BulkEditorDialog({
   targetRecordIds,
   bulkEditableFields,
   onDataChanged,
+  layoutMode = 'desktop',
 }: BulkEditorDialogProps) {
   const { isPending, startLoading } = useLoadingOverlay();
   const [formState, setFormState] = useState<BulkFormState>({});
@@ -229,13 +233,18 @@ export default function BulkEditorDialog({
       title={`${definition.shortLabel} 一括編集（${targetRecordIds.length} 件）`}
       size="md"
       footer={
-        <>
-          {isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">更新中はダイアログを閉じられません。</span> : null}
-          <CustomButton onClick={onClose} disabled={isPending}>キャンセル</CustomButton>
-          <CustomButton variant="accent" disabled={activeFieldCount === 0 || isPending} onClick={() => void handleSave()}>
-            一括更新
-          </CustomButton>
-        </>
+        <DialogFooterLayout
+          layoutMode={layoutMode}
+          status={isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">更新中はダイアログを閉じられません。</span> : null}
+          trailing={
+            <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
+              <CustomButton onClick={onClose} disabled={isPending}>キャンセル</CustomButton>
+              <CustomButton variant="accent" disabled={activeFieldCount === 0 || isPending} onClick={() => void handleSave()}>
+                一括更新
+              </CustomButton>
+            </ResponsiveActionGroup>
+          }
+        />
       }
     >
       <div className="space-y-4">

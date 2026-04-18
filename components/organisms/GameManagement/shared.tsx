@@ -3,6 +3,8 @@
 import CustomComboBox from '@/components/atoms/CustomComboBox';
 import CustomHeader from '@/components/atoms/CustomHeader';
 import CustomLabel from '@/components/atoms/CustomLabel';
+import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
+import type { LayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
 import { formatSaveStorageType } from '@/lib/game-management/save-storage-type';
 import type {
   AccountDto,
@@ -25,6 +27,7 @@ import {
   getGameConsoleMasterName,
   getGameSoftwareMasterName,
 } from './helpers';
+import { shouldRenderSelectPlaceholder } from './select-utils';
 
 // ---------------------------------------------------------------------------
 // SelectField
@@ -49,11 +52,13 @@ export function SelectField({
   disabled?: boolean;
   displayOnly?: boolean;
 }) {
+  const renderPlaceholder = shouldRenderSelectPlaceholder(options, placeholder);
+
   return (
     <div className="space-y-2">
       <CustomLabel htmlFor={id}>{label}</CustomLabel>
       <CustomComboBox id={id} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} displayOnly={displayOnly}>
-        {placeholder ? <option value="">{placeholder}</option> : null}
+        {renderPlaceholder ? <option value="">{placeholder}</option> : null}
         {options.map((option) => (
           <option key={option.value} value={option.value} disabled={option.disabled}>
             {option.label}
@@ -94,25 +99,38 @@ export function PageFrame({
   title,
   description,
   actions,
+  layoutMode = 'desktop',
   children,
 }: {
   eyebrowLabel?: string;
   title: string;
   description: string;
   actions?: React.ReactNode;
+  layoutMode?: LayoutMode;
   children: React.ReactNode;
 }) {
+  const headerLayoutClasses = 'flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between';
+
   return (
     <main className="min-h-screen bg-zinc-50 px-4 py-8 dark:bg-black sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <div className="flex flex-col gap-4 rounded-3xl bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(241,245,249,0.95))] p-6 shadow-sm ring-1 ring-zinc-200 dark:bg-[linear-gradient(135deg,rgba(24,24,27,0.95),rgba(9,9,11,0.95))] dark:ring-zinc-800">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className={headerLayoutClasses}>
             <div className="space-y-3">
               <p className="select-none text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">{eyebrowLabel}</p>
               <CustomHeader level={1}>{title}</CustomHeader>
               <p className="select-none max-w-3xl text-sm leading-6 text-zinc-600 dark:text-zinc-300">{description}</p>
             </div>
-            {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
+            {actions ? (
+              <ResponsiveActionGroup
+                layoutMode={layoutMode}
+                mobileColumns={1}
+                align="end"
+                className="w-full sm:w-auto"
+              >
+                {actions}
+              </ResponsiveActionGroup>
+            ) : null}
           </div>
         </div>
         {children}

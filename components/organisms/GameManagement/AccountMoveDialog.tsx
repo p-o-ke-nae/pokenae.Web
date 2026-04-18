@@ -3,12 +3,14 @@
 import { useCallback, useState } from 'react';
 import CustomButton from '@/components/atoms/CustomButton';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
-import Dialog from '@/components/molecules/Dialog';
+import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
+import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import {
   getGameManagementErrorMessage,
   moveAccountBetweenConsoles,
 } from '@/lib/game-management/api';
+import type { LayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
 import resources from '@/lib/resources';
 import type { AccountDto, ManagementLookups } from '@/lib/game-management/types';
 import { getAccountDisplay, getAccountMoveTargetConsoles, getGameConsoleDisplay } from './helpers';
@@ -20,6 +22,7 @@ export type AccountMoveDialogProps = {
   account: AccountDto;
   lookups: ManagementLookups;
   onSuccess: () => void;
+  layoutMode?: LayoutMode;
 };
 
 export default function AccountMoveDialog({
@@ -28,6 +31,7 @@ export default function AccountMoveDialog({
   account,
   lookups,
   onSuccess,
+  layoutMode = 'desktop',
 }: AccountMoveDialogProps) {
   const { isPending, startLoading } = useLoadingOverlay();
   const [sourceGameConsoleId, setSourceGameConsoleId] = useState('');
@@ -94,15 +98,20 @@ export default function AccountMoveDialog({
       title="アカウントのゲーム機間移行"
       size="md"
       footer={
-        <>
-          {isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">移行中はダイアログを閉じられません。</span> : null}
-          <CustomButton onClick={handleClose} disabled={isPending}>
-            キャンセル
-          </CustomButton>
-          <CustomButton variant="accent" disabled={!canSubmit || isPending} onClick={handleSubmit}>
-            移行する
-          </CustomButton>
-        </>
+        <DialogFooterLayout
+          layoutMode={layoutMode}
+          status={isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">移行中はダイアログを閉じられません。</span> : null}
+          trailing={
+            <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
+              <CustomButton onClick={handleClose} disabled={isPending}>
+                キャンセル
+              </CustomButton>
+              <CustomButton variant="accent" disabled={!canSubmit || isPending} onClick={handleSubmit}>
+                移行する
+              </CustomButton>
+            </ResponsiveActionGroup>
+          }
+        />
       }
     >
       <div className="space-y-5 p-1">

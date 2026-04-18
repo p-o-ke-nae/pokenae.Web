@@ -11,7 +11,8 @@ import CustomMessageArea from '@/components/atoms/CustomMessageArea';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
 import CustomTextBox from '@/components/atoms/CustomTextBox';
 import DataTable, { DATA_TABLE_DEFAULT_PAGE_HEIGHT, type DataTableColumn, type SortState } from '@/components/molecules/DataTable';
-import Dialog from '@/components/molecules/Dialog';
+import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
+import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
 import { moveSelectedItemsByOne, moveSelectedItemsToTarget } from '@/components/molecules/DataTable/selection-utils';
 import RowMoveButtons from '@/components/organisms/GameManagement/RowMoveButtons';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
@@ -19,6 +20,7 @@ import {
   fetchMasterLookups,
   getGameManagementErrorMessage,
 } from '@/lib/game-management/api';
+import { useResponsiveLayoutMode, type LayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
 import resources from '@/lib/resources';
 import {
   fetchPublicStoryProgressSchema,
@@ -240,15 +242,21 @@ function SelectField({
   );
 }
 
-function SectionCard({ title, description, actions, children }: { title: string; description: string; actions?: React.ReactNode; children: React.ReactNode }) {
+function SectionCard({ title, description, actions, layoutMode, children }: { title: string; description: string; actions?: React.ReactNode; layoutMode: LayoutMode; children: React.ReactNode }) {
+  const headerLayoutClasses = 'mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between';
+
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <div className={headerLayoutClasses}>
         <div className="space-y-2">
           <CustomHeader level={2}>{title}</CustomHeader>
           <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">{description}</p>
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
+        {actions ? (
+          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end" className="w-full sm:w-auto">
+            {actions}
+          </ResponsiveActionGroup>
+        ) : null}
       </div>
       {children}
     </section>
@@ -261,6 +269,7 @@ function SectionCard({ title, description, actions, children }: { title: string;
 
 export default function StoryProgressManager() {
   const { isPending, startLoading } = useLoadingOverlay();
+  const layoutMode = useResponsiveLayoutMode();
   const definitionDialogBodyRef = useRef<HTMLDivElement | null>(null);
 
   const [lookups, setLookups] = useState<MasterLookups | null>(null);
@@ -725,6 +734,7 @@ export default function StoryProgressManager() {
         {success && !inlineDialogMessageVisible && <CustomMessageArea variant="success">{success}</CustomMessageArea>}
 
         <SectionCard
+          layoutMode={layoutMode}
           title="進行度定義"
           description="コンテンツグループごとのストーリー進行度定義を管理します。表示順と表示名を定義し、SaveData の候補元になります。"
           actions={
@@ -736,12 +746,14 @@ export default function StoryProgressManager() {
                 options={contentGroupOptions}
                 onChange={setSelectedContentGroupId}
               />
-              {pageMode === 'edit' ? (
-                <CustomButton variant="accent" disabled={!selectedContentGroupId} onClick={() => openDefinitionDialog(null)}>
-                  進行度定義を追加
-                </CustomButton>
-              ) : null}
-              <CustomButton variant="accent" disabled={!defReorderDirty || defReorderSaving || pageMode === 'view' || activeDefinitionCount <= 1} onClick={() => void handleSaveDefReorder()}>表示順を保存</CustomButton>
+              <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                {pageMode === 'edit' ? (
+                  <CustomButton variant="accent" disabled={!selectedContentGroupId} onClick={() => openDefinitionDialog(null)}>
+                    進行度定義を追加
+                  </CustomButton>
+                ) : null}
+                <CustomButton variant="accent" disabled={!defReorderDirty || defReorderSaving || pageMode === 'view' || activeDefinitionCount <= 1} onClick={() => void handleSaveDefReorder()}>表示順を保存</CustomButton>
+              </ResponsiveActionGroup>
             </>
           }
         >
@@ -765,7 +777,7 @@ export default function StoryProgressManager() {
                   render: (_value, row) => {
                     const idx = defRowOrder?.indexOf(row.id) ?? -1;
                     return (
-                      <span className="flex flex-wrap gap-2">
+                      <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2}>
                         <RowMoveButtons
                           isFirst={idx <= 0}
                           isLast={idx === (defRowOrder?.length ?? 0) - 1}
@@ -784,7 +796,7 @@ export default function StoryProgressManager() {
                             削除
                           </CustomButton>
                         )}
-                      </span>
+                      </ResponsiveActionGroup>
                     );
                   },
                 },
@@ -808,6 +820,7 @@ export default function StoryProgressManager() {
         </SectionCard>
 
         <SectionCard
+          layoutMode={layoutMode}
           title="作品別 override"
           description="ゲームソフトマスタ単位で、ラベルの上書きや無効化を設定します。"
           actions={
@@ -830,7 +843,7 @@ export default function StoryProgressManager() {
                   const def = overrideDefinitions.find((item) => item.id === row.id);
                   const hasOverride = overrides.some((o) => o.storyProgressDefinitionId === row.id);
                   return (
-                    <span className="flex flex-wrap gap-2">
+                    <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2}>
                       <CustomButton variant="neutral" onClick={() => { if (def) openOverrideDialog(def); }}>
                         {pageMode === 'view' ? '詳細' : hasOverride ? '編集' : '設定'}
                       </CustomButton>
@@ -839,7 +852,7 @@ export default function StoryProgressManager() {
                           削除
                         </CustomButton>
                       )}
-                    </span>
+                    </ResponsiveActionGroup>
                   );
                 },
               },
@@ -852,6 +865,7 @@ export default function StoryProgressManager() {
         </SectionCard>
 
         <SectionCard
+          layoutMode={layoutMode}
           title="resolved プレビュー"
           description="公開 story-progress-schema API から取得した、作品ごとの最終的な進行度候補を確認します。"
         >
@@ -872,23 +886,40 @@ export default function StoryProgressManager() {
         title={editingDefinition ? (pageMode === 'view' ? '進行度定義の詳細' : '進行度定義の編集') : '進行度定義の新規作成'}
         footer={
           pageMode === 'view' && editingDefinition ? (
-            <>
-              <CustomButton onClick={() => setDefinitionDialogOpen(false)}>閉じる</CustomButton>
-              <CustomButton variant="accent" onClick={() => setPageMode('edit')}>編集を有効化</CustomButton>
-            </>
+            <DialogFooterLayout
+              layoutMode={layoutMode}
+              trailing={
+                <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                  <CustomButton onClick={() => setDefinitionDialogOpen(false)}>閉じる</CustomButton>
+                  <CustomButton variant="accent" onClick={() => setPageMode('edit')}>編集を有効化</CustomButton>
+                </ResponsiveActionGroup>
+              }
+            />
           ) : (
-            <>
-              {editingDefinition && <CustomButton onClick={() => setPageMode('view')}>読み取り専用に戻す</CustomButton>}
-              <CustomButton variant="neutral" onClick={() => setDefinitionDialogOpen(false)} disabled={isPending}>キャンセル</CustomButton>
-              {!editingDefinition ? (
+            <DialogFooterLayout
+              layoutMode={layoutMode}
+              status={isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">保存中はダイアログを閉じられません。</span> : null}
+              trailing={
                 <>
-                  <CustomButton onClick={() => void handleSaveDefinition('continue')} disabled={isPending}>作成して続ける</CustomButton>
-                  <CustomButton variant="accent" onClick={() => void handleSaveDefinition('close')} disabled={isPending}>作成して閉じる</CustomButton>
+                  {editingDefinition ? (
+                    <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
+                      <CustomButton onClick={() => setPageMode('view')}>読み取り専用に戻す</CustomButton>
+                    </ResponsiveActionGroup>
+                  ) : null}
+                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                    <CustomButton variant="neutral" onClick={() => setDefinitionDialogOpen(false)} disabled={isPending}>キャンセル</CustomButton>
+                    {!editingDefinition ? (
+                      <>
+                        <CustomButton onClick={() => void handleSaveDefinition('continue')} disabled={isPending}>作成して続ける</CustomButton>
+                        <CustomButton variant="accent" onClick={() => void handleSaveDefinition('close')} disabled={isPending}>作成して閉じる</CustomButton>
+                      </>
+                    ) : (
+                      <CustomButton variant="accent" onClick={() => void handleSaveDefinition('close')} disabled={isPending}>保存</CustomButton>
+                    )}
+                  </ResponsiveActionGroup>
                 </>
-              ) : (
-                <CustomButton variant="accent" onClick={() => void handleSaveDefinition('close')} disabled={isPending}>保存</CustomButton>
-              )}
-            </>
+              }
+            />
           )
         }
       >
@@ -926,16 +957,31 @@ export default function StoryProgressManager() {
         title={pageMode === 'view' ? 'override の詳細' : editingOverride ? 'override の編集' : 'override の新規設定'}
         footer={
           pageMode === 'view' ? (
-            <>
-              <CustomButton onClick={() => setOverrideDialogOpen(false)}>閉じる</CustomButton>
-              <CustomButton variant="accent" onClick={() => setPageMode('edit')}>編集を有効化</CustomButton>
-            </>
+            <DialogFooterLayout
+              layoutMode={layoutMode}
+              trailing={
+                <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                  <CustomButton onClick={() => setOverrideDialogOpen(false)}>閉じる</CustomButton>
+                  <CustomButton variant="accent" onClick={() => setPageMode('edit')}>編集を有効化</CustomButton>
+                </ResponsiveActionGroup>
+              }
+            />
           ) : (
-            <>
-              <CustomButton onClick={() => setPageMode('view')}>読み取り専用に戻す</CustomButton>
-              <CustomButton variant="neutral" onClick={() => setOverrideDialogOpen(false)} disabled={isPending}>キャンセル</CustomButton>
-              <CustomButton variant="accent" disabled={isPending} onClick={() => void handleSaveOverride()}>保存</CustomButton>
-            </>
+            <DialogFooterLayout
+              layoutMode={layoutMode}
+              status={isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">保存中はダイアログを閉じられません。</span> : null}
+              trailing={
+                <>
+                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
+                    <CustomButton onClick={() => setPageMode('view')}>読み取り専用に戻す</CustomButton>
+                  </ResponsiveActionGroup>
+                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+                    <CustomButton variant="neutral" onClick={() => setOverrideDialogOpen(false)} disabled={isPending}>キャンセル</CustomButton>
+                    <CustomButton variant="accent" disabled={isPending} onClick={() => void handleSaveOverride()}>保存</CustomButton>
+                  </ResponsiveActionGroup>
+                </>
+              }
+            />
           )
         }
       >

@@ -1,5 +1,5 @@
 import { formatSaveStorageType } from '@/lib/game-management/save-storage-type';
-import { formatSaveDataFieldValueForList } from '@/lib/game-management/save-data-fields';
+import { formatMergedFieldValue, formatSaveDataFieldValueForList, mergeSchemaWithSaveData } from '@/lib/game-management/save-data-fields';
 import {
   formatDeletedState,
   getAccountDisplay,
@@ -336,10 +336,13 @@ export function buildTableRows(
         const master = masterId ? lookups.gameSoftwareMasters.find((m) => m.id === masterId) : null;
         const schema = masterId ? saveDataSchemas[masterId] : null;
         const storageParts = getSaveDataStorageParts(item, lookups);
-        const dynamicFieldLabels = Object.fromEntries(item.extendedFields.map((field) => [field.fieldKey, field.label]));
-        const dynamicFieldValues = Object.fromEntries(
-          item.extendedFields.map((field) => [`dynamic:${field.fieldKey}`, formatSaveDataDynamicFieldValue(field, schema)]),
-        );
+        const mergedFields = mergeSchemaWithSaveData(schema, item).filter((field) => !field.isDisabled);
+        const dynamicFieldLabels = mergedFields.length > 0
+          ? Object.fromEntries(mergedFields.map((field) => [field.fieldKey, field.label]))
+          : Object.fromEntries(item.extendedFields.map((field) => [field.fieldKey, field.label]));
+        const dynamicFieldValues = mergedFields.length > 0
+          ? Object.fromEntries(mergedFields.map((field) => [`dynamic:${field.fieldKey}`, formatMergedFieldValue(field)]))
+          : Object.fromEntries(item.extendedFields.map((field) => [`dynamic:${field.fieldKey}`, formatSaveDataDynamicFieldValue(field, schema)]));
 
         return {
           tableRowKey: createTableRowKey(resourceKey, item.id),

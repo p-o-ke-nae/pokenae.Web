@@ -286,6 +286,8 @@ className = "",
 }: DataTableProps<T>) {
 const tableRootRef = useRef<HTMLDivElement>(null);
 const headerTableRef = useRef<HTMLTableElement>(null);
+const headerScrollRef = useRef<HTMLDivElement>(null);
+const filterScrollRef = useRef<HTMLDivElement>(null);
 const recordsRef = useRef<HTMLDivElement>(null);
 const [scrollbarOffset, setScrollbarOffset] = useState(0);
 const [currentPage, setCurrentPage] = useState(0);
@@ -340,6 +342,16 @@ const effectiveExpandedKeys = expandedKeysProp ?? internalExpandedKeys;
 
 const hasActiveFilter = orderedColumns.some(c => c.filterable);
 const filterSourceData = filterOptionsData ?? data;
+
+const syncHeaderRegions = useCallback((scrollLeft: number) => {
+  if (headerScrollRef.current) {
+    headerScrollRef.current.scrollLeft = scrollLeft;
+  }
+
+  if (filterScrollRef.current) {
+    filterScrollRef.current.scrollLeft = scrollLeft;
+  }
+}, []);
 
 useLayoutEffect(() => {
   const headerTable = headerTableRef.current;
@@ -396,6 +408,10 @@ useLayoutEffect(() => {
     resizeObserver.disconnect();
   };
 }, [height, maxHeight, processedData.length, orderedColumns.length]);
+
+useLayoutEffect(() => {
+  syncHeaderRegions(recordsRef.current?.scrollLeft ?? 0);
+});
 
 // 値選択フィルタの選択肢をデータから自動生成（重複なし）
 const selectFilterOptions = useMemo(() => {
@@ -913,6 +929,16 @@ const panelSizeStyle: React.CSSProperties = {
 ...(maxHeight ? { maxHeight } : undefined),
 };
 
+const handleRecordsScroll = useCallback(() => {
+  syncHeaderRegions(recordsRef.current?.scrollLeft ?? 0);
+}, [syncHeaderRegions]);
+
+const visibleRangeStart = totalItems > 0 ? pageStartIndex + 1 : 0;
+const visibleRangeEnd = totalItems > 0 ? pageEndIndex : 0;
+const paginationSummary = `${totalItems} 件中 ${visibleRangeStart}–${visibleRangeEnd} 件を表示`;
+const showPaginationFooter = paginated;
+const showPaginationNav = effectivePaginated && totalPages > 1;
+
 return (
 <>
 {onAddRow && (
@@ -949,23 +975,28 @@ style={{
 )}
 {headerRow && (
 <div className={styles.header} style={scrollbarOffset > 0 ? { paddingRight: scrollbarOffset } : undefined}>
+<div ref={headerScrollRef} className={styles.headerViewport}>
 <table ref={headerTableRef} className={styles.table}>
 {renderColGroup()}
 <thead>{headerRow}</thead>
 </table>
 </div>
+</div>
 )}
 {filterRow && (
 <div className={styles.filters} style={scrollbarOffset > 0 ? { paddingRight: scrollbarOffset } : undefined}>
+<div ref={filterScrollRef} className={styles.headerViewport}>
 <table className={styles.table}>
 {renderColGroup()}
 <thead>{filterRow}</thead>
 </table>
 </div>
+</div>
 )}
 <div
 ref={recordsRef}
 className={cx(styles.records, (height || maxHeight) ? styles.recordsScrollable : '')}
+onScroll={handleRecordsScroll}
 >
 {paginatedData.length > 0 ? (
 <div className={styles.recordsInner}>
@@ -982,11 +1013,13 @@ className={cx(styles.records, (height || maxHeight) ? styles.recordsScrollable :
 </div>
 )}
 </div>
-{effectivePaginated && totalPages > 1 && (
+{showPaginationFooter && (
 <div className={styles.pagination}>
-<span className={styles.paginationInfo}>
-{totalItems} 件中 {pageStartIndex + 1}–{pageEndIndex} 件を表示
-</span>
+<div className={styles.paginationInfoSlot}>
+<span className={styles.paginationInfo}>{paginationSummary}</span>
+</div>
+<div className={styles.paginationNavSlot}>
+{showPaginationNav ? (
 <nav className={styles.paginationNav} aria-label="ページ送り">
 <button
 type="button"
@@ -1041,6 +1074,11 @@ aria-label="最後のページ"
 »
 </button>
 </nav>
+ ) : (
+<div className={styles.paginationNavPlaceholder} aria-hidden="true" />
+ )}
+</div>
+<div className={styles.paginationSizeSlot}>
 <div className={styles.paginationSizeSelect}>
 <label>
 {resources.dataTable.pageSize ?? '表示件数'}
@@ -1058,6 +1096,7 @@ setCurrentPage(0);
 </label>
 </div>
 </div>
+ </div>
 )}
 {paginated && effectiveRowReorderEnabled && (
 <div className={styles.paginationReorderNote}>
