@@ -4,8 +4,52 @@
  */
 
 import type { ApiServiceConfig } from '../config/api-config';
+import { BACKEND_API_DEFAULT_TIMEOUT_MS } from '../config/api-config';
 import type { ApiResponse, ApiRequestOptions } from '../types/api';
-import resources from '@/lib/resources';
+import resources from '../resources';
+
+function mergeAbortSignals(signals: Array<AbortSignal | undefined>): {
+  signal: AbortSignal | undefined;
+  cleanup: () => void;
+} {
+  const activeSignals = signals.filter((signal): signal is AbortSignal => signal != null);
+
+  if (activeSignals.length === 0) {
+    return { signal: undefined, cleanup: () => undefined };
+  }
+
+  if (activeSignals.length === 1) {
+    return { signal: activeSignals[0], cleanup: () => undefined };
+  }
+
+  const controller = new AbortController();
+  const listeners = new Map<AbortSignal, () => void>();
+
+  const cleanup = () => {
+    for (const [signal, listener] of listeners) {
+      signal.removeEventListener('abort', listener);
+    }
+    listeners.clear();
+  };
+
+  const abortFrom = (sourceSignal: AbortSignal) => {
+    cleanup();
+    controller.abort(sourceSignal.reason);
+  };
+
+  for (const signal of activeSignals) {
+    if (signal.aborted) {
+      abortFrom(signal);
+      return { signal: controller.signal, cleanup };
+    }
+
+    const listener = () => abortFrom(signal);
+    listeners.set(signal, listener);
+    signal.addEventListener('abort', listener, { once: true });
+  }
+
+  return { signal: controller.signal, cleanup };
+}
 
 export class ApiClient {
   private baseUrl: string;
@@ -14,9 +58,8 @@ export class ApiClient {
 
   constructor(config: ApiServiceConfig) {
     this.baseUrl = config.baseUrl.replace(/\/$/, ''); // 末尾のスラッシュを除去
-    // CPU負荷軽減のため、タイムアウトを10秒に短縮（以前は30秒）
-    // 注: 長時間かかるAPIエンドポイントの場合は、呼び出し時にtimeoutオプションで個別に指定可能
-    this.timeout = config.timeout || 10000;
+    // ACA の scale-to-zero 復帰時に発生するコールドスタートを吸収できる既定値を使う
+    this.timeout = config.timeout ?? BACKEND_API_DEFAULT_TIMEOUT_MS;
     this.defaultHeaders = {
       'Content-Type': 'application/json',
     };
@@ -42,12 +85,13 @@ export class ApiClient {
     // タイムアウト用のAbortController
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const { signal, cleanup } = mergeAbortSignals([options.signal, controller.signal]);
 
     try {
       const fetchOptions: RequestInit = {
         method,
         headers,
-        signal: options.signal || controller.signal,
+        signal,
       };
 
       // GET以外のメソッドでbodyを追加
@@ -58,6 +102,7 @@ export class ApiClient {
       const response = await fetch(url, fetchOptions);
 
       clearTimeout(timeoutId);
+      cleanup();
 
       // レスポンスをJSON形式でパース
       let data;
@@ -87,6 +132,7 @@ export class ApiClient {
       }
     } catch (error) {
       clearTimeout(timeoutId);
+      cleanup();
 
       // エラーハンドリング
       if (error instanceof Error) {
