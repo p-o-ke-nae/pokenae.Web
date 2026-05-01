@@ -13,7 +13,7 @@ export interface ApiServiceConfig {
 
 export type ApiServiceName = 'user-api' | 'service1' | 'service2' | 'service3' | (string & {});
 
-const DEFAULT_TIMEOUT_MS = 30000;
+export const BACKEND_API_DEFAULT_TIMEOUT_MS = 60000;
 
 const BUILTIN_SERVICE_CONFIG: Record<string, { baseUrlEnv: string; apiKeyEnv?: string; defaultPath?: string }> = {
   service1: {
@@ -83,7 +83,7 @@ export function getApiConfig(serviceName: ApiServiceName): ApiServiceConfig {
     return {
       baseUrl: process.env[builtinConfig.baseUrlEnv] || joinBaseUrl(apiBaseUrl, builtinConfig.defaultPath || ''),
       apiKey: builtinConfig.apiKeyEnv ? process.env[builtinConfig.apiKeyEnv] : undefined,
-      timeout: DEFAULT_TIMEOUT_MS,
+      timeout: BACKEND_API_DEFAULT_TIMEOUT_MS,
     };
   }
 
@@ -94,7 +94,7 @@ export function getApiConfig(serviceName: ApiServiceName): ApiServiceConfig {
   return {
     baseUrl: process.env[dynamicBaseUrlEnvName] || joinBaseUrl(apiBaseUrl, serviceName),
     apiKey: process.env[dynamicApiKeyEnvName],
-    timeout: DEFAULT_TIMEOUT_MS,
+    timeout: BACKEND_API_DEFAULT_TIMEOUT_MS,
   };
 }
 
