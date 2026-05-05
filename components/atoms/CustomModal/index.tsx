@@ -3,15 +3,53 @@
 import { forwardRef, useCallback, useEffect, useRef } from "react";
 import type { HTMLAttributes, ReactNode } from "react";
 
+let scrollLockDepth = 0;
+let previousBodyOverflow = "";
+let previousBodyOverscrollBehavior = "";
+
+const lockBodyScroll = () => {
+	if (typeof document === "undefined") return;
+	if (scrollLockDepth === 0) {
+		previousBodyOverflow = document.body.style.overflow;
+		previousBodyOverscrollBehavior = document.body.style.overscrollBehavior;
+		document.body.style.overflow = "hidden";
+		document.body.style.overscrollBehavior = "contain";
+	}
+	scrollLockDepth += 1;
+};
+
+const unlockBodyScroll = () => {
+	if (typeof document === "undefined" || scrollLockDepth === 0) return;
+	scrollLockDepth -= 1;
+	if (scrollLockDepth === 0) {
+		document.body.style.overflow = previousBodyOverflow;
+		document.body.style.overscrollBehavior = previousBodyOverscrollBehavior;
+	}
+};
+
 export type CustomModalProps = HTMLAttributes<HTMLDialogElement> & {
 	open: boolean;
 	onClose?: () => void;
+	closeDisabled?: boolean;
+	mobileLayout?: "centered" | "viewport-fit";
 	children?: ReactNode;
 };
 
 const CustomModal = forwardRef<HTMLDialogElement, CustomModalProps>(
-	({ open, onClose, children, className = "", ...rest }, ref) => {
+	({ open, onClose, closeDisabled = false, mobileLayout = "centered", children, className = "", ...rest }, ref) => {
 		const localRef = useRef<HTMLDialogElement>(null);
+		const restoreFocusRef = useRef<HTMLElement | null>(null);
+		const wasOpenRef = useRef(open);
+
+		const restoreFocus = useCallback(() => {
+			const restoreTarget = restoreFocusRef.current;
+			restoreFocusRef.current = null;
+			if (restoreTarget && restoreTarget.isConnected) {
+				requestAnimationFrame(() => {
+					restoreTarget.focus();
+				});
+			}
+		}, []);
 
 		const setRef = useCallback(
 			(node: HTMLDialogElement | null) => {
@@ -35,11 +73,62 @@ const CustomModal = forwardRef<HTMLDialogElement, CustomModalProps>(
 			}
 		}, [open]);
 
+		useEffect(() => {
+			wasOpenRef.current = open;
+		}, [open]);
+
+		useEffect(() => {
+			if (open) {
+				const activeElement = document.activeElement;
+				restoreFocusRef.current = activeElement instanceof HTMLElement ? activeElement : null;
+				lockBodyScroll();
+				return () => {
+					unlockBodyScroll();
+				};
+			}
+
+			restoreFocus();
+			return undefined;
+		}, [open, restoreFocus]);
+
+		useEffect(() => {
+			return () => {
+				if (wasOpenRef.current) {
+					restoreFocus();
+				}
+			};
+		}, [restoreFocus]);
+
+		const handleCancel = useCallback((event: React.SyntheticEvent<HTMLDialogElement, Event>) => {
+			if (closeDisabled) {
+				event.preventDefault();
+			}
+		}, [closeDisabled]);
+
+		const handleClose = useCallback(() => {
+			if (closeDisabled) {
+				const dialog = localRef.current;
+				if (dialog && open && !dialog.open) {
+					dialog.showModal();
+				}
+				return;
+			}
+
+			onClose?.();
+		}, [closeDisabled, onClose, open]);
+
 		const classes = ["custom-modal", className].filter(Boolean).join(" ");
 
 		return (
 			<>
-				<dialog ref={setRef} className={classes} onClose={onClose} {...rest}>
+				<dialog
+					ref={setRef}
+					className={classes}
+					data-mobile-layout={mobileLayout}
+					onCancel={handleCancel}
+					onClose={handleClose}
+					{...rest}
+				>
 					{children}
 				</dialog>
 
@@ -57,6 +146,9 @@ const CustomModal = forwardRef<HTMLDialogElement, CustomModalProps>(
 						box-shadow:
 							0 0 0 1px var(--color-base-70-dark),
 							0 24px 64px rgba(31, 31, 42, 0.18);
+						width: var(--custom-modal-inline-size, auto);
+						max-width: min(calc(100vw - 1.5rem), var(--custom-modal-inline-size, calc(100vw - 1.5rem)));
+						max-height: var(--custom-modal-max-block-size, calc(100dvh - 1.5rem));
 						padding: 0;
 						overflow: hidden;
 						outline: none;
@@ -89,6 +181,15 @@ const CustomModal = forwardRef<HTMLDialogElement, CustomModalProps>(
 						}
 						to {
 							opacity: 1;
+						}
+					}
+
+					@media (max-width: 640px) {
+						.custom-modal[data-mobile-layout="viewport-fit"] {
+							width: calc(100vw - 0.75rem);
+							max-width: calc(100vw - 0.75rem);
+							max-height: calc(100dvh - 0.75rem);
+							border-radius: 1rem;
 						}
 					}
 				`}</style>

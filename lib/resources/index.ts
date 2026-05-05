@@ -1,28 +1,18 @@
 /**
- * UIコンポーネントで使用するテキストリソース
- * 多言語対応時はこのファイルを言語ごとに分けて切り替えてください。
+ * UI とエラーメッセージの統合リソース入口。
+ * 利用側は原則このファイルを入口として参照し、内部では責務別モジュールへ分割する。
  */
+
+import { apiErrorResources } from './api-errors';
+import { gameManagementResources } from './game-management';
+import { uiResources } from './ui';
+
 const resources = {
-  common: {
-    close: "閉じる",
-    loading: "Loading...",
-  },
-  loader: {
-    label: "Loading...",
-  },
-  loadingOverlay: {
-    message: "Loading...",
-  },
-  searchField: {
-    dialogTitle: "検索",
-    searchPlaceholder: "絞り込み...",
-    noResults: "該当する項目がありません",
-    searchButtonLabel: "検索ダイアログを開く",
-    clearButtonLabel: "クリア",
-    valuePlaceholder: "IDを入力",
-    labelPlaceholder: "名称",
-    noMatch: "一致なし",
-  },
+  ...uiResources,
+  apiError: apiErrorResources,
+  gameManagement: gameManagementResources,
 } as const;
 
 export default resources;
+
+export { apiErrorResources, gameManagementResources, uiResources };

@@ -28,5 +28,6 @@ export const config = {
     '/api/fetch-user/:path*',
     '/api/services/:path*',
     '/api-example/:path*',
+    '/game-management/:path*',
   ],
 };

@@ -75,6 +75,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             NEXT_PUBLIC_ENVIRONMENT=${{ inputs.environment }}
+            NEXT_PUBLIC_API_BASE_URL=${{ secrets.api_url }}
             NEXT_PUBLIC_API_URL=${{ secrets.api_url }}
             NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.google_client_id }}
             NEXT_PUBLIC_GOOGLE_REDIRECT_URI=${{ secrets.google_redirect_uri }}

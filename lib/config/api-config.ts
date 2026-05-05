@@ -11,7 +11,62 @@ export interface ApiServiceConfig {
   timeout?: number;
 }
 
-export type ApiServiceName = 'service1' | 'service2' | 'service3' | 'user-api';
+export type ApiServiceName = 'user-api' | 'service1' | 'service2' | 'service3' | (string & {});
+
+export const BACKEND_API_DEFAULT_TIMEOUT_MS = 60000;
+
+const BUILTIN_SERVICE_CONFIG: Record<string, { baseUrlEnv: string; apiKeyEnv?: string; defaultPath?: string }> = {
+  service1: {
+    baseUrlEnv: 'API_SERVICE_1_BASE_URL',
+    apiKeyEnv: 'API_SERVICE_1_API_KEY',
+    defaultPath: '/service1',
+  },
+  service2: {
+    baseUrlEnv: 'API_SERVICE_2_BASE_URL',
+    apiKeyEnv: 'API_SERVICE_2_API_KEY',
+    defaultPath: '/service2',
+  },
+  service3: {
+    baseUrlEnv: 'API_SERVICE_3_BASE_URL',
+    apiKeyEnv: 'API_SERVICE_3_API_KEY',
+    defaultPath: '/service3',
+  },
+  'user-api': {
+    baseUrlEnv: 'USER_API_BASE_URL',
+    apiKeyEnv: 'USER_API_API_KEY',
+    defaultPath: '',
+  },
+};
+
+function joinBaseUrl(baseUrl: string, path: string): string {
+  const trimmedBaseUrl = baseUrl.replace(/\/$/, '');
+  if (!path) {
+    return trimmedBaseUrl;
+  }
+
+  return `${trimmedBaseUrl}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+function normalizeServiceNameForEnv(serviceName: string): string {
+  return serviceName
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+    .toUpperCase();
+}
+
+function getAdditionalServices(): string[] {
+  const raw = process.env.API_SERVICES;
+  if (!raw) {
+    return [];
+  }
+
+  return raw
+    .split(',')
+    .map((serviceName) => serviceName.trim())
+    .filter(Boolean);
+}
 
 /**
  * 各AppServiceの設定を取得
@@ -22,35 +77,30 @@ export type ApiServiceName = 'service1' | 'service2' | 'service3' | 'user-api';
 export function getApiConfig(serviceName: ApiServiceName): ApiServiceConfig {
   // 環境変数から取得したベースURLを使用
   const apiBaseUrl = getApiBaseUrl();
-  
-  const configs: Record<ApiServiceName, ApiServiceConfig> = {
-    service1: {
-      baseUrl: process.env.API_SERVICE_1_BASE_URL || `${apiBaseUrl}/service1`,
-      apiKey: process.env.API_SERVICE_1_API_KEY,
-      timeout: 30000,
-    },
-    service2: {
-      baseUrl: process.env.API_SERVICE_2_BASE_URL || `${apiBaseUrl}/service2`,
-      apiKey: process.env.API_SERVICE_2_API_KEY,
-      timeout: 30000,
-    },
-    service3: {
-      baseUrl: process.env.API_SERVICE_3_BASE_URL || `${apiBaseUrl}/service3`,
-      apiKey: process.env.API_SERVICE_3_API_KEY,
-      timeout: 30000,
-    },
-    'user-api': {
-      baseUrl: process.env.USER_API_BASE_URL || apiBaseUrl,
-      timeout: 30000,
-    },
-  };
 
-  return configs[serviceName];
+  const builtinConfig = BUILTIN_SERVICE_CONFIG[serviceName];
+  if (builtinConfig) {
+    return {
+      baseUrl: process.env[builtinConfig.baseUrlEnv] || joinBaseUrl(apiBaseUrl, builtinConfig.defaultPath || ''),
+      apiKey: builtinConfig.apiKeyEnv ? process.env[builtinConfig.apiKeyEnv] : undefined,
+      timeout: BACKEND_API_DEFAULT_TIMEOUT_MS,
+    };
+  }
+
+  const normalizedServiceName = normalizeServiceNameForEnv(serviceName);
+  const dynamicBaseUrlEnvName = `API_SERVICE_${normalizedServiceName}_BASE_URL`;
+  const dynamicApiKeyEnvName = `API_SERVICE_${normalizedServiceName}_API_KEY`;
+
+  return {
+    baseUrl: process.env[dynamicBaseUrlEnvName] || joinBaseUrl(apiBaseUrl, serviceName),
+    apiKey: process.env[dynamicApiKeyEnvName],
+    timeout: BACKEND_API_DEFAULT_TIMEOUT_MS,
+  };
 }
 
 /**
  * 利用可能なサービス名一覧を取得
  */
 export function getAvailableServices(): ApiServiceName[] {
-  return ['service1', 'service2', 'service3', 'user-api'];
+  return [...new Set<ApiServiceName>(['service1', 'service2', 'service3', 'user-api', ...getAdditionalServices()])];
 }

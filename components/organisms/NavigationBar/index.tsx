@@ -10,6 +10,7 @@
 
 import { useSession, signIn } from 'next-auth/react';
 import { useEffect } from 'react';
+import Link from 'next/link';
 import { getEnvironment } from '@/lib/config/env';
 import EnvironmentBadge from '@/components/atoms/EnvironmentBadge';
 import AuthBadge from '@/components/atoms/AuthBadge';
@@ -19,7 +20,6 @@ export default function NavigationBar() {
   const environment = getEnvironment();
   const isProduction = environment === 'production';
   const isAuthenticated = !!session?.user;
-
   // トークンリフレッシュに失敗した場合、再ログインを促す
   useEffect(() => {
     if (session?.error === 'RefreshAccessTokenError') {
@@ -32,11 +32,25 @@ export default function NavigationBar() {
     <nav className="w-full bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* ロゴ・タイトル */}
-          <div className="flex items-center">
-            <h1 className="text-xl font-bold text-zinc-900 dark:text-white">
+          {/* ナビゲーションリンク */}
+          <div className="flex items-center gap-6">
+            <Link href="/" className="text-xl font-bold text-zinc-900 dark:text-white">
               pokenae
-            </h1>
+            </Link>
+            <Link
+              href="/game-library"
+              className="text-sm font-medium text-zinc-700 transition hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
+            >
+              ゲームライブラリ
+            </Link>
+            {isAuthenticated && (
+              <Link
+                href="/game-management"
+                className="text-sm font-medium text-zinc-700 transition hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
+              >
+                マスタ管理
+              </Link>
+            )}
           </div>
 
           {/* バッジエリア */}

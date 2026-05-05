@@ -5,13 +5,15 @@ import type { InputHTMLAttributes } from "react";
 
 export type CustomTextBoxProps = InputHTMLAttributes<HTMLInputElement> & {
 	isError?: boolean;
+	displayOnly?: boolean;
 };
 
 const CustomTextBox = forwardRef<HTMLInputElement, CustomTextBoxProps>(
-	({ isError = false, className = "", ...rest }, ref) => {
+	({ isError = false, displayOnly = false, className = "", ...rest }, ref) => {
 		const classes = [
 			"custom-textbox",
 			isError ? "custom-textbox--error" : "",
+			displayOnly ? "custom-textbox--display-only" : "",
 			className,
 		]
 			.filter(Boolean)
@@ -19,7 +21,13 @@ const CustomTextBox = forwardRef<HTMLInputElement, CustomTextBoxProps>(
 
 		return (
 			<>
-				<input ref={ref} className={classes} aria-invalid={isError} {...rest} />
+				<input
+					ref={ref}
+					className={classes}
+					aria-invalid={isError}
+					{...rest}
+					{...(displayOnly ? { readOnly: true, tabIndex: -1, "aria-readonly": true } : {})}
+				/>
 
 				<style jsx>{`
 					.custom-textbox {
@@ -32,6 +40,7 @@ const CustomTextBox = forwardRef<HTMLInputElement, CustomTextBoxProps>(
 						color: var(--color-text-strong);
 						font-size: 0.875rem;
 						line-height: 1.5;
+						cursor: text;
 						transition:
 							border-color 140ms ease,
 							box-shadow 140ms ease,
@@ -51,6 +60,18 @@ const CustomTextBox = forwardRef<HTMLInputElement, CustomTextBoxProps>(
 						border-color: var(--color-accent-25);
 						background-color: color-mix(in srgb, var(--color-accent-25) 4%, var(--color-base-70-light));
 						box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-25) 20%, transparent);
+					}
+
+					.custom-textbox:read-only {
+						cursor: default;
+						caret-color: transparent;
+					}
+
+					.custom-textbox--display-only {
+						cursor: default;
+						caret-color: transparent;
+						pointer-events: none;
+						user-select: text;
 					}
 
 					.custom-textbox--error {

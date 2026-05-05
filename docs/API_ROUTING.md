@@ -38,23 +38,39 @@ Next.js API Routes (/api/services/[service]/[...path])
 
 ### 環境変数
 
-`.env.local` ファイルを作成し、各AppServiceのエンドポイントを設定します：
+`.env.local` または Docker 用の `.env.docker.*` ファイルで、デフォルト API と追加 API の URL を設定します。
 
 ```bash
-# AppService 1
+# アプリ全体の既定 API
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+
+# 業務機能 API の例: ゲームライブラリ管理
+API_SERVICES=game-library-api
+API_SERVICE_GAME_LIBRARY_API_BASE_URL=http://localhost:10080
+API_SERVICE_GAME_LIBRARY_API_KEY=your-game-library-api-key-here
+
+# 既存の固定サービス
 API_SERVICE_1_BASE_URL=http://localhost:8001
 API_SERVICE_1_API_KEY=your-api-key-here
-
-# AppService 2
 API_SERVICE_2_BASE_URL=http://localhost:8002
 API_SERVICE_2_API_KEY=your-api-key-here
-
-# AppService 3
 API_SERVICE_3_BASE_URL=http://localhost:8003
 API_SERVICE_3_API_KEY=your-api-key-here
+
+# 将来追加するサービス
+API_SERVICES=inventory-api,reporting-api
+API_SERVICE_INVENTORY_API_BASE_URL=http://localhost:8011
+API_SERVICE_INVENTORY_API_KEY=your-inventory-api-key-here
+API_SERVICE_REPORTING_API_BASE_URL=http://localhost:8012
+API_SERVICE_REPORTING_API_KEY=your-reporting-api-key-here
 ```
 
-`.env.local.example` をコピーして使用してください。
+補足:
+
+- `NEXT_PUBLIC_API_BASE_URL` は共通の既定値です。
+- 業務機能 API は `game-library-api` のように、画面名より業務ドメインが分かる名前を付けます。
+- `API_SERVICES` に列挙したサービスは `createFrontendApiClient("inventory-api")` のように直接使えます。
+- `API_SERVICE_<サービス名>_BASE_URL` のサービス名部分は、ハイフンなどを `_` に変換し大文字化して指定します。
 
 ## 使用方法
 
@@ -182,7 +198,7 @@ export async function GET() {
 
 **パラメータ:**
 
-- `{service}`: サービス名（`service1`, `service2`, `service3`）
+- `{service}`: サービス名（`service1`, `service2`, `service3`, または `API_SERVICES` に追加した任意名）
 - `{...path}`: AppServiceのエンドポイントパス
 
 **サポートされるHTTPメソッド:**
@@ -196,6 +212,9 @@ export async function GET() {
 ### 例
 
 ```bash
+# game-library-api の /api/Accounts にアクセス
+GET /api/services/game-library-api/api/Accounts
+
 # Service1の /users エンドポイントにアクセス
 GET /api/services/service1/users
 
@@ -213,42 +232,29 @@ GET /api/services/service3/items/123
 
 ## 新しいサービスの追加
 
-1. **環境変数の追加**: `.env.local` に新しいサービスの設定を追加
+1. `.env.local` または `.env.docker.*` にサービス名を追加
 
 ```bash
-API_SERVICE_4_BASE_URL=http://localhost:8004
-API_SERVICE_4_API_KEY=your-api-key-here
+API_SERVICES=inventory-api,reporting-api
+API_SERVICE_INVENTORY_API_BASE_URL=http://localhost:8011
+API_SERVICE_REPORTING_API_BASE_URL=http://localhost:8012
 ```
 
-2. **設定ファイルの更新**: `lib/config/api-config.ts` を編集
+2. 必要なら API キーも追加
 
-```typescript
-export type ApiServiceName = "service1" | "service2" | "service3" | "service4";
-
-export function getApiConfig(serviceName: ApiServiceName): ApiServiceConfig {
-  const configs: Record<ApiServiceName, ApiServiceConfig> = {
-    // ... 既存のサービス
-    service4: {
-      baseUrl: process.env.API_SERVICE_4_BASE_URL || "http://localhost:8004",
-      apiKey: process.env.API_SERVICE_4_API_KEY,
-      timeout: 30000,
-    },
-  };
-
-  return configs[serviceName];
-}
-
-export function getAvailableServices(): ApiServiceName[] {
-  return ["service1", "service2", "service3", "service4"];
-}
+```bash
+API_SERVICE_INVENTORY_API_KEY=your-inventory-api-key-here
+API_SERVICE_REPORTING_API_KEY=your-reporting-api-key-here
 ```
 
-3. **使用**: すぐに新しいサービスが利用可能になります
+3. フロントエンドまたは Route Handler からそのまま使用
 
 ```tsx
-const client = createFrontendApiClient("service4");
+const client = createFrontendApiClient("inventory-api");
 const response = await client.get("/endpoint");
 ```
+
+この方式なら、サービス追加のたびに `lib/config/api-config.ts` を編集しなくても済みます。
 
 ## ディレクトリ構造
 
@@ -364,7 +370,7 @@ Next.js API Routesを経由することでCORSの問題を回避できます。
 
 ### タイムアウトエラー
 
-デフォルトのタイムアウトは30秒です。長時間かかる処理の場合は、設定で調整してください。
+デフォルトのタイムアウトは60秒です。Azure Container Apps の scale-to-zero 復帰時に発生するコールドスタートを吸収できる値にしており、長時間かかる処理では必要に応じて個別指定で調整してください。
 
 ### 環境変数が反映されない
 

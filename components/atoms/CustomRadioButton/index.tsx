@@ -3,15 +3,27 @@
 import { forwardRef } from "react";
 import type { InputHTMLAttributes } from "react";
 
-export type CustomRadioButtonProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type">;
+export type CustomRadioButtonProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
+	displayOnly?: boolean;
+};
 
 const CustomRadioButton = forwardRef<HTMLInputElement, CustomRadioButtonProps>(
-	({ className = "", ...rest }, ref) => {
-		const classes = ["custom-radio", className].filter(Boolean).join(" ");
+	({ displayOnly = false, className = "", ...rest }, ref) => {
+		const classes = [
+			"custom-radio",
+			displayOnly ? "custom-radio--display-only" : "",
+			className,
+		].filter(Boolean).join(" ");
 
 		return (
 			<>
-				<input ref={ref} type="radio" className={classes} {...rest} />
+				<input
+					ref={ref}
+					type="radio"
+					className={classes}
+					{...rest}
+					{...(displayOnly ? { disabled: true, tabIndex: -1, "aria-disabled": true } : {})}
+				/>
 
 				<style jsx>{`
 					.custom-radio {
@@ -55,6 +67,12 @@ const CustomRadioButton = forwardRef<HTMLInputElement, CustomRadioButtonProps>(
 					.custom-radio:disabled {
 						opacity: 0.5;
 						cursor: not-allowed;
+					}
+
+					.custom-radio--display-only {
+						opacity: 1;
+						cursor: default;
+						pointer-events: none;
 					}
 				`}</style>
 			</>

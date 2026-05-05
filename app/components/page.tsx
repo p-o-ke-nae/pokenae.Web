@@ -1,6 +1,7 @@
-'use client';
+ 'use client';
 
 import { useRef, useState } from 'react';
+import { getSession } from 'next-auth/react';
 import CustomButton from '@/components/atoms/CustomButton';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomHeader from '@/components/atoms/CustomHeader';
@@ -17,12 +18,189 @@ import CheckboxField from '@/components/molecules/CheckboxField';
 import Dialog from '@/components/molecules/Dialog';
 import RadioField from '@/components/molecules/RadioField';
 import SearchField, { type SearchOption, type SearchFieldColumn } from '@/components/molecules/SearchField';
+import DataTable, { DATA_TABLE_DEFAULT_PAGE_HEIGHT, type DataTableColumn, type SortState } from '@/components/molecules/DataTable';
+import { useTableData, omitTrackedFields } from '@/lib/hooks/useTableData';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
+
+type AddRowPokemon = { id: string; name: string; type: string; active: boolean; score: string };
+type EditablePokemon = { id: string; name: string; type: string; active: boolean; score: string };
+
+const ADD_ROW_INITIAL_DATA: AddRowPokemon[] = [
+  { id: '001', name: 'フシギダネ', type: '草/毒', active: true, score: '91' },
+  { id: '004', name: 'ヒトカゲ', type: '炎', active: true, score: '85' },
+  { id: '007', name: 'ゼニガメ', type: '水', active: false, score: '68' },
+];
+
+const ADD_ROW_NEW_TEMPLATE: Partial<AddRowPokemon> = {
+  name: '', type: '', active: false, score: '0',
+};
+
+const ADD_ROW_COLUMNS: DataTableColumn<AddRowPokemon>[] = [
+  { key: 'id', header: 'No.', width: '4rem' },
+  { key: 'name', header: '名前' },
+  { key: 'type', header: 'タイプ', width: '8rem' },
+  { key: 'score', header: 'スコア', width: '6rem' },
+  { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
+];
+
+const EDITABLE_INITIAL_DATA: EditablePokemon[] = [
+  { id: '001', name: 'フシギダネ', type: '草/毒', active: true, score: '91' },
+  { id: '004', name: 'ヒトカゲ', type: '炎', active: true, score: '85' },
+  { id: '007', name: 'ゼニガメ', type: '水', active: false, score: '68' },
+  { id: '025', name: 'ピカチュウ', type: '電気', active: true, score: '78' },
+];
+
+const EDITABLE_NEW_TEMPLATE: Partial<EditablePokemon> = {
+  name: '', type: '', active: false, score: '0',
+};
+
+function AddRowDemo() {
+  const tableData = useTableData<AddRowPokemon>({
+    data: ADD_ROW_INITIAL_DATA,
+    rowKey: 'id',
+    newRowTemplate: ADD_ROW_NEW_TEMPLATE,
+  });
+  return (
+    <div className="space-y-2">
+      <DataTable<AddRowPokemon>
+        columns={ADD_ROW_COLUMNS}
+        data={tableData.rows as AddRowPokemon[]}
+        height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
+        rowKey="id"
+        onAddRow={tableData.addRow}
+      />
+      <div className="flex gap-2 flex-wrap items-center">
+        <p className="text-xs text-zinc-500">
+          追加行: {tableData.addedRows.length} 件　変更行: {tableData.modifiedRows.length} 件
+        </p>
+        {(tableData.addedRows.length > 0 || tableData.modifiedRows.length > 0) && (
+          <button
+            type="button"
+            className="text-xs text-red-500 underline"
+            onClick={tableData.resetAll}
+          >
+            変更を全て取り消す
+          </button>
+        )}
+      </div>
+      {tableData.addedRows.length > 0 && (
+        <details className="text-xs">
+          <summary className="cursor-pointer text-zinc-500">追加行データ (JSON)</summary>
+          <pre className="mt-1 p-2 bg-zinc-100 dark:bg-zinc-800 rounded text-xs overflow-auto">
+            {JSON.stringify(tableData.addedRows.map(omitTrackedFields), null, 2)}
+          </pre>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function EditableDemo() {
+  const tableData = useTableData<EditablePokemon>({
+    data: EDITABLE_INITIAL_DATA,
+    rowKey: 'id',
+    newRowTemplate: EDITABLE_NEW_TEMPLATE,
+  });
+
+  const columns: DataTableColumn<EditablePokemon>[] = [
+    { key: 'id', header: 'No.', width: '4rem' },
+    {
+      key: 'name',
+      header: '名前',
+      render: (value, row) => (
+        <CustomTextBox
+          value={String(value ?? '')}
+          onChange={e => tableData.updateRow(String(row.id), { name: e.target.value })}
+          placeholder="名前"
+          style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}
+        />
+      ),
+    },
+    {
+      key: 'type',
+      header: 'タイプ',
+      width: '10rem',
+      render: (value, row) => (
+        <CustomTextBox
+          value={String(value ?? '')}
+          onChange={e => tableData.updateRow(String(row.id), { type: e.target.value })}
+          placeholder="タイプ"
+          style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}
+        />
+      ),
+    },
+    {
+      key: 'score',
+      header: 'スコア',
+      width: '7rem',
+      render: (value, row) => (
+        <CustomTextBox
+          value={String(value ?? '')}
+          onChange={e => tableData.updateRow(String(row.id), { score: e.target.value })}
+          placeholder="0"
+          style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}
+        />
+      ),
+    },
+    {
+      key: 'active',
+      header: '有効',
+      width: '4rem',
+      render: (value, row) => (
+        <CustomCheckBox
+          checked={Boolean(value)}
+          onChange={e => tableData.updateRow(String(row.id), { active: e.target.checked })}
+          aria-label="有効"
+        />
+      ),
+    },
+  ];
+
+  const currentJson = tableData.rows.map(omitTrackedFields);
+
+  return (
+    <div className="space-y-3">
+      <DataTable<EditablePokemon>
+        columns={columns}
+        data={tableData.rows as EditablePokemon[]}
+        height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
+        rowKey="id"
+        onAddRow={tableData.addRow}
+      />
+      <div className="flex gap-2 flex-wrap items-center">
+        <p className="text-xs text-zinc-500">
+          追加行: {tableData.addedRows.length} 件　変更行: {tableData.modifiedRows.length} 件
+        </p>
+        {(tableData.addedRows.length > 0 || tableData.modifiedRows.length > 0) && (
+          <button
+            type="button"
+            className="text-xs text-red-500 underline"
+            onClick={tableData.resetAll}
+          >
+            変更を全て取り消す
+          </button>
+        )}
+      </div>
+      <details open className="text-xs">
+        <summary className="cursor-pointer text-zinc-500 font-medium select-none">
+          現在の JSON データ（リアルタイム更新）
+        </summary>
+        <pre className="mt-1 p-3 bg-zinc-100 dark:bg-zinc-800 rounded text-xs overflow-auto max-h-64 leading-relaxed">
+          {JSON.stringify(currentJson, null, 2)}
+        </pre>
+      </details>
+    </div>
+  );
+}
 
 export default function ComponentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
+  const [dataTableSelectedKeys, setDataTableSelectedKeys] = useState<string[]>([]);
+  const [dataTableSortState, setDataTableSortState] = useState<SortState | null>(null);
+  const [dataTableFilteredCount, setDataTableFilteredCount] = useState<number>(5);
+
   const logoRef = useRef<PokenaeLogoRef>(null);
   const { startLoading } = useLoadingOverlay();
 
@@ -53,6 +231,43 @@ export default function ComponentsPage() {
     { key: 'label', header: '名前', searchable: true },
     { key: 'type', header: 'タイプ', width: '6rem', searchable: true },
   ];
+
+  // Debug: サーバー側で受信したヘッダを表示するための状態と実行関数
+  const [dbgHeaders, setDbgHeaders] = useState<Record<string, string> | null>(null);
+  const [dbgLoading, setDbgLoading] = useState(false);
+
+  const fetchDebugHeaders = async (includeToken: boolean) => {
+    setDbgLoading(true);
+    setDbgHeaders(null);
+    try {
+      const headers: Record<string, string> = {};
+      if (includeToken) {
+        try {
+          const session = await getSession();
+          if (session?.accessToken) {
+            headers['Authorization'] = `Bearer ${session.accessToken}`;
+            headers['X-Google-Access-Token'] = session.accessToken;
+          }
+        } catch (err) {
+          console.warn('getSession failed', err);
+        }
+      }
+
+      const res = await fetch('/api/debug/inspect-headers', {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
+
+      const json = await res.json();
+      if (json && json.headers) setDbgHeaders(json.headers);
+      else setDbgHeaders(json);
+    } catch (err) {
+      setDbgHeaders({ error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setDbgLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black p-8">
@@ -350,6 +565,156 @@ export default function ComponentsPage() {
               />
             </div>
 
+          </div>
+        </section>
+
+        {/* DataTable (Molecule) */}
+        <section className="space-y-4">
+          <CustomHeader level={2}>DataTable（分子粒度・Molecule）</CustomHeader>
+          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm space-y-6">
+
+            {/* 1. 行選択チェックボックス */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-zinc-500">① 行選択チェックボックス付きテーブル</p>
+              <DataTable<{ id: string; name: string; type: string; active: boolean; score: string }>
+                columns={[
+                  { key: 'id', header: 'No.', width: '4rem' },
+                  { key: 'name', header: '名前' },
+                  { key: 'type', header: 'タイプ', width: '8rem' },
+                  { key: 'score', header: 'スコア', width: '6rem' },
+                  { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
+                ] as DataTableColumn<{ id: string; name: string; type: string; active: boolean; score: string }>[]}
+                data={[
+                  { id: '001', name: 'フシギダネ', type: '草/毒', active: true, score: '91' },
+                  { id: '004', name: 'ヒトカゲ', type: '炎', active: true, score: '85' },
+                  { id: '007', name: 'ゼニガメ', type: '水', active: false, score: '68' },
+                  { id: '025', name: 'ピカチュウ', type: '電気', active: true, score: '78' },
+                  { id: '133', name: 'イーブイ', type: 'ノーマル', active: false, score: '60' },
+                ]}
+                rowKey="id"
+                height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
+                selectable
+                selectedKeys={dataTableSelectedKeys}
+                onSelectionChange={setDataTableSelectedKeys}
+              />
+              <p className="text-xs text-zinc-500">
+                選択中: {dataTableSelectedKeys.length > 0 ? dataTableSelectedKeys.join(', ') : 'なし'}
+              </p>
+            </div>
+
+            {/* 2. ソート＋フィルタ＋列順変更＋列幅リサイズ */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-zinc-500">
+                ② ソート（ヘッダークリック）・フィルタ（入力欄）・列順変更（ヘッダードラッグ）・列幅リサイズ（右端ドラッグ）
+              </p>
+              <DataTable<{ id: string; name: string; type: string; score: string; active: boolean }>
+                columns={[
+                  { key: 'id', header: 'No.', width: '4rem', sortable: true },
+                  { key: 'name', header: '名前', sortable: true, filterable: true },
+                  { key: 'type', header: 'タイプ', width: '8rem', sortable: true, filterable: true },
+                  {
+                    key: 'score',
+                    header: 'スコア',
+                    width: '6rem',
+                    sortable: true,
+                    sortValue: (v) => Number(v),
+                  },
+                  { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
+                ] as DataTableColumn<{ id: string; name: string; type: string; score: string; active: boolean }>[]}
+                data={[
+                  { id: '001', name: 'フシギダネ', type: '草/毒', active: true, score: '91' },
+                  { id: '004', name: 'ヒトカゲ', type: '炎', active: true, score: '85' },
+                  { id: '007', name: 'ゼニガメ', type: '水', active: false, score: '68' },
+                  { id: '025', name: 'ピカチュウ', type: '電気', active: true, score: '78' },
+                  { id: '133', name: 'イーブイ', type: 'ノーマル', active: false, score: '60' },
+                ]}
+                rowKey="id"
+                height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
+                resizable
+                sortState={dataTableSortState}
+                onSortChange={setDataTableSortState}
+                onFilteredDataChange={(d) => setDataTableFilteredCount(d.length)}
+              />
+              <p className="text-xs text-zinc-500">
+                ソート: {dataTableSortState ? `${dataTableSortState.key} ${dataTableSortState.direction}` : 'なし'}
+                　表示件数: {dataTableFilteredCount} 件
+              </p>
+            </div>
+
+            {/* 3. 親子階層データ */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-zinc-500">③ 親子階層データ（childrenKey=&quot;children&quot;）</p>
+              <DataTable<Record<string, unknown>>
+                columns={[
+                  { key: 'name', header: 'カテゴリ / ポケモン' },
+                  { key: 'type', header: 'タイプ', width: '8rem' },
+                  { key: 'active', header: '有効', type: 'checkbox', width: '4rem' },
+                ]}
+                data={[
+                  {
+                    id: 'cat-grass', name: '草タイプ', type: '草系', active: true,
+                    children: [
+                      { id: 'cat-grass-1', name: 'フシギダネ', type: '草/毒', active: true },
+                      { id: 'cat-grass-2', name: 'フシギソウ', type: '草/毒', active: false },
+                    ],
+                  },
+                  {
+                    id: 'cat-fire', name: '炎タイプ', type: '炎系', active: true,
+                    children: [
+                      { id: 'cat-fire-1', name: 'ヒトカゲ', type: '炎', active: true },
+                      { id: 'cat-fire-2', name: 'リザードン', type: '炎/飛行', active: true },
+                    ],
+                  },
+                  { id: 'cat-electric', name: '電気タイプ（子なし）', type: '電気系', active: false },
+                ]}
+                rowKey="id"
+                height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
+                childrenKey="children"
+              />
+            </div>
+
+            {/* 4. useTableData による行追加・変更追跡 */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-zinc-500">
+                ④ 行追加・変更追跡（useTableData フック）
+              </p>
+              <AddRowDemo />
+            </div>
+
+            {/* 5. インライン編集テーブル（CustomTextBox + CustomCheckBox） */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-zinc-500">
+                ⑤ インライン編集テーブル（CustomTextBox・CustomCheckBox でセルを直接編集 / JSON リアルタイム表示）
+              </p>
+              <EditableDemo />
+            </div>
+
+          </div>
+        </section>
+
+        {/* Debug: Auth ヘッダ確認 */}
+        <section className="space-y-4">
+          <CustomHeader level={2}>認証ヘッダ確認（デバッグ）</CustomHeader>
+          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">ボタンを押すと /api/debug/inspect-headers にリクエストを送り、サーバー側で受信したヘッダを表示します。</p>
+            <div className="flex gap-3 mb-4">
+              <CustomButton
+                variant="accent"
+                onClick={async () => await fetchDebugHeaders(true)}
+              >
+                ヘッダ取得（トークン付与）
+              </CustomButton>
+              <CustomButton
+                variant="neutral"
+                onClick={async () => await fetchDebugHeaders(false)}
+              >
+                ヘッダ取得（トークン未付与）
+              </CustomButton>
+            </div>
+            {dbgLoading && <div className="mb-3"><CustomLoader /></div>}
+            {dbgHeaders && (
+              <pre className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded text-sm overflow-auto">{JSON.stringify(dbgHeaders, null, 2)}</pre>
+            )}
           </div>
         </section>
       </div>

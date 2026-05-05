@@ -50,6 +50,7 @@ const CustomMessageArea = forwardRef<HTMLDivElement, CustomMessageAreaProps>(
 						border: 1px solid transparent;
 						font-size: 0.875rem;
 						line-height: 1.55;
+						cursor: default;
 					}
 
 					.custom-message-area--banner {

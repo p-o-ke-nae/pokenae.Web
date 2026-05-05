@@ -155,7 +155,12 @@ jobs:
       image: ghcr.io/${{ github.repository_owner }}/pokenae-web:develop
       registry_server: ghcr.io
       registry_username: ${{ github.actor }}
-      env_vars: "NODE_ENV=production PORT=3000 NEXTAUTH_URL=${{ vars.DEV_NEXTAUTH_URL_ACA }}"
+      env_vars: >-
+        NODE_ENV=production
+        PORT=3000
+        NEXTAUTH_URL=${{ vars.DEV_NEXTAUTH_URL_ACA }}
+        API_SERVICES=game-library-api
+        API_SERVICE_GAME_LIBRARY_API_BASE_URL=${{ vars['DEV_GAME_LIBRARY_API_BASE_URL'] }}
     secrets:
       azure_credentials: ${{ secrets.AZURE_CREDENTIALS }}
       registry_password: ${{ secrets.GITHUB_TOKEN }}
