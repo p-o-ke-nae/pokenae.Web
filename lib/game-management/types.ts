@@ -6,16 +6,59 @@ export type GameSoftwareVariant = 0 | 1;
 
 export type MemoryCardBlockCount = 59 | 251 | 1019;
 
+export type MaintenanceHealthStatus = 0 | 1 | 2;
+
+export type MaintenanceHealthFilter = 'All' | 'ExcludeUnhealthy' | 'OnlyUnhealthy';
+
+export type ApiErrorDetail = {
+  code: string;
+  field?: string;
+  fieldLabel?: string;
+  message: string;
+  userMessage: string;
+  suggestedAction: string;
+};
+
 export type ProblemDetails = {
   type?: string;
   title?: string;
   status?: number;
   detail?: string;
   instance?: string;
+  traceId?: string;
+  errorDetails?: ApiErrorDetail[];
 };
 
 export type ValidationProblemDetails = ProblemDetails & {
   errors?: Record<string, string[]>;
+};
+
+export type CurrentUserDto = {
+  ownerGoogleUserId: string;
+  assignedRoles: string[];
+  effectiveRoles: string[];
+  isAdmin: boolean;
+  isBootstrapEligible: boolean;
+};
+
+export type UserRoleAssignmentDto = {
+  ownerGoogleUserId: string;
+  assignedRoles: string[];
+  effectiveRoles: string[];
+  isBootstrapEligible: boolean;
+};
+
+export type SetUserRolesRequest = {
+  assignedRoles: string[];
+};
+
+export type MaintenanceSummaryDto = {
+  hasRecord: boolean;
+  intervalDays: number;
+  lastMaintenanceDate: string | null;
+  nextMaintenanceDate: string | null;
+  isOverdue: boolean;
+  latestHealthStatus: MaintenanceHealthStatus;
 };
 
 // ---------------------------------------------------------------------------
@@ -188,6 +231,7 @@ export type GameConsoleDto = {
   label: string | null;
   memo: string | null;
   isDeleted: boolean;
+  maintenance: MaintenanceSummaryDto;
 };
 
 export type CreateGameConsoleRequest = {
@@ -208,6 +252,30 @@ export type GameConsoleCountByMasterDto = {
   gameConsoleMasterId: number;
   gameConsoleMasterName: string | null;
   count: number;
+};
+
+export type GameConsoleMaintenanceDto = {
+  id: number;
+  gameConsoleId: number;
+  maintenanceDate: string;
+  isPowerOnPerformed: boolean;
+  isStartupConfirmed: boolean;
+  memo: string | null;
+  isDeleted: boolean;
+};
+
+export type CreateGameConsoleMaintenanceRequest = {
+  maintenanceDate: string;
+  isPowerOnPerformed: boolean;
+  isStartupConfirmed: boolean;
+  memo: string | null;
+};
+
+export type UpdateGameConsoleMaintenanceRequest = {
+  maintenanceDate: string;
+  isPowerOnPerformed: boolean;
+  isStartupConfirmed: boolean;
+  memo: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -274,6 +342,7 @@ export type GameSoftwareDto = {
   label: string | null;
   memo: string | null;
   isDeleted: boolean;
+  maintenance: MaintenanceSummaryDto;
 };
 
 export type CreateGameSoftwareRequest = {
@@ -298,6 +367,30 @@ export type GameSoftwareCountByMasterDto = {
   gameSoftwareMasterId: number;
   gameSoftwareMasterName: string | null;
   count: number;
+};
+
+export type GameSoftwareMaintenanceDto = {
+  id: number;
+  gameSoftwareId: number;
+  maintenanceDate: string;
+  isPowerOnPerformed: boolean;
+  isStartupConfirmed: boolean;
+  memo: string | null;
+  isDeleted: boolean;
+};
+
+export type CreateGameSoftwareMaintenanceRequest = {
+  maintenanceDate: string;
+  isPowerOnPerformed: boolean;
+  isStartupConfirmed: boolean;
+  memo: string | null;
+};
+
+export type UpdateGameSoftwareMaintenanceRequest = {
+  maintenanceDate: string;
+  isPowerOnPerformed: boolean;
+  isStartupConfirmed: boolean;
+  memo: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -335,6 +428,7 @@ export type MemoryCardDto = {
   label: string | null;
   memo: string | null;
   isDeleted: boolean;
+  maintenance: MaintenanceSummaryDto;
 };
 
 export type CreateMemoryCardRequest = {
@@ -347,6 +441,36 @@ export type CreateMemoryCardRequest = {
 export type UpdateMemoryCardRequest = {
   memoryCardEditionMasterId: number;
   label: string | null;
+  memo: string | null;
+};
+
+export type MemoryCardCountByEditionDto = {
+  memoryCardEditionMasterId: number;
+  memoryCardEditionName: string | null;
+  count: number;
+};
+
+export type MemoryCardMaintenanceDto = {
+  id: number;
+  memoryCardId: number;
+  maintenanceDate: string;
+  isPowerOnPerformed: boolean;
+  isStartupConfirmed: boolean;
+  memo: string | null;
+  isDeleted: boolean;
+};
+
+export type CreateMemoryCardMaintenanceRequest = {
+  maintenanceDate: string;
+  isPowerOnPerformed: boolean;
+  isStartupConfirmed: boolean;
+  memo: string | null;
+};
+
+export type UpdateMemoryCardMaintenanceRequest = {
+  maintenanceDate: string;
+  isPowerOnPerformed: boolean;
+  isStartupConfirmed: boolean;
   memo: string | null;
 };
 
