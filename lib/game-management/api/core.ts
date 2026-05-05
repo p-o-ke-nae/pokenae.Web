@@ -1,7 +1,12 @@
 import { createFrontendApiClient } from '@/lib/api/frontend-client';
 import resources from '@/lib/resources';
 import { getResourceDefinition } from '@/lib/game-management/resources';
-import type { MoveAccountBetweenConsolesRequest, ReorderItemRequest, ResourceKey } from '@/lib/game-management/types';
+import type {
+  MoveAccountBetweenConsolesRequest,
+  ReorderItemRequest,
+  ResourceKey,
+} from '@/lib/game-management/types';
+import { extractServerDetail } from './problem-details';
 
 const client = createFrontendApiClient('game-library-api');
 
@@ -39,19 +44,6 @@ export class ApiError extends Error {
 
 function formatMessageParts(title: string, detail?: string | null): string {
   return [title, detail].filter((value): value is string => Boolean(value)).join('\n');
-}
-
-export function extractServerDetail(details: unknown): string | null {
-  if (!details || typeof details !== 'object') return null;
-  const candidate = details as { detail?: string; title?: string; errors?: Record<string, string[]> };
-  if (candidate.detail) return candidate.detail;
-  if (candidate.errors) {
-    const lines = Object.entries(candidate.errors)
-      .flatMap(([key, values]) => values.map((value) => `${key}: ${value}`));
-    if (lines.length > 0) return lines.join('\n');
-  }
-  if (candidate.title) return candidate.title;
-  return null;
 }
 
 function getErrorMessage(details: unknown, fallback: string): string {
@@ -164,9 +156,31 @@ export async function unwrap<T>(promise: ReturnType<typeof client.get<T>>): Prom
 // Generic resource fetch
 // ---------------------------------------------------------------------------
 
-export async function fetchResourceList<T>(resourceKey: ResourceKey, includeDeleted = false): Promise<T[]> {
+export type FetchResourceListOptions = {
+  includeDeleted?: boolean;
+  query?: Record<string, string | number | boolean | null | undefined>;
+};
+
+export async function fetchResourceList<T>(
+  resourceKey: ResourceKey,
+  includeDeletedOrOptions: boolean | FetchResourceListOptions = false,
+): Promise<T[]> {
   const definition = getResourceDefinition(resourceKey);
-  return unwrap(client.get<T[]>(`${definition.apiPath}?includeDeleted=${includeDeleted}`));
+  const options = typeof includeDeletedOrOptions === 'boolean'
+    ? { includeDeleted: includeDeletedOrOptions }
+    : includeDeletedOrOptions;
+  const searchParams = new URLSearchParams();
+  searchParams.set('includeDeleted', String(options.includeDeleted ?? false));
+
+  for (const [key, value] of Object.entries(options.query ?? {})) {
+    if (value == null || value === '') {
+      continue;
+    }
+
+    searchParams.set(key, String(value));
+  }
+
+  return unwrap(client.get<T[]>(`${definition.apiPath}?${searchParams.toString()}`));
 }
 
 export async function fetchResourceById<T>(resourceKey: ResourceKey, id: string | number): Promise<T> {
@@ -216,3 +230,4 @@ export async function moveAccountBetweenConsoles(payload: MoveAccountBetweenCons
 
 export { client };
 export { getErrorMessage };
+export { extractProblemFieldErrors, extractServerDetail, getProblemDetails } from './problem-details';
