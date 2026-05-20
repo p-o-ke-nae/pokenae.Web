@@ -1,12 +1,22 @@
 # 環境モードの設定と区別方法
 
-このドキュメントでは、pokenae.Web プロジェクトの3つの環境モード（debug, development, production）と、シークレット管理の方法について説明します。
+## 概要
+
+このドキュメントは、pokenae.Web の環境モード、シークレット管理、追加 API サービス設定を整理するものです。Issue #97 のポケモンダメージ計算機能では、既存の環境変数ルールを使って `pokemon-damage-calculator-api` を追加する予定です。
+
+| 項目 | 内容 |
+|------|------|
+| 環境モード | `debug` / `development` / `production` |
+| シークレット管理 | Docker Compose secrets |
+| API サービス拡張 | `API_SERVICES`, `API_SERVICE_<NAME>_BASE_URL` |
+| Issue #97 の追加予定 | `pokemon-damage-calculator-api`, `googleUserId` を扱う認証設計 |
 
 ## 開発・認証・実装の共通方針
 
 - 本プロジェクトは Docker ベースの開発手順を前提とし、ローカル実行・検証・運用手順は Docker Compose を優先します。
 - 認証は Google OAuth2（NextAuth）を使用します。認証情報は既存の環境変数・シークレット管理に従って扱います。
 - API リクエストには Google 認証のアクセストークンを含める前提です。API クライアント／Route Handler の変更時はトークンの受け渡し・付与・検証を考慮してください。
+- Issue #97 では、Google のユーザー識別子を `googleUserId` として session / JWT で扱えるようにする予定です。
 - 実装は Next.js の標準機能（App Router / Route Handlers / Server Components）を最大限活用し、独自実装より推奨パターンを優先します。
 - UI はコンポーネント指向を順守し、再利用可能な単位で責務分離します。既存の階層（atoms / molecules / organisms）と命名規則を尊重します。
 
@@ -213,6 +223,21 @@ API_SERVICE_GAME_LIBRARY_API_BASE_URL=https://game-library.example.com
 ADMIN_ALLOWED_EMAILS=admin@example.com,another-admin@example.com
 ```
 
+### Phase 2 設計骨子: ポケモンダメージ計算 API の追加予定
+
+ポケモンダメージ計算機能では、既存のサービス追加ルールを使って以下を設定する予定です。
+
+```bash
+API_SERVICES=game-library-api,pokemon-damage-calculator-api
+API_SERVICE_POKEMON_DAMAGE_CALCULATOR_API_BASE_URL=http://localhost:<pokemon-damage-calculator-api-port>
+```
+
+補足:
+
+- `pokemon-damage-calculator-api` はサービス名をそのまま `createFrontendApiClient` と proxy に渡す想定です。
+- 環境変数名は `pokemon-damage-calculator-api` を `POKEMON_DAMAGE_CALCULATOR_API` に正規化して組み立てます。
+- 実際の URL はバックエンドの実行形態に応じて Phase 3 で確定します。
+
 ### 複数 Web API を使う場合
 
 - `NEXT_PUBLIC_API_BASE_URL` は全体の既定 API です。
@@ -221,6 +246,18 @@ ADMIN_ALLOWED_EMAILS=admin@example.com,another-admin@example.com
 - 追加サービスの URL は `API_SERVICE_<サービス名>_BASE_URL` で指定します。
 - サービス名にハイフンが含まれる場合は `_` に変換して大文字で指定します。
   - 例: `inventory-api` → `API_SERVICE_INVENTORY_API_BASE_URL`
+
+### Issue #97 に関連する認証設定メモ
+
+ポケモンダメージ計算機能では、環境変数の追加よりも認証情報の保持方法が重要です。
+
+| 項目 | 設計骨子 |
+|------|----------|
+| アクセストークン | 従来どおり `Authorization` と `X-Google-Access-Token` に伝搬 |
+| Google ユーザー識別子 | `googleUserId` を session / JWT に保持予定 |
+| 所有者判定 | `RunDto.OwnerUserId` と `googleUserId` を比較して UI 制御に利用予定 |
+
+この時点では追加シークレットは想定していません。
 
 ### 管理画面用の許可リスト
 
@@ -258,3 +295,4 @@ echo %NEXT_PUBLIC_ENVIRONMENT%  # Windows
 ### ビルド時にデフォルト設定になる
 
 - `NEXT_PUBLIC_ENVIRONMENT` が設定されていない場合は自動的に `development` になります
+- 追加 API サービスを設定した場合は、`API_SERVICES` と `API_SERVICE_<NAME>_BASE_URL` の両方を確認してください

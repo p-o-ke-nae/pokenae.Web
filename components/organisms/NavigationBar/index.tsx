@@ -43,6 +43,12 @@ export default function NavigationBar() {
             >
               ゲームライブラリ
             </Link>
+            <Link
+              href="/pokemon-damage-calculator"
+              className="text-sm font-medium text-zinc-700 transition hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
+            >
+              ダメージ計算
+            </Link>
             {isAuthenticated && (
               <Link
                 href="/game-management"

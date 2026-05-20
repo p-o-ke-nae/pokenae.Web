@@ -1,10 +1,17 @@
 # APIルーティング基盤
 
-このプロジェクトは、複数のAppService（APIプロジェクト）を操作するGUIアプリケーションとして機能します。
-
 ## 概要
 
-Next.jsのAPI Routesを活用した統一的なAPIアクセス基盤を提供します。
+このドキュメントは、Next.js の proxy / Route Handler を用いた API ルーティング基盤を整理するものです。Issue #97 のポケモンダメージ計算機能では、既存基盤を拡張せずに `pokemon-damage-calculator-api` を feature-local に利用する方針を採用します。
+
+| 項目 | 内容 |
+|------|------|
+| proxy 入口 | `/api/services/{service}/{...path}` |
+| フロントエンド呼び出し | `createFrontendApiClient(serviceName)` |
+| 認証伝搬 | `Authorization` と `X-Google-Access-Token` |
+| 匿名アクセス | GET allowlist 方式を維持予定 |
+| Issue #97 の feature route | `/pokemon-damage-calculator`, `/pokemon-damage-calculator/runs/[runId]` |
+| ドキュメント状態 | Phase 2 の暫定骨子。Phase 3 で実装差分を反映して最終確定 |
 
 ## 開発・認証の前提
 
@@ -18,21 +25,73 @@ Next.jsのAPI Routesを活用した統一的なAPIアクセス基盤を提供し
 
 ### 主な特徴
 
-- 📡 **複数APIサービスへの統一的なアクセス**: サービス名を指定するだけで異なるAPIにアクセス可能
-- 🔄 **プロキシパターン**: フロントエンドからNext.js API Routes経由でバックエンドAPIにアクセス
-- 🛡️ **型安全**: TypeScriptによる完全な型定義
-- ⚡ **簡単な利用**: Reactフック（`useApi`）による直感的なAPI呼び出し
-- 🔧 **拡張可能**: 新しいサービスの追加が容易
+- 複数 API サービスへの統一的なアクセス
+- フロントエンドから Next.js API Routes 経由でバックエンド API にアクセスする proxy パターン
+- TypeScript による型安全な実装
+- `useApi` / `createFrontendApiClient` による利用
+- 追加サービスを環境変数で拡張可能
 
 ## アーキテクチャ
 
+```mermaid
+flowchart TD
+    A[フロントエンド] -->|useApi / createFrontendApiClient| B["Next.js Route Handler<br/>/api/services/{service}/{...path}"]
+    B -->|ApiClient| C[バックエンド AppService]
 ```
-フロントエンド (React)
-    ↓ useApi フック / FrontendApiClient
-Next.js API Routes (/api/services/[service]/[...path])
-    ↓ ApiClient
-バックエンド AppService (外部API)
-```
+
+## ポケモンダメージ計算機能の設計骨子
+
+本機能では、既存の `game-management` から画面状態やレイアウトを流用せず、feature-local の UI / state / DTO 変換を採用する予定です。
+
+| 項目 | 設計骨子 |
+|------|----------|
+| feature entry | `/pokemon-damage-calculator` |
+| Run workspace | `/pokemon-damage-calculator/runs/[runId]` |
+| 利用サービス名 | `pokemon-damage-calculator-api` |
+| フロントエンド API 呼び出し | `createFrontendApiClient("pokemon-damage-calculator-api")` |
+| Route Handler | 既存の `/api/services/[service]/[...path]` を継続利用 |
+
+### 匿名 GET allowlist の維持方針
+
+ポケモンダメージ計算 API には匿名参照を許可する GET エンドポイントが含まれるため、本機能では既存 proxy の認証モデルを壊さず、Issue #97 / backend PR #6 で確認した許可対象 GET パスのみ匿名通過できる allowlist を採用する予定です。
+
+Step 2.4 時点で補正した匿名許可 GET 一覧は以下です。
+
+| 区分 | 想定する proxy パス | 用途 |
+|------|----------------------|------|
+| RuleSet 一覧 | `GET /api/services/pokemon-damage-calculator-api/api/rule-sets` | feature entry の初期表示 |
+| Run 一覧 | `GET /api/services/pokemon-damage-calculator-api/api/runs` | feature entry の一覧表示 |
+| Run 詳細 | `GET /api/services/pokemon-damage-calculator-api/api/runs/{runId}` | workspace 初期表示 |
+| Battle 一覧 | `GET /api/services/pokemon-damage-calculator-api/api/runs/{runId}/battles` | workspace の参照データ取得 |
+| Party State 参照 | `GET /api/services/pokemon-damage-calculator-api/api/runs/{runId}/party-state` | workspace の状態参照 |
+
+また、Step 2.4 時点で確認した認証必須操作一覧は以下です。
+
+| 区分 | 想定する proxy パス | 方針 |
+|------|----------------------|------|
+| Run 作成・更新・削除 | `POST /api/services/pokemon-damage-calculator-api/api/runs`、`PUT/DELETE /api/services/pokemon-damage-calculator-api/api/runs/{runId}` | 認証必須 |
+| Battle 作成・更新・削除 | `POST /api/services/pokemon-damage-calculator-api/api/runs/{runId}/battles`、`PUT/DELETE /api/services/pokemon-damage-calculator-api/api/runs/{runId}/battles/{id}` | 認証必須 |
+| Party State 進行イベント追加 | `POST /api/services/pokemon-damage-calculator-api/api/runs/{runId}/party-state` | 認証必須 |
+| Damage Calculation 実行 | `POST /api/services/pokemon-damage-calculator-api/api/runs/{runId}/battles/{id}/calculate` | 認証必須 |
+
+補足:
+
+- `pokemon-damage-calculator-api` の匿名 GET パスを明示的に列挙する
+- allowlist 対象外は従来どおり認証必須とする
+- 計算結果は `POST /api/runs/{runId}/battles/{id}/calculate` のレスポンスとして取得し、`GET /api/runs/{runId}/calculations` や calculations 配下の CRUD は契約に含めない
+- Route Handler / middleware の双方で整合した判定を維持する
+- この一覧は Phase 2 の docs 骨子であり、実際の実装差分・API 契約との差分確認は Phase 3 で最終確定する
+
+### 認証ヘッダー伝搬の維持方針
+
+認証が必要なリクエストでは、既存実装と同様に以下 2 ヘッダーの伝搬を維持する予定です。
+
+| ヘッダー | 用途 |
+|----------|------|
+| `Authorization: Bearer <token>` | 一般的な bearer token 伝搬 |
+| `X-Google-Access-Token: <token>` | Google 連携を前提としたバックエンド処理向け |
+
+`createFrontendApiClient` と proxy Route Handler の両方で同じ方針を維持し、片側のみ変更される状態を避けます。
 
 ## 設定
 
@@ -63,6 +122,10 @@ API_SERVICE_INVENTORY_API_BASE_URL=http://localhost:8011
 API_SERVICE_INVENTORY_API_KEY=your-inventory-api-key-here
 API_SERVICE_REPORTING_API_BASE_URL=http://localhost:8012
 API_SERVICE_REPORTING_API_KEY=your-reporting-api-key-here
+
+# Phase 2 設計骨子: ポケモンダメージ計算 API
+API_SERVICES=inventory-api,reporting-api,pokemon-damage-calculator-api
+API_SERVICE_POKEMON_DAMAGE_CALCULATOR_API_BASE_URL=http://localhost:<pokemon-damage-calculator-api-port>
 ```
 
 補足:
@@ -71,6 +134,8 @@ API_SERVICE_REPORTING_API_KEY=your-reporting-api-key-here
 - 業務機能 API は `game-library-api` のように、画面名より業務ドメインが分かる名前を付けます。
 - `API_SERVICES` に列挙したサービスは `createFrontendApiClient("inventory-api")` のように直接使えます。
 - `API_SERVICE_<サービス名>_BASE_URL` のサービス名部分は、ハイフンなどを `_` に変換し大文字化して指定します。
+
+ポケモンダメージ計算機能では、`pokemon-damage-calculator-api` を上記ルールに従って登録する予定です。
 
 ## 使用方法
 
@@ -228,7 +293,17 @@ Content-Type: application/json
 
 # Service3の /items/123 を取得
 GET /api/services/service3/items/123
+
+# ポケモンダメージ計算 API の runs を取得
+GET /api/services/pokemon-damage-calculator-api/api/runs
 ```
+
+### Issue #97 で想定する利用例
+
+| 画面 | 想定する proxy 呼び出し |
+|------|-------------------------|
+| `/pokemon-damage-calculator` | RuleSet 一覧、Run 一覧の GET |
+| `/pokemon-damage-calculator/runs/[runId]` | Run 詳細、Battle 一覧、Party State の GET、Battle CRUD、Party State 追加、ダメージ計算 POST |
 
 ## 新しいサービスの追加
 
@@ -255,6 +330,8 @@ const response = await client.get("/endpoint");
 ```
 
 この方式なら、サービス追加のたびに `lib/config/api-config.ts` を編集しなくても済みます。
+
+ポケモンダメージ計算機能でも同じ拡張方式を利用し、サービス追加のための feature 固有分岐は増やさない予定です。
 
 ## ディレクトリ構造
 
@@ -382,4 +459,4 @@ npm run dev
 
 ## まとめ
 
-このAPIルーティング基盤により、複数のAppServiceへのアクセスが統一的かつ型安全に実現できます。新しいサービスの追加も容易で、拡張性の高いアーキテクチャとなっています。
+この API ルーティング基盤により、複数の AppService へのアクセスを統一的かつ型安全に実現できます。Issue #97 では、この既存基盤を維持しながら `pokemon-damage-calculator-api` の追加、匿名 GET allowlist の明確化、認証ヘッダー 2 系統の維持を進める予定です。
