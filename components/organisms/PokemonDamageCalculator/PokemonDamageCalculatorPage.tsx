@@ -13,6 +13,11 @@ import {
 } from '@/lib/pokemon-damage-calculator/api';
 import { formatRuleSetLabel, sortRuleSets, sortRuns } from '@/lib/pokemon-damage-calculator/mappers';
 import { getRunOwnership } from '@/lib/pokemon-damage-calculator/ownership';
+import {
+  filterRunsByScope,
+  getDefaultRunListScope,
+  type RunListScope,
+} from '@/lib/pokemon-damage-calculator/run-list';
 import { validateCreateRunRequest } from '@/lib/pokemon-damage-calculator/validation';
 import type { RuleSetDto, RunDto } from '@/lib/pokemon-damage-calculator/types';
 import {
@@ -38,6 +43,7 @@ export function PokemonDamageCalculatorPage() {
   const { data: session, status } = useSession();
   const [ruleSets, setRuleSets] = useState<RuleSetDto[]>([]);
   const [runs, setRuns] = useState<RunDto[]>([]);
+  const [runListScope, setRunListScope] = useState<RunListScope>('all');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -46,6 +52,7 @@ export function PokemonDamageCalculatorPage() {
     name: '',
     ruleSetId: '',
   });
+  const googleUserId = session?.googleUserId ?? null;
 
   const loadData = useCallback(async () => {
     try {
@@ -75,12 +82,21 @@ export function PokemonDamageCalculatorPage() {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    setRunListScope(getDefaultRunListScope(googleUserId));
+  }, [googleUserId]);
+
   const ownershipRuns = useMemo(
     () => runs.map((run) => ({
       ...run,
-      ownership: getRunOwnership(run.ownerUserId, session?.googleUserId ?? null),
+      ownership: getRunOwnership(run.ownerUserId, googleUserId),
     })),
-    [runs, session?.googleUserId],
+    [googleUserId, runs],
+  );
+
+  const visibleRuns = useMemo(
+    () => filterRunsByScope(ownershipRuns, runListScope),
+    [ownershipRuns, runListScope],
   );
 
   const handleCreateRun = useCallback(async () => {
@@ -127,17 +143,43 @@ export function PokemonDamageCalculatorPage() {
       <div className="grid gap-6 xl:grid-cols-[1.3fr_1fr]">
         <SectionCard
           title="Run 一覧"
-          description="全ユーザーの Run を閲覧できます。所有している Run のみ編集可能です。"
+          description={status === 'authenticated'
+            ? runListScope === 'owned'
+              ? '認証済みユーザーは既定で自分の Run を表示します。必要に応じて、すべての Run に切り替えられます。'
+              : 'すべての Run を表示しています。所有している Run のみ編集可能です。'
+            : '全ユーザーの Run を閲覧できます。所有している Run のみ編集可能です。'}
           actions={(
             <CustomButton variant="ghost" onClick={() => void loadData()} disabled={loading}>
               再取得
             </CustomButton>
           )}
         >
+          {status === 'authenticated' ? (
+            <div className="mb-4 flex flex-wrap gap-3">
+              <CustomButton
+                variant={runListScope === 'owned' ? 'accent' : 'ghost'}
+                onClick={() => setRunListScope('owned')}
+                disabled={runListScope === 'owned'}
+              >
+                自分の Run
+              </CustomButton>
+              <CustomButton
+                variant={runListScope === 'all' ? 'accent' : 'ghost'}
+                onClick={() => setRunListScope('all')}
+                disabled={runListScope === 'all'}
+              >
+                すべての Run
+              </CustomButton>
+            </div>
+          ) : null}
           {loading ? (
             <StatusMessage tone="info">データを取得しています...</StatusMessage>
-          ) : ownershipRuns.length === 0 ? (
-            <EmptyState>Run はまだ登録されていません。</EmptyState>
+          ) : visibleRuns.length === 0 ? (
+            <EmptyState>
+              {runListScope === 'owned'
+                ? '自分の Run はまだ登録されていません。必要に応じて「すべての Run」に切り替えて他ユーザーの Run を閲覧できます。'
+                : 'Run はまだ登録されていません。'}
+            </EmptyState>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-800">
@@ -150,7 +192,7 @@ export function PokemonDamageCalculatorPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-900">
-                  {ownershipRuns.map((run) => (
+                  {visibleRuns.map((run) => (
                     <tr key={run.id}>
                       <td className="px-3 py-3 font-medium text-zinc-900 dark:text-zinc-100">{run.name}</td>
                       <td className="px-3 py-3 text-zinc-700 dark:text-zinc-300">{run.status}</td>

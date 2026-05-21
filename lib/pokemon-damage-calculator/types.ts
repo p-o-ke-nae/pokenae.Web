@@ -37,8 +37,8 @@ export interface OwnPokemonSnapshotDto {
   battleId: string;
   species: string;
   level: number;
-  baseStats: string | null;
-  iVs: string | null;
+  baseStats: string;
+  iVs: string;
   stats: string;
   eVs: string;
 }
@@ -82,8 +82,8 @@ export interface AddProgressionEventRequest {
   battleId: string;
   species: string;
   level: number;
-  baseStats: string | null;
-  iVs: string | null;
+  baseStats: string;
+  iVs: string;
   stats: string;
   eVs: string;
 }

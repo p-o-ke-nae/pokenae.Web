@@ -21,6 +21,10 @@ import {
 import { mapCalculationResult, safeParseJsonValue, sortBattles } from '@/lib/pokemon-damage-calculator/mappers';
 import { canEditRun, getRunReadOnlyReason } from '@/lib/pokemon-damage-calculator/ownership';
 import {
+  buildAddProgressionEventRequest,
+  getPartyStatePrerequisiteMessage,
+} from '@/lib/pokemon-damage-calculator/progression-event';
+import {
   validateBattleRequest,
   validateDamageCalculationRequest,
   validateProgressionEventRequest,
@@ -144,6 +148,8 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
 
   const isEditable = canEditRun(run?.ownerUserId, session?.googleUserId ?? null);
   const readOnlyReason = getRunReadOnlyReason(run?.ownerUserId, session?.googleUserId ?? null);
+  const mutationsDisabled = !isEditable || busyAction !== null;
+  const partyStatePrerequisiteMessage = getPartyStatePrerequisiteMessage(battles.length);
 
   const latestBattleOptions = useMemo(
     () => battles.map((battle) => ({ value: battle.id, label: `${battle.sequence}. ${battle.enemyPokemon}` })),
@@ -309,15 +315,7 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
       return;
     }
 
-    const request = {
-      battleId: progressionForm.battleId,
-      species: progressionForm.species.trim(),
-      level: Number.parseInt(progressionForm.level, 10),
-      baseStats: progressionForm.baseStats.trim() || null,
-      iVs: progressionForm.iVs.trim() || null,
-      stats: progressionForm.stats.trim(),
-      eVs: progressionForm.eVs.trim(),
-    };
+    const request = buildAddProgressionEventRequest(progressionForm);
 
     const errors = validateProgressionEventRequest(request);
     setPartyFormErrors(errors);
@@ -402,6 +400,16 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
 
       {pageError ? <StatusMessage tone="error">{pageError}</StatusMessage> : null}
       {readOnlyReason ? <StatusMessage tone="warning">{readOnlyReason}</StatusMessage> : null}
+      {!isEditable && status === 'unauthenticated' ? (
+        <StatusMessage tone="info">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>自分の Run を編集するには Google でログインしてください。</span>
+            <CustomButton variant="ghost" onClick={() => void handleAuthRequired()} disabled={busyAction !== null}>
+              Google でログイン
+            </CustomButton>
+          </div>
+        </StatusMessage>
+      ) : null}
       {busyAction ? <StatusMessage tone="info">処理中: {busyAction}</StatusMessage> : null}
 
       <SectionCard
@@ -438,23 +446,23 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
               <FieldGroup label="Run 名">
                 <TextInput
                   value={runForm.name}
-                  disabled={!isEditable || busyAction !== null}
+                  disabled={mutationsDisabled}
                   onChange={(event) => setRunForm((current) => ({ ...current, name: event.target.value }))}
                 />
               </FieldGroup>
               <FieldGroup label="ステータス">
                 <TextInput
                   value={runForm.status}
-                  disabled={!isEditable || busyAction !== null}
+                  disabled={mutationsDisabled}
                   onChange={(event) => setRunForm((current) => ({ ...current, status: event.target.value }))}
                 />
               </FieldGroup>
             </div>
             <div className="flex flex-wrap gap-3">
-              <CustomButton variant="accent" onClick={() => void handleRunUpdate()} disabled={busyAction !== null}>
-                {status === 'authenticated' ? 'Run を更新' : 'ログインして編集'}
+              <CustomButton variant="accent" onClick={() => void handleRunUpdate()} disabled={mutationsDisabled}>
+                Run を更新
               </CustomButton>
-              <CustomButton variant="ghost" onClick={() => void handleRunDelete()} disabled={busyAction !== null}>
+              <CustomButton variant="ghost" onClick={() => void handleRunDelete()} disabled={mutationsDisabled}>
                 Run を削除
               </CustomButton>
             </div>
@@ -469,6 +477,11 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
               <ul className="list-disc pl-5">
                 {battleFormErrors.map((error) => <li key={error}>{error}</li>)}
               </ul>
+            </StatusMessage>
+          ) : null}
+          {!isEditable ? (
+            <StatusMessage tone="info">
+              Battle の作成 / 編集 / 削除は所有者のみ実行できます。
             </StatusMessage>
           ) : null}
 
@@ -486,10 +499,10 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
                         <p className="mt-2 font-mono text-xs text-zinc-500 dark:text-zinc-400">{battle.id}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <CustomButton variant="ghost" onClick={() => handleStartBattleEdit(battle)} disabled={busyAction !== null}>
+                        <CustomButton variant="ghost" onClick={() => handleStartBattleEdit(battle)} disabled={mutationsDisabled}>
                           編集
                         </CustomButton>
-                        <CustomButton variant="ghost" onClick={() => void handleBattleDelete(battle.id)} disabled={busyAction !== null}>
+                        <CustomButton variant="ghost" onClick={() => void handleBattleDelete(battle.id)} disabled={mutationsDisabled}>
                           削除
                         </CustomButton>
                       </div>
@@ -506,7 +519,7 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
               <FieldGroup label="敵ポケモン名">
                 <TextInput
                   value={battleForm.enemyPokemon}
-                  disabled={!isEditable || busyAction !== null}
+                  disabled={mutationsDisabled}
                   onChange={(event) => setBattleForm((current) => ({ ...current, enemyPokemon: event.target.value }))}
                 />
               </FieldGroup>
@@ -515,18 +528,18 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
                   type="number"
                   min={1}
                   value={battleForm.sequence}
-                  disabled={!isEditable || busyAction !== null}
+                  disabled={mutationsDisabled}
                   onChange={(event) => setBattleForm((current) => ({ ...current, sequence: event.target.value }))}
                 />
               </FieldGroup>
               <div className="flex flex-wrap gap-3">
-                <CustomButton variant="accent" onClick={() => void handleBattleSubmit()} disabled={busyAction !== null}>
+                <CustomButton variant="accent" onClick={() => void handleBattleSubmit()} disabled={mutationsDisabled}>
                   {battleForm.id ? 'Battle を更新' : 'Battle を追加'}
                 </CustomButton>
                 <CustomButton
                   variant="ghost"
                   onClick={() => setBattleForm({ id: '', enemyPokemon: '', sequence: String(Math.max(battles.length + 1, 1)) })}
-                  disabled={busyAction !== null}
+                  disabled={mutationsDisabled}
                 >
                   入力をクリア
                 </CustomButton>
@@ -541,6 +554,11 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
               <ul className="list-disc pl-5">
                 {partyFormErrors.map((error) => <li key={error}>{error}</li>)}
               </ul>
+            </StatusMessage>
+          ) : null}
+          {!isEditable ? (
+            <StatusMessage tone="info">
+              Party State の追加は所有者のみ実行できます。閲覧はそのまま可能です。
             </StatusMessage>
           ) : null}
 
@@ -576,11 +594,16 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
 
             <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
               <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">進行イベントを追加</h3>
+              {partyStatePrerequisiteMessage ? (
+                <div className="mt-4">
+                  <StatusMessage tone="info">{partyStatePrerequisiteMessage}</StatusMessage>
+                </div>
+              ) : null}
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <FieldGroup label="Battle">
                   <SelectInput
                     value={progressionForm.battleId}
-                    disabled={!isEditable || busyAction !== null || latestBattleOptions.length === 0}
+                    disabled={mutationsDisabled || latestBattleOptions.length === 0}
                     onChange={(event) => setProgressionForm((current) => ({ ...current, battleId: event.target.value }))}
                   >
                     <option value="">Battle を選択</option>
@@ -592,7 +615,7 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
                 <FieldGroup label="種族名">
                   <TextInput
                     value={progressionForm.species}
-                    disabled={!isEditable || busyAction !== null}
+                    disabled={mutationsDisabled}
                     onChange={(event) => setProgressionForm((current) => ({ ...current, species: event.target.value }))}
                   />
                 </FieldGroup>
@@ -602,7 +625,7 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
                     min={1}
                     max={100}
                     value={progressionForm.level}
-                    disabled={!isEditable || busyAction !== null}
+                    disabled={mutationsDisabled}
                     onChange={(event) => setProgressionForm((current) => ({ ...current, level: event.target.value }))}
                   />
                 </FieldGroup>
@@ -611,7 +634,7 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
                   <TextAreaInput
                     rows={4}
                     value={progressionForm.baseStats}
-                    disabled={!isEditable || busyAction !== null}
+                    disabled={mutationsDisabled}
                     onChange={(event) => setProgressionForm((current) => ({ ...current, baseStats: event.target.value }))}
                   />
                 </FieldGroup>
@@ -619,7 +642,7 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
                   <TextAreaInput
                     rows={4}
                     value={progressionForm.iVs}
-                    disabled={!isEditable || busyAction !== null}
+                    disabled={mutationsDisabled}
                     onChange={(event) => setProgressionForm((current) => ({ ...current, iVs: event.target.value }))}
                   />
                 </FieldGroup>
@@ -627,7 +650,7 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
                   <TextAreaInput
                     rows={4}
                     value={progressionForm.stats}
-                    disabled={!isEditable || busyAction !== null}
+                    disabled={mutationsDisabled}
                     onChange={(event) => setProgressionForm((current) => ({ ...current, stats: event.target.value }))}
                   />
                 </FieldGroup>
@@ -635,13 +658,13 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
                   <TextAreaInput
                     rows={4}
                     value={progressionForm.eVs}
-                    disabled={!isEditable || busyAction !== null}
+                    disabled={mutationsDisabled}
                     onChange={(event) => setProgressionForm((current) => ({ ...current, eVs: event.target.value }))}
                   />
                 </FieldGroup>
               </div>
               <div className="mt-4">
-                <CustomButton variant="accent" onClick={() => void handleProgressionSubmit()} disabled={busyAction !== null || latestBattleOptions.length === 0}>
+                <CustomButton variant="accent" onClick={() => void handleProgressionSubmit()} disabled={mutationsDisabled || latestBattleOptions.length === 0}>
                   進行イベントを追加
                 </CustomButton>
               </div>
@@ -658,13 +681,18 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
             </ul>
           </StatusMessage>
         ) : null}
+        {!isEditable ? (
+          <StatusMessage tone="info">
+            ダメージ計算の実行は所有者のみ可能です。結果の閲覧は継続できます。
+          </StatusMessage>
+        ) : null}
 
         <div className="grid gap-6 xl:grid-cols-[1fr_1.1fr]">
           <div className="space-y-4 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
             <FieldGroup label="Battle">
               <SelectInput
                 value={calculationForm.battleId}
-                disabled={!isEditable || busyAction !== null || latestBattleOptions.length === 0}
+                disabled={mutationsDisabled || latestBattleOptions.length === 0}
                 onChange={(event) => setCalculationForm((current) => ({ ...current, battleId: event.target.value }))}
               >
                 <option value="">Battle を選択</option>
@@ -674,54 +702,54 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
               </SelectInput>
             </FieldGroup>
             <div className="grid gap-4 md:grid-cols-2">
-              <FieldGroup label="Attacker Level">
-                <TextInput
-                  type="number"
-                  value={calculationForm.attackerLevel}
-                  disabled={!isEditable || busyAction !== null}
-                  onChange={(event) => setCalculationForm((current) => ({ ...current, attackerLevel: event.target.value }))}
-                />
-              </FieldGroup>
-              <FieldGroup label="Attack Stat">
-                <TextInput
-                  type="number"
-                  value={calculationForm.attackStat}
-                  disabled={!isEditable || busyAction !== null}
-                  onChange={(event) => setCalculationForm((current) => ({ ...current, attackStat: event.target.value }))}
-                />
-              </FieldGroup>
-              <FieldGroup label="Move Power">
-                <TextInput
-                  type="number"
-                  value={calculationForm.movePower}
-                  disabled={!isEditable || busyAction !== null}
-                  onChange={(event) => setCalculationForm((current) => ({ ...current, movePower: event.target.value }))}
-                />
-              </FieldGroup>
-              <FieldGroup label="Defense Stat">
-                <TextInput
-                  type="number"
-                  value={calculationForm.defenseStat}
-                  disabled={!isEditable || busyAction !== null}
-                  onChange={(event) => setCalculationForm((current) => ({ ...current, defenseStat: event.target.value }))}
-                />
-              </FieldGroup>
-              <FieldGroup label="Type Effectiveness">
-                <TextInput
-                  type="number"
-                  step="0.25"
-                  value={calculationForm.typeEffectiveness}
-                  disabled={!isEditable || busyAction !== null}
-                  onChange={(event) => setCalculationForm((current) => ({ ...current, typeEffectiveness: event.target.value }))}
-                />
-              </FieldGroup>
+                <FieldGroup label="Attacker Level">
+                  <TextInput
+                    type="number"
+                    value={calculationForm.attackerLevel}
+                    disabled={mutationsDisabled}
+                    onChange={(event) => setCalculationForm((current) => ({ ...current, attackerLevel: event.target.value }))}
+                  />
+                </FieldGroup>
+                <FieldGroup label="Attack Stat">
+                  <TextInput
+                    type="number"
+                    value={calculationForm.attackStat}
+                    disabled={mutationsDisabled}
+                    onChange={(event) => setCalculationForm((current) => ({ ...current, attackStat: event.target.value }))}
+                  />
+                </FieldGroup>
+                <FieldGroup label="Move Power">
+                  <TextInput
+                    type="number"
+                    value={calculationForm.movePower}
+                    disabled={mutationsDisabled}
+                    onChange={(event) => setCalculationForm((current) => ({ ...current, movePower: event.target.value }))}
+                  />
+                </FieldGroup>
+                <FieldGroup label="Defense Stat">
+                  <TextInput
+                    type="number"
+                    value={calculationForm.defenseStat}
+                    disabled={mutationsDisabled}
+                    onChange={(event) => setCalculationForm((current) => ({ ...current, defenseStat: event.target.value }))}
+                  />
+                </FieldGroup>
+                <FieldGroup label="Type Effectiveness">
+                  <TextInput
+                    type="number"
+                    step="0.25"
+                    value={calculationForm.typeEffectiveness}
+                    disabled={mutationsDisabled}
+                    onChange={(event) => setCalculationForm((current) => ({ ...current, typeEffectiveness: event.target.value }))}
+                  />
+                </FieldGroup>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="flex items-center gap-2 text-sm text-zinc-800 dark:text-zinc-200">
                 <input
                   type="checkbox"
                   checked={calculationForm.isSpecialMove}
-                  disabled={!isEditable || busyAction !== null}
+                  disabled={mutationsDisabled}
                   onChange={(event) => setCalculationForm((current) => ({ ...current, isSpecialMove: event.target.checked }))}
                 />
                 特殊技
@@ -730,13 +758,13 @@ export function PokemonDamageCalculatorRunWorkspace({ runId }: RunWorkspaceProps
                 <input
                   type="checkbox"
                   checked={calculationForm.hasStab}
-                  disabled={!isEditable || busyAction !== null}
+                  disabled={mutationsDisabled}
                   onChange={(event) => setCalculationForm((current) => ({ ...current, hasStab: event.target.checked }))}
                 />
                 STAB あり
               </label>
             </div>
-            <CustomButton variant="accent" onClick={() => void handleCalculationSubmit()} disabled={busyAction !== null || latestBattleOptions.length === 0}>
+            <CustomButton variant="accent" onClick={() => void handleCalculationSubmit()} disabled={mutationsDisabled || latestBattleOptions.length === 0}>
               ダメージ計算を実行
             </CustomButton>
           </div>

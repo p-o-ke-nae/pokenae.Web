@@ -80,11 +80,11 @@ export function validateProgressionEventRequest(request: AddProgressionEventRequ
     errors.push('レベルは 1 から 100 の整数で入力してください。');
   }
 
-  if (request.baseStats && !isJsonObjectText(request.baseStats)) {
+  if (!isBlank(request.baseStats) && !isJsonObjectText(request.baseStats)) {
     errors.push('Base Stats は JSON オブジェクト文字列で入力してください。');
   }
 
-  if (request.iVs && !isJsonObjectText(request.iVs)) {
+  if (!isBlank(request.iVs) && !isJsonObjectText(request.iVs)) {
     errors.push('IVs は JSON オブジェクト文字列で入力してください。');
   }
 

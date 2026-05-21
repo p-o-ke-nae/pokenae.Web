@@ -35,8 +35,8 @@ describe('pokemon damage calculator validation helpers', () => {
       battleId: 'battle-1',
       species: 'Pikachu',
       level: 25,
-      baseStats: '{"Hp":35}',
-      iVs: '{"Attack":31}',
+      baseStats: '',
+      iVs: '',
       stats: '{"Hp":80}',
       eVs: '{"Speed":252}',
     })).toEqual([]);
