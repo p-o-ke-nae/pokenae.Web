@@ -10,13 +10,13 @@
 | 認証 | Google OAuth2 / NextAuth |
 | API 接続 | `createFrontendApiClient` と `/api/services/{service}/{...path}` proxy |
 | 開発前提 | Docker Compose ベース |
-| 実装済み機能 | ポケモンダメージ計算 (`/pokemon-damage-calculator`) |
+| 実装済み機能 | ポケモンダメージ計算 (`/pokemon-damage-calculator`) / 管理 UI (`/pokemon-damage-calculator/admin`) |
 
 ## Documentation
 
 - **[環境モードの設定と区別方法](./docs/ENVIRONMENT_SETUP.md)** - 環境変数、シークレット、追加 API サービス設定
 - **[API Routing Guide](./docs/API_ROUTING.md)** - API ルーティング基盤と proxy 運用方針
-- **[Pokemon Damage Calculator API 契約差分メモ](./docs/API_CONTRACT_DIFFS_POKEMON_DAMAGE_CALCULATOR_API.md)** - Issue #97 の実装反映済みメモ
+- **[Pokemon Damage Calculator API 契約差分メモ](./docs/API_CONTRACT_DIFFS_POKEMON_DAMAGE_CALCULATOR_API.md)** - ポケモンダメージ計算 / 管理 UI の実装反映メモ
 - **[Google Auth Setup Guide](./docs/GOOGLE_AUTH_SETUP.md)** - Google OAuth2認証の設定ガイド（英語）
 - **[Google OAuth2認証機能について](./docs/GOOGLE_AUTH_SETUP_JA.md)** - Google OAuth2認証の詳細解説（日本語）
 - **[Kernel Stack Overflow Investigation](./docs/KERNEL_STACK_OVERFLOW_INVESTIGATION.md)** - スタックオーバーフロー問題の調査と修正レポート
