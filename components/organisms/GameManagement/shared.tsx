@@ -5,6 +5,7 @@ import CustomHeader from '@/components/atoms/CustomHeader';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
 import type { LayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
+import { buildMaintenanceSummaryText } from '@/lib/game-management/maintenance';
 import { formatSaveStorageType } from '@/lib/game-management/save-storage-type';
 import type {
   AccountDto,
@@ -179,7 +180,7 @@ export function ResourceSummary({ resourceKey, record, lookups, storyProgressLab
     }
     case 'game-consoles': {
       const item = record as GameConsoleDto;
-      return <p className="select-none text-sm text-zinc-600 dark:text-zinc-300">対応マスタ: {getGameConsoleMasterName(item.gameConsoleMasterId, lookups)}</p>;
+      return <p className="select-none text-sm text-zinc-600 dark:text-zinc-300">対応マスタ: {getGameConsoleMasterName(item.gameConsoleMasterId, lookups)} / {buildMaintenanceSummaryText(item.maintenance)}</p>;
     }
     case 'game-software-masters': {
       const item = record as GameSoftwareMasterDto;
@@ -187,11 +188,11 @@ export function ResourceSummary({ resourceKey, record, lookups, storyProgressLab
     }
     case 'game-softwares': {
       const item = record as GameSoftwareDto;
-      return <p className="select-none text-sm text-zinc-600 dark:text-zinc-300">ソフトマスタ: {getGameSoftwareMasterName(item.gameSoftwareMasterId, lookups)}</p>;
+      return <p className="select-none text-sm text-zinc-600 dark:text-zinc-300">ソフトマスタ: {getGameSoftwareMasterName(item.gameSoftwareMasterId, lookups)} / {buildMaintenanceSummaryText(item.maintenance)}</p>;
     }
     case 'memory-cards': {
       const item = record as MemoryCardDto;
-      return <p className="select-none text-sm text-zinc-600 dark:text-zinc-300">所有者: {item.ownerGoogleUserId}</p>;
+      return <p className="select-none text-sm text-zinc-600 dark:text-zinc-300">所有者: {item.ownerGoogleUserId} / {buildMaintenanceSummaryText(item.maintenance)}</p>;
     }
     case 'save-datas': {
       const item = record as SaveDataDto;

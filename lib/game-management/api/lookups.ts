@@ -9,6 +9,7 @@ import type {
   GameSoftwareContentGroupDto,
   GameSoftwareMasterDto,
   GameSoftwareDto,
+  MaintenanceHealthFilter,
   ManagementLookups,
   MasterLookups,
   MemoryCardEditionMasterDto,
@@ -17,6 +18,10 @@ import type {
 } from '@/lib/game-management/types';
 import { client, fetchResourceList, unwrap } from './core';
 import { fetchPublicMasterLookups } from './public';
+
+type UserLookupOptions = {
+  maintenanceHealthFilter?: MaintenanceHealthFilter;
+};
 
 // ---------------------------------------------------------------------------
 // Admin master lookups
@@ -45,7 +50,8 @@ export async function fetchMasterLookups(): Promise<MasterLookups> {
   return { accountTypeMasters, gameConsoleCategories, gameConsoleCategoryCompatibilities, gameConsoleMasters, gameConsoleEditionMasters, gameSoftwareContentGroups, gameSoftwareMasters, memoryCardEditionMasters };
 }
 
-export async function fetchUserLookups(): Promise<ManagementLookups> {
+export async function fetchUserLookups(options: UserLookupOptions = {}): Promise<ManagementLookups> {
+  const maintenanceHealthFilter = options.maintenanceHealthFilter ?? 'All';
   const [
     masterLookups,
     accounts,
@@ -56,9 +62,9 @@ export async function fetchUserLookups(): Promise<ManagementLookups> {
   ] = await Promise.all([
     fetchPublicMasterLookups(),
     fetchResourceList<AccountDto>('accounts'),
-    fetchResourceList<GameConsoleDto>('game-consoles'),
-    fetchResourceList<GameSoftwareDto>('game-softwares'),
-    fetchResourceList<MemoryCardDto>('memory-cards'),
+    fetchResourceList<GameConsoleDto>('game-consoles', { query: { maintenanceHealthFilter } }),
+    fetchResourceList<GameSoftwareDto>('game-softwares', { query: { maintenanceHealthFilter } }),
+    fetchResourceList<MemoryCardDto>('memory-cards', { query: { maintenanceHealthFilter } }),
     fetchResourceList<SaveDataDto>('save-datas'),
   ]);
   return {
@@ -75,7 +81,8 @@ export async function fetchUserLookups(): Promise<ManagementLookups> {
 // Authenticated user lookups (public masters + user data)
 // ---------------------------------------------------------------------------
 
-export async function fetchAuthenticatedUserLookups(): Promise<ManagementLookups> {
+export async function fetchAuthenticatedUserLookups(options: UserLookupOptions = {}): Promise<ManagementLookups> {
+  const maintenanceHealthFilter = options.maintenanceHealthFilter ?? 'All';
   const [
     masterLookups,
     accounts,
@@ -86,9 +93,9 @@ export async function fetchAuthenticatedUserLookups(): Promise<ManagementLookups
   ] = await Promise.all([
     fetchPublicMasterLookups(),
     fetchResourceList<AccountDto>('accounts'),
-    fetchResourceList<GameConsoleDto>('game-consoles'),
-    fetchResourceList<GameSoftwareDto>('game-softwares'),
-    fetchResourceList<MemoryCardDto>('memory-cards'),
+    fetchResourceList<GameConsoleDto>('game-consoles', { query: { maintenanceHealthFilter } }),
+    fetchResourceList<GameSoftwareDto>('game-softwares', { query: { maintenanceHealthFilter } }),
+    fetchResourceList<MemoryCardDto>('memory-cards', { query: { maintenanceHealthFilter } }),
     fetchResourceList<SaveDataDto>('save-datas'),
   ]);
   return {

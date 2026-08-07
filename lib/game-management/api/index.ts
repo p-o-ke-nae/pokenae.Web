@@ -17,6 +17,14 @@ export {
 } from './compatibility';
 
 export {
+  fetchCurrentUser,
+  fetchMaintenanceList,
+  createMaintenanceRecord,
+  updateMaintenanceRecord,
+  deleteMaintenanceRecord,
+} from './maintenance';
+
+export {
   fetchMasterLookups,
   fetchUserLookups,
   fetchAuthenticatedUserLookups,

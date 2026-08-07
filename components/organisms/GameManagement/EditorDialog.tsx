@@ -25,9 +25,11 @@ import {
   formatSaveDataFieldValueForList,
   mergeSchemaWithSaveData,
 } from '@/lib/game-management/save-data-fields';
+import { buildMaintenanceSummaryText, supportsMaintenance } from '@/lib/game-management/maintenance';
 import { trialGetResourceById } from '@/lib/game-management/trial';
 import type {
   ManagementLookups,
+  MaintenanceSummaryDto,
   ResourceKey,
   SaveDataDto,
   SaveDataSchemaDto,
@@ -35,6 +37,7 @@ import type {
 } from '@/lib/game-management/types';
 import { numberOrNull, getStoryProgressLabel } from './helpers';
 import { createContinueFormState, createSeededFormState, buildInitialFormState } from './form-state';
+import MaintenanceRecordsSection from './MaintenanceRecordsSection';
 import { validateForm } from './validation';
 import { selectOptionsFromLookups, optionize } from './options';
 import { FormFields } from './form-fields';
@@ -93,6 +96,7 @@ export default function EditorDialog({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
 
   const [saveDataSchema, setSaveDataSchema] = useState<SaveDataSchemaDto | null>(null);
   const [saveDataSchemaLoading, setSaveDataSchemaLoading] = useState(false);
@@ -105,45 +109,47 @@ export default function EditorDialog({
   // Record loading
   // ---------------------------------------------------------------------------
 
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
+  const reloadCurrentRecord = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
 
-    const doLoad = async () => {
-      setLoading(true);
-      setError(null);
-      setSuccess(null);
-
-      try {
-        if (recordId === null) {
-          setRecord(null);
-          setFormState(createSeededFormState(initialFormState));
-        } else {
-          let nextRecord: unknown;
-          if (isTrial) {
-            nextRecord = trialGetResourceById(resourceKey, recordId);
-            if (!nextRecord) throw new Error(`レコード #${recordId} が見つかりません。`);
-          } else {
-            nextRecord = await fetchResourceById(resourceKey, String(recordId));
-          }
-          if (cancelled) return;
-          setRecord(nextRecord);
-          setFormState(buildInitialFormState(resourceKey, nextRecord));
-        }
-      } catch (err) {
-        if (cancelled) return;
-        setError(getGameManagementErrorMessage(err, {
-          fallback: resources.gameManagement.errors.detailLoad,
-          adminFallback: resources.gameManagement.errors.adminRequired,
-        }));
-      } finally {
-        if (!cancelled) setLoading(false);
+    try {
+      if (recordId === null) {
+        setRecord(null);
+        setFormState(createSeededFormState(initialFormState));
+        return;
       }
-    };
 
-    void doLoad();
-    return () => { cancelled = true; };
-  }, [initialFormState, open, recordId, isTrial, resourceKey]);
+      let nextRecord: unknown;
+      if (isTrial) {
+        nextRecord = trialGetResourceById(resourceKey, recordId);
+        if (!nextRecord) {
+          throw new Error(`レコード #${recordId} が見つかりません。`);
+        }
+      } else {
+        nextRecord = await fetchResourceById(resourceKey, String(recordId));
+      }
+
+      setRecord(nextRecord);
+      setFormState(buildInitialFormState(resourceKey, nextRecord));
+    } catch (err) {
+      setError(getGameManagementErrorMessage(err, {
+        fallback: resources.gameManagement.errors.detailLoad,
+        adminFallback: resources.gameManagement.errors.adminRequired,
+      }));
+    } finally {
+      setLoading(false);
+    }
+  }, [initialFormState, isTrial, recordId, resourceKey]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    void reloadCurrentRecord();
+  }, [open, reloadCurrentRecord]);
 
   // Reset on close
   useEffect(() => {
@@ -159,6 +165,7 @@ export default function EditorDialog({
     setError(null);
     setSuccess(null);
     setDeleteDialogOpen(false);
+    setMaintenanceDialogOpen(false);
   }, [initialFormState, open]);
 
   // ---------------------------------------------------------------------------
@@ -247,6 +254,19 @@ export default function EditorDialog({
       : {};
     return getStoryProgressLabel(gsmId, spdId, fallbackMap) ?? null;
   }, [formState.gameSoftwareMasterId, formState.storyProgressDefinitionId, resourceKey, storyProgressSchema]);
+
+  const maintenanceSummary = useMemo<MaintenanceSummaryDto | undefined>(() => {
+    if (!record || !supportsMaintenance(resourceKey)) {
+      return undefined;
+    }
+
+    return (record as { maintenance?: MaintenanceSummaryDto }).maintenance;
+  }, [record, resourceKey]);
+
+  const handleMaintenanceChanged = useCallback(async () => {
+    await reloadCurrentRecord();
+    onDataChanged();
+  }, [onDataChanged, reloadCurrentRecord]);
 
   // ---------------------------------------------------------------------------
   // Save
@@ -491,6 +511,55 @@ export default function EditorDialog({
                   {record ? <ResourceSummary resourceKey={resourceKey} record={record} lookups={lookups} storyProgressLabel={selectedStoryProgressLabel} /> : null}
                 </div>
               )}
+               {!isNew && recordId != null && supportsMaintenance(resourceKey) ? (
+                 <>
+                   <section className="space-y-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                       <div className="space-y-2">
+                         <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">保守履歴</h3>
+                         <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-300">
+                           {buildMaintenanceSummaryText(maintenanceSummary)}
+                         </p>
+                       </div>
+                       <CustomButton variant="neutral" onClick={() => setMaintenanceDialogOpen(true)}>
+                         履歴を見る
+                       </CustomButton>
+                     </div>
+                     {isTrial ? (
+                       <CustomMessageArea variant="info">
+                         トライアルモードでは保守履歴ダイアログは確認できますが、保存操作は利用できません。
+                       </CustomMessageArea>
+                     ) : null}
+                   </section>
+                   <Dialog
+                     open={maintenanceDialogOpen}
+                     onClose={() => setMaintenanceDialogOpen(false)}
+                     title={`${definition.shortLabel}の保守履歴`}
+                     size="lg"
+                     footer={(
+                       <DialogFooterLayout
+                         layoutMode={layoutMode}
+                         trailing={(
+                           <CustomButton variant="neutral" onClick={() => setMaintenanceDialogOpen(false)}>
+                             閉じる
+                           </CustomButton>
+                         )}
+                       />
+                     )}
+                   >
+                     <MaintenanceRecordsSection
+                       key={`${resourceKey}:${recordId}:${isTrial ? 'trial' : 'live'}`}
+                       resourceKey={resourceKey}
+                       parentId={recordId}
+                       summary={maintenanceSummary}
+                       readOnly={isViewMode}
+                       trialMode={isTrial}
+                       layoutMode={layoutMode}
+                       onChanged={() => { void handleMaintenanceChanged(); }}
+                     />
+                   </Dialog>
+                 </>
+               ) : null}
               {resourceKey === 'save-datas' && record && !isNew ? (() => {
                 const saveData = record as SaveDataDto;
                 const mergedFields = mergeSchemaWithSaveData(saveDataSchema, saveData);

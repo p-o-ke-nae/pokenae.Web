@@ -9,6 +9,7 @@ export default function GameManagementPage() {
     <GameManagementDashboard
       basePath="/game-management"
       resourceKeys={ADMIN_RESOURCE_ORDER}
+      requiresAdmin
       sectionLabel={texts.sectionLabel}
       sectionTitle={texts.sectionTitle}
       sectionDescription={texts.sectionDescription}

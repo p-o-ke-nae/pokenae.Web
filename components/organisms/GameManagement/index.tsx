@@ -17,12 +17,14 @@ import {
 import RowMoveButtons from '@/components/organisms/GameManagement/RowMoveButtons';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import {
+  fetchCurrentUser,
   fetchMasterLookups,
   fetchPublicMasterLookups,
   fetchAuthenticatedUserLookups,
   getGameManagementErrorMessage,
   reorderResource,
 } from '@/lib/game-management/api';
+import { MAINTENANCE_FILTER_OPTIONS, supportsMaintenance } from '@/lib/game-management/maintenance';
 import resources from '@/lib/resources';
 import {
   fetchPublicSaveDataSchema,
@@ -40,6 +42,7 @@ import {
 } from '@/lib/game-management/trial';
 import { useResponsiveLayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
 import type {
+  MaintenanceHealthFilter,
   ManagementLookups,
   ResourceKey,
   SaveDataSchemaDto,
@@ -362,6 +365,7 @@ function ContentGroupChildTable({
 export function GameManagementDashboard({
     basePath = '/game-management',
     resourceKeys,
+    requiresAdmin = false,
     sectionLabel = 'Game Management',
     sectionTitle = 'ゲーム管理ダッシュボード',
     sectionDescription = '各マスタ、所有ゲーム機、ゲームソフト、アカウント、メモリーカード、セーブデータの一覧確認と編集画面への遷移をここから行えます。',
@@ -369,6 +373,7 @@ export function GameManagementDashboard({
   }: {
     basePath?: string;
     resourceKeys?: ResourceKey[];
+    requiresAdmin?: boolean;
     sectionLabel?: string;
     sectionTitle?: string;
     sectionDescription?: string;
@@ -376,7 +381,53 @@ export function GameManagementDashboard({
   }) {
     const { data: session } = useSession();
     const isTrial = !session?.user;
+    const [authError, setAuthError] = useState<string | null>(null);
+    const [authLoading, setAuthLoading] = useState(requiresAdmin && Boolean(session?.user));
     const displayKeys = resourceKeys ?? ADMIN_RESOURCE_ORDER;
+    const effectiveAuthError = requiresAdmin && session?.user ? authError : null;
+    const effectiveAuthLoading = requiresAdmin && session?.user ? authLoading : false;
+
+    useEffect(() => {
+      if (!requiresAdmin || !session?.user) {
+        return;
+      }
+
+      let cancelled = false;
+
+      void fetchCurrentUser()
+        .then((user) => {
+          if (cancelled) {
+            return;
+          }
+
+          if (!user.isAdmin && !user.effectiveRoles.includes('Admin')) {
+            setAuthError(getGameManagementErrorMessage(new Error('FORBIDDEN'), {
+              fallback: resources.gameManagement.errors.adminRequired,
+              adminFallback: resources.gameManagement.errors.adminRequired,
+            }));
+            return;
+          }
+
+          setAuthError(null);
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            setAuthError(getGameManagementErrorMessage(error, {
+              fallback: resources.gameManagement.errors.detailLoad,
+              adminFallback: resources.gameManagement.errors.adminRequired,
+            }));
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setAuthLoading(false);
+          }
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    }, [requiresAdmin, session?.user]);
 
     return (
       <PageFrame
@@ -387,40 +438,47 @@ export function GameManagementDashboard({
         {isTrial && (
           <TrialBanner />
         )}
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {displayKeys.map((resourceKey) => {
-            const definition = RESOURCE_DEFINITIONS[resourceKey];
+        {effectiveAuthError ? <CustomMessageArea variant="error">{effectiveAuthError}</CustomMessageArea> : null}
+        {effectiveAuthLoading ? (
+          <PageCard>
+            <p className="text-sm text-zinc-500 dark:text-zinc-300">権限を確認しています...</p>
+          </PageCard>
+        ) : effectiveAuthError ? null : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {displayKeys.map((resourceKey) => {
+              const definition = RESOURCE_DEFINITIONS[resourceKey];
 
-            return (
+              return (
+                <Link
+                  key={resourceKey}
+                  href={`${basePath}/${resourceKey}`}
+                  className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
+                >
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{definition.shortLabel}</p>
+                    <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">{definition.label}</h2>
+                    <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">{definition.description}</p>
+                    <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">一覧を開く</p>
+                  </div>
+                </Link>
+              );
+            })}
+            {extraCards.map((card) => (
               <Link
-                key={resourceKey}
-                href={`${basePath}/${resourceKey}`}
+                key={card.href}
+                href={card.href}
                 className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
               >
                 <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{definition.shortLabel}</p>
-                  <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">{definition.label}</h2>
-                  <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">{definition.description}</p>
-                  <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">一覧を開く</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{card.shortLabel}</p>
+                  <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">{card.title}</h2>
+                  <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">{card.description}</p>
+                  <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">{card.actionLabel ?? '画面を開く'}</p>
                 </div>
               </Link>
-            );
-          })}
-          {extraCards.map((card) => (
-            <Link
-              key={card.href}
-              href={card.href}
-              className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
-            >
-              <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{card.shortLabel}</p>
-                <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">{card.title}</h2>
-                <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">{card.description}</p>
-                <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">{card.actionLabel ?? '画面を開く'}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </PageFrame>
     );
   }
@@ -440,6 +498,7 @@ export function GameManagementDashboard({
     const [lookups, setLookups] = useState<ManagementLookups | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [authLoading, setAuthLoading] = useState(scope === 'admin' && Boolean(session?.user));
     const [storyProgressLabels, setStoryProgressLabels] = useState<StoryProgressLabelMap>({});
     const [selectedContentGroupId, setSelectedContentGroupId] = useState('');
     const [saveDataSchemas, setSaveDataSchemas] = useState<Record<number, SaveDataSchemaDto>>({});
@@ -460,6 +519,7 @@ export function GameManagementDashboard({
     const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>([]);
     const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
     const [pageMode, setPageMode] = useState<PageMode>('view');
+    const [maintenanceHealthFilter, setMaintenanceHealthFilter] = useState<MaintenanceHealthFilter>('All');
     const layoutMode = useResponsiveLayoutMode();
     const [bulkEditorOpen, setBulkEditorOpen] = useState(false);
     const [bulkEditorTargetIds, setBulkEditorTargetIds] = useState<number[]>([]);
@@ -469,6 +529,7 @@ export function GameManagementDashboard({
 
   const load = useCallback(async () => {
     setLoading(true);
+    setAuthLoading(scope === 'admin' && Boolean(session?.user));
     setError(null);
     setSaveError(null);
     setIsDirty(false);
@@ -479,6 +540,10 @@ export function GameManagementDashboard({
     try {
       let result: ManagementLookups;
       if (scope === 'admin') {
+        const user = await fetchCurrentUser();
+        if (!user.isAdmin && !user.effectiveRoles.includes('Admin')) {
+          throw new Error('ADMIN_REQUIRED');
+        }
         const masters = await fetchMasterLookups();
         result = { ...masters, accounts: [], gameConsoles: [], gameSoftwares: [], memoryCards: [], saveDatas: [] };
       } else if (isTrial) {
@@ -486,7 +551,9 @@ export function GameManagementDashboard({
         const userData = buildTrialUserData();
         result = { ...masters, ...userData };
       } else {
-        result = await fetchAuthenticatedUserLookups();
+        result = await fetchAuthenticatedUserLookups({
+          maintenanceHealthFilter: supportsMaintenance(resourceKey) ? maintenanceHealthFilter : 'All',
+        });
       }
       setLookups(result);
     } catch (loadError) {
@@ -496,8 +563,9 @@ export function GameManagementDashboard({
       }));
     } finally {
       setLoading(false);
+      setAuthLoading(false);
     }
-  }, [isTrial, scope]);
+  }, [isTrial, maintenanceHealthFilter, resourceKey, scope, session?.user]);
 
   useEffect(() => {
     void load();
@@ -1162,10 +1230,31 @@ export function GameManagementDashboard({
       {saveError ? <CustomMessageArea variant="error">{saveError}</CustomMessageArea> : null}
       {isTrial && <TrialBanner />}
       <PageCard>
-        {loading ? (
-          <p className="text-sm text-zinc-500">一覧を読み込んでいます...</p>
+        {loading || authLoading ? (
+          <p className="text-sm text-zinc-500">{authLoading ? '権限を確認しています...' : '一覧を読み込んでいます...'}</p>
         ) : (
           <div className="space-y-4">
+            {supportsMaintenance(resourceKey) ? (
+              <div className="space-y-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,20rem)_1fr] md:items-end">
+                  <div className="space-y-2">
+                    <CustomLabel htmlFor="maintenance-health-filter">保守状態</CustomLabel>
+                    <CustomComboBox
+                      id="maintenance-health-filter"
+                      value={maintenanceHealthFilter}
+                      onChange={(event) => setMaintenanceHealthFilter(event.target.value as MaintenanceHealthFilter)}
+                    >
+                      {MAINTENANCE_FILTER_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </CustomComboBox>
+                  </div>
+                  <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-300">
+                    最新の保守記録に基づいて一覧を絞り込みます。未確認は「起動不調を除外」に含まれ、期限超過は一覧の詳細表示で確認できます。
+                  </p>
+                </div>
+              </div>
+            ) : null}
             {resourceKey === 'save-datas' ? (
               <div className="space-y-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
                 <div className="grid gap-3 md:grid-cols-[minmax(0,20rem)_1fr] md:items-end">

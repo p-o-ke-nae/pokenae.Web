@@ -1,5 +1,6 @@
 import { formatSaveStorageType } from '@/lib/game-management/save-storage-type';
 import { formatMergedFieldValue, formatSaveDataFieldValueForList, mergeSchemaWithSaveData } from '@/lib/game-management/save-data-fields';
+import { buildMaintenanceSummaryText } from '@/lib/game-management/maintenance';
 import {
   formatDeletedState,
   getAccountDisplay,
@@ -242,7 +243,7 @@ export function buildTableRows(
         displayOrder: item.displayOrder,
         primary: getGameConsoleDisplay(item, lookups),
         relation: getGameConsoleMasterName(item.gameConsoleMasterId, lookups),
-        note: item.memo ?? '',
+        note: [buildMaintenanceSummaryText(item.maintenance), item.memo].filter(Boolean).join(' / '),
         status: formatDeletedState(item.isDeleted),
         edit: '編集',
       }));
@@ -296,6 +297,7 @@ export function buildTableRows(
           const console = item.installedGameConsoleId != null ? lookups.gameConsoles.find((c) => c.id === item.installedGameConsoleId) : undefined;
           if (console) noteParts.push(`インストール先: ${getGameConsoleDisplay(console, lookups)}`);
         }
+        noteParts.unshift(buildMaintenanceSummaryText(item.maintenance));
         if (item.memo) noteParts.push(item.memo);
         return {
           tableRowKey: createTableRowKey(resourceKey, item.id),
@@ -315,7 +317,7 @@ export function buildTableRows(
         displayOrder: item.displayOrder,
         primary: item.label || `MemoryCard #${item.id}`,
         relation: getMemoryCardEditionMasterName(item.memoryCardEditionMasterId, lookups),
-        note: item.memo ?? '',
+        note: [buildMaintenanceSummaryText(item.maintenance), item.memo].filter(Boolean).join(' / '),
         status: formatDeletedState(item.isDeleted),
         edit: '詳細',
       }));

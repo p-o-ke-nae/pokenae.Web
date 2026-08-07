@@ -11,6 +11,7 @@ import type {
   CreateSaveDataRequest,
   GameConsoleDto,
   GameSoftwareDto,
+  MaintenanceSummaryDto,
   ManagementLookups,
   MasterLookups,
   MemoryCardDto,
@@ -37,6 +38,17 @@ function resolveDisplayOrder(displayOrder: number | null | undefined, fallback: 
   return typeof displayOrder === 'number' && Number.isInteger(displayOrder) && displayOrder > 0
     ? displayOrder
     : fallback;
+}
+
+function createTrialMaintenanceSummary(): MaintenanceSummaryDto {
+  return {
+    hasRecord: false,
+    intervalDays: 365,
+    lastMaintenanceDate: null,
+    nextMaintenanceDate: null,
+    isOverdue: false,
+    latestHealthStatus: 0,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +107,10 @@ export function trialDeleteAccount(id: number): void {
 // ---------------------------------------------------------------------------
 
 export function trialListGameConsoles(): GameConsoleDto[] {
-  return readDisplayOrderedList<GameConsoleDto>('game-consoles');
+  return readDisplayOrderedList<GameConsoleDto>('game-consoles').map((item) => ({
+    ...item,
+    maintenance: item.maintenance ?? createTrialMaintenanceSummary(),
+  }));
 }
 
 export function trialGetGameConsole(id: number): GameConsoleDto | undefined {
@@ -114,6 +129,7 @@ export function trialCreateGameConsole(payload: CreateGameConsoleRequest): numbe
     label: payload.label,
     memo: payload.memo,
     isDeleted: false,
+    maintenance: createTrialMaintenanceSummary(),
   });
   writeList('game-consoles', items);
   return newId;
@@ -149,7 +165,10 @@ export function trialDeleteGameConsole(id: number): void {
 // ---------------------------------------------------------------------------
 
 export function trialListGameSoftwares(): GameSoftwareDto[] {
-  return readDisplayOrderedList<GameSoftwareDto>('game-softwares');
+  return readDisplayOrderedList<GameSoftwareDto>('game-softwares').map((item) => ({
+    ...item,
+    maintenance: item.maintenance ?? createTrialMaintenanceSummary(),
+  }));
 }
 
 export function trialGetGameSoftware(id: number): GameSoftwareDto | undefined {
@@ -170,6 +189,7 @@ export function trialCreateGameSoftware(payload: CreateGameSoftwareRequest): num
     label: payload.label,
     memo: payload.memo,
     isDeleted: false,
+    maintenance: createTrialMaintenanceSummary(),
   });
   writeList('game-softwares', items);
   return newId;
@@ -204,7 +224,10 @@ export function trialDeleteGameSoftware(id: number): void {
 // ---------------------------------------------------------------------------
 
 export function trialListMemoryCards(): MemoryCardDto[] {
-  return readDisplayOrderedList<MemoryCardDto>('memory-cards');
+  return readDisplayOrderedList<MemoryCardDto>('memory-cards').map((item) => ({
+    ...item,
+    maintenance: item.maintenance ?? createTrialMaintenanceSummary(),
+  }));
 }
 
 export function trialGetMemoryCard(id: number): MemoryCardDto | undefined {
@@ -222,6 +245,7 @@ export function trialCreateMemoryCard(payload: CreateMemoryCardRequest): number 
     label: payload.label,
     memo: payload.memo,
     isDeleted: false,
+    maintenance: createTrialMaintenanceSummary(),
   });
   writeList('memory-cards', items);
   return newId;
