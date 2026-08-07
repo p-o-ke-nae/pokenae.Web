@@ -102,13 +102,18 @@ export function getAuthOptions(): AuthOptions {
       }),
     ],
     callbacks: {
-      async jwt({ token, account }) {
+      async jwt({ token, account, profile }) {
+        const googleUserId = typeof (profile as { sub?: string } | undefined)?.sub === 'string'
+          ? (profile as { sub: string }).sub
+          : token.sub;
+
         // 初回サインイン時にアクセストークンとリフレッシュトークンを保存
         if (account) {
           return {
             ...token,
             accessToken: account.access_token,
             refreshToken: account.refresh_token,
+            googleUserId,
             // expires_at はUNIXタイムスタンプ（秒）
             accessTokenExpires: account.expires_at,
           };
@@ -131,6 +136,7 @@ export function getAuthOptions(): AuthOptions {
         // これによりクライアント側でアクセストークンを利用可能にする
         session.accessToken = token.accessToken as string;
         session.refreshToken = token.refreshToken as string;
+        session.googleUserId = token.googleUserId as string | undefined;
         // トークンリフレッシュエラーをセッションに伝播
         if (token.error) {
           session.error = token.error as string;

@@ -1,51 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# pokenae.Web
+
+## 概要
+
+このリポジトリは、Next.js を用いて構築する pokenae のフロントエンドです。Google OAuth2（NextAuth）認証と Next.js の proxy / Route Handler を組み合わせ、複数のバックエンド API を画面機能ごとに利用します。
+
+| 項目 | 内容 |
+|------|------|
+| フロントエンド基盤 | Next.js App Router |
+| 認証 | Google OAuth2 / NextAuth |
+| API 接続 | `createFrontendApiClient` と `/api/services/{service}/{...path}` proxy |
+| 開発前提 | Docker Compose ベース |
+| 実装済み機能 | ポケモンダメージ計算 (`/pokemon-damage-calculator`) |
 
 ## Documentation
 
-- **[API Routing Guide](./docs/API_ROUTING.md)** - APIルーティング基盤の使用方法
+- **[環境モードの設定と区別方法](./docs/ENVIRONMENT_SETUP.md)** - 環境変数、シークレット、追加 API サービス設定
+- **[API Routing Guide](./docs/API_ROUTING.md)** - API ルーティング基盤と proxy 運用方針
+- **[Pokemon Damage Calculator API 契約差分メモ](./docs/API_CONTRACT_DIFFS_POKEMON_DAMAGE_CALCULATOR_API.md)** - Issue #97 の実装反映済みメモ
 - **[Google Auth Setup Guide](./docs/GOOGLE_AUTH_SETUP.md)** - Google OAuth2認証の設定ガイド（英語）
 - **[Google OAuth2認証機能について](./docs/GOOGLE_AUTH_SETUP_JA.md)** - Google OAuth2認証の詳細解説（日本語）
 - **[Kernel Stack Overflow Investigation](./docs/KERNEL_STACK_OVERFLOW_INVESTIGATION.md)** - スタックオーバーフロー問題の調査と修正レポート
 
-## Development & Coding Policy
+## 開発・実装の共通方針
 
-- Docker Compose ベースの開発手順を前提とします（ローカル実行・検証・説明は Docker フローを優先）。
+- Docker Compose ベースの開発手順を前提とします。
 - 認証方式は Google OAuth2（NextAuth）を前提とし、認証情報は環境変数・シークレット管理の設計に従います。
 - API リクエストでは Google 認証のアクセストークンを受け渡し・付与・検証する前提で実装します。
 - Next.js の標準機能（App Router / Route Handlers / Server Components）を最大限活用します。
-- UI はコンポーネント指向で設計し、既存の階層（atoms / molecules / organisms）と命名規則を尊重します。
+- UI はコンポーネント指向で設計し、既存の階層と命名規則を尊重します。
+
+## ポケモンダメージ計算機能
+
+Issue #97 では、ポケモンダメージ計算機能を既存の認証・proxy 基盤へ統合しました。
+
+| 項目 | 実装内容 |
+|------|----------|
+| feature entry | `/pokemon-damage-calculator` |
+| Run workspace | `/pokemon-damage-calculator/runs/[runId]` |
+| 利用 API | `pokemon-damage-calculator-api` |
+| 匿名参照 | RuleSet / Run / Battle / Party State の GET allowlist を実装 |
+| 認証伝搬 | `Authorization` と `X-Google-Access-Token` の 2 ヘッダーを維持 |
+| 所有者判定 | `googleUserId` を session / JWT に保持し、`RunDto.OwnerUserId` と比較して read-only 制御 |
+
+詳細は [`docs/API_ROUTING.md`](./docs/API_ROUTING.md) と [`docs/API_CONTRACT_DIFFS_POKEMON_DAMAGE_CALCULATOR_API.md`](./docs/API_CONTRACT_DIFFS_POKEMON_DAMAGE_CALCULATOR_API.md) を参照してください。
 
 ## Getting Started
 
-First, run the development server:
+まず開発サーバーを起動します。
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+ブラウザーで [http://localhost:3000](http://localhost:3000) を開いて動作を確認してください。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+ローカルセットアップや環境変数の詳細は [`docs/ENVIRONMENT_SETUP.md`](./docs/ENVIRONMENT_SETUP.md) を参照してください。
