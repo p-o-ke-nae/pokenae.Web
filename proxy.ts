@@ -12,10 +12,15 @@
  * - /_next/*: Next.jsの静的アセット
  */
 
-import { type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import authMiddleware from 'next-auth/middleware';
+import { isAnonymousServiceProxyRequest } from '@/lib/pokemon-damage-calculator/proxy-policy';
 
 export function proxy(request: NextRequest) {
+  if (isAnonymousServiceProxyRequest(request)) {
+    return NextResponse.next();
+  }
+
   return (authMiddleware as unknown as (req: NextRequest) => Response | Promise<Response | undefined> | undefined)(request);
 }
 

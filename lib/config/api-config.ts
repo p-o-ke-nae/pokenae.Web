@@ -11,7 +11,13 @@ export interface ApiServiceConfig {
   timeout?: number;
 }
 
-export type ApiServiceName = 'user-api' | 'service1' | 'service2' | 'service3' | (string & {});
+export type ApiServiceName =
+  | 'user-api'
+  | 'service1'
+  | 'service2'
+  | 'service3'
+  | 'pokemon-damage-calculator-api'
+  | (string & {});
 
 export const BACKEND_API_DEFAULT_TIMEOUT_MS = 60000;
 
@@ -35,6 +41,11 @@ const BUILTIN_SERVICE_CONFIG: Record<string, { baseUrlEnv: string; apiKeyEnv?: s
     baseUrlEnv: 'USER_API_BASE_URL',
     apiKeyEnv: 'USER_API_API_KEY',
     defaultPath: '',
+  },
+  'pokemon-damage-calculator-api': {
+    baseUrlEnv: 'API_SERVICE_POKEMON_DAMAGE_CALCULATOR_API_BASE_URL',
+    apiKeyEnv: 'API_SERVICE_POKEMON_DAMAGE_CALCULATOR_API_KEY',
+    defaultPath: '/pokemon-damage-calculator-api',
   },
 };
 
@@ -102,5 +113,12 @@ export function getApiConfig(serviceName: ApiServiceName): ApiServiceConfig {
  * 利用可能なサービス名一覧を取得
  */
 export function getAvailableServices(): ApiServiceName[] {
-  return [...new Set<ApiServiceName>(['service1', 'service2', 'service3', 'user-api', ...getAdditionalServices()])];
+  return [...new Set<ApiServiceName>([
+    'service1',
+    'service2',
+    'service3',
+    'user-api',
+    'pokemon-damage-calculator-api',
+    ...getAdditionalServices(),
+  ])];
 }

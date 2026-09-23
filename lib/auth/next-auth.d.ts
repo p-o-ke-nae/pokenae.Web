@@ -10,6 +10,7 @@ declare module 'next-auth' {
   interface Session {
     accessToken?: string;
     refreshToken?: string;
+    googleUserId?: string;
     /** トークンリフレッシュ失敗時のエラー */
     error?: string;
   }
@@ -19,6 +20,7 @@ declare module 'next-auth/jwt' {
   interface JWT {
     accessToken?: string;
     refreshToken?: string;
+    googleUserId?: string;
     accessTokenExpires?: number;
     /** トークンリフレッシュ失敗時のエラー */
     error?: string;

@@ -11,6 +11,8 @@ import { getAuthOptions } from '@/lib/auth/auth-options';
 import { getApiClient } from '@/lib/api/client-factory';
 import { getAvailableServices, type ApiServiceName } from '@/lib/config/api-config';
 import { createSuccessResponse, createErrorResponse, createSafeErrorResponse, parseRequestBody } from '@/lib/api/route-helpers';
+import { isPokemonDamageCalculatorAnonymousAccess } from '@/lib/pokemon-damage-calculator/proxy-policy';
+import { buildGoogleProxyHeaders } from '@/lib/pokemon-damage-calculator/service-proxy';
 
 interface RouteParams {
   params: Promise<{
@@ -65,16 +67,25 @@ async function handleRequest(
   try {
     const { service, path } = await context.params;
 
-    // セッションによる認証チェック（ミドルウェアに加えた二重防御）
-    const session = await getServerSession(getAuthOptions());
-    if (!session) {
-      return createErrorResponse('UNAUTHORIZED', '認証が必要です。ログインしてください。', 401);
-    }
-
     // サービス名のバリデーション
     const availableServices = getAvailableServices();
     if (!availableServices.includes(service as ApiServiceName)) {
       return createSafeErrorResponse('INVALID_SERVICE', 400);
+    }
+
+    const allowsAnonymousAccess = isPokemonDamageCalculatorAnonymousAccess({
+      service,
+      method,
+      pathSegments: path,
+    });
+
+    let session = null;
+    if (!allowsAnonymousAccess) {
+      // セッションによる認証チェック（ミドルウェアに加えた二重防御）
+      session = await getServerSession(getAuthOptions());
+      if (!session) {
+        return createErrorResponse('UNAUTHORIZED', '認証が必要です。ログインしてください。', 401);
+      }
     }
 
     // APIクライアントを取得
@@ -94,21 +105,10 @@ async function handleRequest(
     }
 
     // 認証ヘッダーを構築（Googleアクセストークンをバックエンドへ転送）
-    const sessionAccessToken = typeof session.accessToken === 'string'
+    const sessionAccessToken = typeof session?.accessToken === 'string'
       ? session.accessToken
       : undefined;
-    const authorizationHeader = request.headers.get('authorization');
-    const requestBearerToken = authorizationHeader?.toLowerCase().startsWith('bearer ')
-      ? authorizationHeader.slice(7).trim()
-      : undefined;
-    const requestGoogleToken = request.headers.get('x-google-access-token') ?? undefined;
-    const accessToken = sessionAccessToken || requestBearerToken || requestGoogleToken;
-
-    const proxyHeaders: Record<string, string> = {};
-    if (accessToken) {
-      proxyHeaders.Authorization = `Bearer ${accessToken}`;
-      proxyHeaders['X-Google-Access-Token'] = accessToken;
-    }
+    const proxyHeaders = buildGoogleProxyHeaders(sessionAccessToken, request.headers);
 
     // AppServiceにリクエストを転送
     let response;
