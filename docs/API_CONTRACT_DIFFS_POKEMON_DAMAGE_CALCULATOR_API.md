@@ -8,6 +8,7 @@
 |------|----------|
 | feature entry | `/pokemon-damage-calculator` |
 | Run workspace | `/pokemon-damage-calculator/runs/[runId]` |
+| admin entry | `/pokemon-damage-calculator/admin` |
 | 利用 API | `pokemon-damage-calculator-api` |
 | API 呼び出し方式 | `createFrontendApiClient` + `/api/services/{service}/{...path}` proxy |
 | 認証伝搬 | `Authorization` と `X-Google-Access-Token` を維持 |
@@ -26,6 +27,9 @@
 |------|------|------|
 | `/pokemon-damage-calculator` | feature entry | RuleSet 一覧、Run 一覧、Run 作成 |
 | `/pokemon-damage-calculator/runs/[runId]` | Run workspace | Run 詳細、Battle 管理、Party State、ダメージ計算 |
+| `/pokemon-damage-calculator/admin` | admin entry | RuleSet / UserAuthorization 管理ハブ |
+| `/pokemon-damage-calculator/admin/rule-sets` | admin RuleSet | 一覧 / 作成 / 詳細 / 更新 / 削除 |
+| `/pokemon-damage-calculator/admin/user-authorizations` | admin UserAuthorization | 一覧 / 作成 / 詳細 / 更新 / 削除 |
 
 ## API 利用方針
 
@@ -105,6 +109,14 @@
 - workspace では Run / Battle / Party State を再取得し、更新後に一覧とフォーム状態を同期する
 - Party State は append-only とし、既存スナップショットは表示のみ提供する
 - ダメージ計算結果は最新 1 件を画面内に保持し、Damage Rolls と送信パラメータを表示する
+
+## Admin master maintenance
+
+- 管理 UI は `game-management` とは独立した feature-local route として `/pokemon-damage-calculator/admin` 配下に追加した
+- 管理 API は `pokemon-damage-calculator-api` の `/api/admin/*` をそのまま利用し、public UI とは API 契約を分離した
+- role 判定 API はないため、admin top と new/edit 画面では GET 成否から capability probing を行う
+- `ProblemDetails` は `status/title/detail` ベースで扱い、送信前の local validation は frontend 側の `string[]` メッセージで表示する
+- 404 / 409 の deep link / conflict は一覧へ戻る導線と入力保持を優先する
 
 ## 関連ドキュメント
 
