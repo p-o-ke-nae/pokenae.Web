@@ -5,8 +5,6 @@ version: '3.8'
 
 services:
   app:
-    env_file:
-      - .env.docker.production
     # CI/CD では GHCR から pull したイメージを使用（環境変数 IMAGE で指定）
     # ローカルでは build セクションが優先される
     image: ${IMAGE:-}
@@ -14,16 +12,16 @@ services:
       target: runner
       args:
         NEXT_PUBLIC_ENVIRONMENT: production
-    container_name: pokenae-web-prod
     ports:
-      - "${PORT:-3001}:3000"
+      - "127.0.0.1:${PORT:-3001}:3000"
     environment:
       NODE_ENV: production
-      NEXTAUTH_URL: ${NEXTAUTH_URL}
-      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:?NEXTAUTH_URL is required}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?NEXT_PUBLIC_API_BASE_URL is required}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-${NEXT_PUBLIC_API_BASE_URL}}
       USER_API_BASE_URL: ${USER_API_BASE_URL:-}
-      API_SERVICES: ${API_SERVICES:-}
+      API_SERVICES: ${API_SERVICES:-game-library-api}
+      API_SERVICE_GAME_LIBRARY_API_BASE_URL: ${API_SERVICE_GAME_LIBRARY_API_BASE_URL:?API_SERVICE_GAME_LIBRARY_API_BASE_URL is required}
       API_SERVICE_1_BASE_URL: ${API_SERVICE_1_BASE_URL:-}
       API_SERVICE_2_BASE_URL: ${API_SERVICE_2_BASE_URL:-}
       API_SERVICE_3_BASE_URL: ${API_SERVICE_3_BASE_URL:-}
@@ -33,6 +31,9 @@ services:
       USER_API_API_KEY: ${USER_API_API_KEY:-}
       ADMIN_ALLOWED_EMAILS: ${ADMIN_ALLOWED_EMAILS:-}
       ADMIN_EMAIL_ALLOWLIST: ${ADMIN_EMAIL_ALLOWLIST:-}
+      DEPLOY_SHA: ${DEPLOY_SHA:-unknown}
+    labels:
+      org.opencontainers.image.revision: ${DEPLOY_SHA:-unknown}
     # always: VPS 再起動後も自動起動し、クラッシュ時も常に再起動する
     restart: always
     # コンテナのリソース制限
@@ -45,10 +46,9 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
-    # ヘルスチェック失敗時はコンテナを終了させ、restart: always で自動再起動させる。
-    # /api/auth/session は認証不要で応答するため、アプリの生死確認に適している。
+    # IPv6 の ::1 ではなく、Next.js が待ち受ける IPv4 ループバックを明示する。
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/auth/session || exit 1"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --output-document=/dev/null http://127.0.0.1:3000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

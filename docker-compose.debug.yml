@@ -10,7 +10,6 @@ services:
       target: dev  # Dockerfile の dev ステージを使用（next dev でホットリロード）
       args:
         NEXT_PUBLIC_ENVIRONMENT: debug
-    container_name: pokenae-web-debug
     ports:
       - "${PORT:-5000}:3000"
     environment:

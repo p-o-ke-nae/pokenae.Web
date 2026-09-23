@@ -9,15 +9,16 @@ on:
       project_name:
         required: true
         type: string
-      container_name:
-        required: true
-        type: string
       image_tag:
         required: true
         type: string
       port:
         required: true
         type: string
+      api_services:
+        required: false
+        type: string
+        default: game-library-api
     secrets:
       host:
         required: true
@@ -33,6 +34,10 @@ on:
         required: true
       google_client_secret:
         required: true
+      api_url:
+        required: true
+      admin_allowed_emails:
+        required: false
 
 jobs:
   deploy:
@@ -90,29 +95,55 @@ jobs:
              printf '%s' '${{ secrets.nextauth_secret }}' > secrets/nextauth_secret && \
              printf '%s' '${{ secrets.google_client_id }}' > secrets/google_client_id && \
              printf '%s' '${{ secrets.google_client_secret }}' > secrets/google_client_secret && \
-             chmod 644 secrets/*"
+             chmod 600 secrets/*"
 
       - name: Deploy to VPS
         env:
           SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
           HOST: ${{ secrets.host }}
           USERNAME: ${{ secrets.username }}
+          NEXTAUTH_URL: ${{ secrets.nextauth_url }}
+          API_URL: ${{ secrets.api_url }}
+          API_SERVICES: ${{ inputs.api_services }}
+          ADMIN_ALLOWED_EMAILS: ${{ secrets.admin_allowed_emails }}
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
+
+          NEXTAUTH_URL_B64="$(printf '%s' "$NEXTAUTH_URL" | base64 -w 0)"
+          API_URL_B64="$(printf '%s' "$API_URL" | base64 -w 0)"
+          API_SERVICES_B64="$(printf '%s' "$API_SERVICES" | base64 -w 0)"
+          ADMIN_ALLOWED_EMAILS_B64="$(printf '%s' "$ADMIN_ALLOWED_EMAILS" | base64 -w 0)"
 
           ssh "$USERNAME@$HOST" -i private_key -p 22 \
             "IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }} \
              OVERRIDE_COMPOSE_FILE=${{ inputs.compose_file }} \
              PROJECT_NAME=${{ inputs.project_name }} \
-             CONTAINER_NAME=${{ inputs.container_name }} \
-             NEXTAUTH_URL=${{ secrets.nextauth_url }} \
+             PORT=${{ inputs.port }} \
+             DEPLOY_SHA=${{ github.sha }} \
+             NEXTAUTH_URL_B64=${NEXTAUTH_URL_B64} \
+             API_URL_B64=${API_URL_B64} \
+             API_SERVICES_B64=${API_SERVICES_B64} \
+             ADMIN_ALLOWED_EMAILS_B64=${ADMIN_ALLOWED_EMAILS_B64} \
              GITHUB_TOKEN=${{ github.token }} \
              GITHUB_ACTOR=${{ github.actor }} \
              bash -s" <<'EOF'
           set -euo pipefail
 
           cd ~/pokenae-web
+          export NEXTAUTH_URL="$(printf '%s' "${NEXTAUTH_URL_B64}" | base64 -d)"
+          export NEXT_PUBLIC_API_BASE_URL="$(printf '%s' "${API_URL_B64}" | base64 -d)"
+          export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_BASE_URL}"
+          export API_SERVICES="$(printf '%s' "${API_SERVICES_B64}" | base64 -d)"
+          export API_SERVICE_GAME_LIBRARY_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL}"
+          export ADMIN_ALLOWED_EMAILS="$(printf '%s' "${ADMIN_ALLOWED_EMAILS_B64}" | base64 -d)"
+
+          get_container_id() {
+            docker ps -aq \
+              --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
+              --filter "label=com.docker.compose.service=app" |
+              head -n 1
+          }
 
           LOCK_DIR="/tmp/pokenae-deploy-${PROJECT_NAME}.lock"
           for i in $(seq 1 60); do
@@ -134,39 +165,71 @@ jobs:
           echo "[INFO] Pulling image..."
           docker pull "${IMAGE}"
 
-          echo "[INFO] Stopping existing compose project..."
+          echo "[INFO] Validating compose configuration..."
           IMAGE="${IMAGE}" docker compose \
             -p "${PROJECT_NAME}" \
             -f docker-compose.yml \
             -f "${OVERRIDE_COMPOSE_FILE}" \
-            down --remove-orphans 2>/dev/null || true
-
-          echo "[INFO] Removing stale container if exists..."
-          for i in $(seq 1 10); do
-            if docker ps -a --format '{{.Names}}' | grep -qx "${CONTAINER_NAME}"; then
-              docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
-              sleep 2
-              continue
-            fi
-            break
-          done
-
-          if docker ps -a --format '{{.Names}}' | grep -qx "${CONTAINER_NAME}"; then
-            echo "[ERROR] Stale container still exists: ${CONTAINER_NAME}"
-            exit 1
-          fi
+            config --quiet
 
           echo "[INFO] Starting container with docker compose..."
-          IMAGE="${IMAGE}" \
-          NEXTAUTH_URL="${NEXTAUTH_URL}" \
-          docker compose \
+          PREVIOUS_CONTAINER_ID="$(get_container_id)"
+          PREVIOUS_IMAGE_ID="$(docker inspect --format='{{.Image}}' "${PREVIOUS_CONTAINER_ID}" 2>/dev/null || true)"
+          if ! IMAGE="${IMAGE}" docker compose \
             -p "${PROJECT_NAME}" \
             -f docker-compose.yml \
             -f "${OVERRIDE_COMPOSE_FILE}" \
-            up -d --no-build --force-recreate
+            up -d --no-build --force-recreate --remove-orphans; then
+            echo "[ERROR] Failed to start the new container"
+            if [ -n "${PREVIOUS_IMAGE_ID}" ]; then
+              echo "[INFO] Restoring previous image..."
+              IMAGE="${PREVIOUS_IMAGE_ID}" docker compose \
+                -p "${PROJECT_NAME}" \
+                -f docker-compose.yml \
+                -f "${OVERRIDE_COMPOSE_FILE}" \
+                up -d --no-build --force-recreate
+              for i in $(seq 1 12); do
+                if curl -sf "http://127.0.0.1:${PORT}/api/auth/session" > /dev/null; then
+                  echo "[INFO] Previous image restored"
+                  break
+                fi
+                sleep 5
+              done
+            fi
+            exit 1
+          fi
 
-          echo "[INFO] Cleaning up old images..."
-          docker image prune -f
+          echo "[INFO] Waiting for the new container to become healthy..."
+          for i in $(seq 1 24); do
+            CONTAINER_ID="$(get_container_id)"
+            CONTAINER_STATUS="$(docker inspect --format='{{.State.Status}}' "${CONTAINER_ID}" 2>/dev/null || echo not_found)"
+            HEALTH_STATUS="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${CONTAINER_ID}" 2>/dev/null || echo none)"
+            if [ "${CONTAINER_STATUS}" = "running" ] &&
+               [ "${HEALTH_STATUS}" = "healthy" ] &&
+               curl -sf "http://127.0.0.1:${PORT}/api/health" > /dev/null; then
+              echo "[SUCCESS] New container is healthy"
+              docker image prune -f
+              exit 0
+            fi
+            echo "[INFO] Waiting for healthy startup... (${i}/24) status=${CONTAINER_STATUS}, health=${HEALTH_STATUS}"
+            sleep 5
+          done
+
+          echo "[ERROR] New container failed its health check"
+          docker ps -a \
+            --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
+            --filter "label=com.docker.compose.service=app" || true
+          docker logs "$(get_container_id)" --tail 100 2>/dev/null || true
+
+          if [ -n "${PREVIOUS_IMAGE_ID}" ]; then
+            echo "[INFO] Restoring previous image..."
+            IMAGE="${PREVIOUS_IMAGE_ID}" docker compose \
+              -p "${PROJECT_NAME}" \
+              -f docker-compose.yml \
+              -f "${OVERRIDE_COMPOSE_FILE}" \
+              up -d --no-build --force-recreate
+          fi
+          exit 1
           EOF
 
       - name: Verify deployment
@@ -174,26 +237,37 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
           HOST: ${{ secrets.host }}
           USERNAME: ${{ secrets.username }}
+          SITE_URL: ${{ secrets.nextauth_url }}
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
 
           ssh "$USERNAME@$HOST" -i private_key -p 22 \
-            "CONTAINER_NAME=${{ inputs.container_name }} \
+            "PROJECT_NAME=${{ inputs.project_name }} \
              PORT=${{ inputs.port }} \
              bash -s" <<'EOF'
           set -euo pipefail
 
           echo "[INFO] Verifying deployment..."
 
+          get_container_id() {
+            docker ps -aq \
+              --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
+              --filter "label=com.docker.compose.service=app" |
+              head -n 1
+          }
+
+          VERIFIED=false
           for i in $(seq 1 24); do
-            CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo "not_found")
-            HEALTH_STATUS=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${CONTAINER_NAME}" 2>/dev/null || echo "none")
+            CONTAINER_ID="$(get_container_id)"
+            CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' "${CONTAINER_ID}" 2>/dev/null || echo "not_found")
+            HEALTH_STATUS=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${CONTAINER_ID}" 2>/dev/null || echo "none")
 
             if [ "$CONTAINER_STATUS" = "running" ] && [ "$HEALTH_STATUS" != "unhealthy" ]; then
-              if curl -sf "http://localhost:${PORT}/" > /dev/null 2>&1; then
+              if curl -sf "http://127.0.0.1:${PORT}/api/health" > /dev/null 2>&1; then
                 echo "[SUCCESS] Application is responding on port ${PORT}"
-                exit 0
+                VERIFIED=true
+                break
               fi
             fi
 
@@ -201,8 +275,16 @@ jobs:
             sleep 5
           done
 
-          echo "[ERROR] Deployment verification timed out"
-          docker ps -a --filter "name=${CONTAINER_NAME}" || true
-          docker logs "${CONTAINER_NAME}" --tail 100 2>/dev/null || true
-          exit 1
+          if [ "${VERIFIED}" != "true" ]; then
+            echo "[ERROR] Deployment verification timed out"
+            docker ps -a \
+              --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
+              --filter "label=com.docker.compose.service=app" || true
+            docker logs "$(get_container_id)" --tail 100 2>/dev/null || true
+            exit 1
+          fi
           EOF
+
+          curl --fail --silent --show-error \
+            --retry 5 --retry-all-errors --retry-delay 5 \
+            "${SITE_URL%/}/api/health" > /dev/null
