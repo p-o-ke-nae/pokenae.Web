@@ -69,9 +69,58 @@ GitHub Actions でのデプロイ時は、GitHub Secrets に登録した値を�
 | `GOOGLE_CLIENT_ID`     | Google OAuth2 クライアントID                                    |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth2 クライアントシークレット                          |
 | `PROD_NEXTAUTH_URL`    | 本番環境のNextAuth URL（例: `https://pokenae.example.com`）     |
+| `PROD_API_URL`         | 本番環境のバックエンド API URL                                  |
+| `ADMIN_ALLOWED_EMAILS` | 管理画面を利用できるメールアドレス（任意、カンマ区切り）        |
 | `DEV_NEXTAUTH_URL`     | 開発環境のNextAuth URL（例: `https://dev.pokenae.example.com`） |
 
 デプロイワークフロー（`.github/workflows/main.yml`）が自動的に VPS 上の `~/pokenae-web/secrets/` にファイルを作成し、Docker Compose secrets として利用します。
+本番の非機密設定も GitHub Actions から Docker Compose に明示的に渡すため、
+VPS 上の `.env.docker.production` は使用しません。
+
+### VPS 本番環境
+
+本番は nginx が `127.0.0.1:3001` の Web コンテナへリバースプロキシします。
+コンテナの 3001 番ポートもループバックだけに公開し、外部から直接アクセスさせません。
+
+通常のデプロイは `main` ブランチへの push で実行します。ワークフローは次の順序で処理します。
+
+1. GHCR から新しいイメージを pull
+2. 必須環境変数と Compose 設定を検証
+3. 既存コンテナを先に削除せず、新しいイメージで更新
+4. コンテナの `/api/health` と公開 URL を検証
+5. 起動に失敗した場合は直前のイメージへロールバック
+
+本番障害時は、まず次の読み取り専用コマンドで状態を確認します。
+
+```bash
+CONTAINER_ID="$(docker ps -aq \
+  --filter label=com.docker.compose.project=pokenae-prod \
+  --filter label=com.docker.compose.service=app | head -n 1)"
+docker ps -a \
+  --filter label=com.docker.compose.project=pokenae-prod \
+  --filter label=com.docker.compose.service=app
+docker inspect "$CONTAINER_ID" \
+  --format 'status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{end}} restarts={{.RestartCount}} oom={{.State.OOMKilled}}'
+docker logs --tail 200 "$CONTAINER_ID"
+curl --fail --show-error http://127.0.0.1:3001/api/health
+tail -n 100 /var/log/nginx/error.log
+```
+
+手動復旧が必要な場合も、設定値は GitHub Actions を正として再デプロイすることを優先します。
+やむを得ず既存イメージを起動する場合は、`NEXTAUTH_URL`、API URL、
+`API_SERVICE_GAME_LIBRARY_API_BASE_URL` を明示し、既存の `secrets/` を利用します。
+秘密値をコマンド履歴や `.env` ファイルへ直接残さないでください。
+
+復旧後は次を順に確認します。
+
+```bash
+curl --fail http://127.0.0.1:3001/api/health
+curl --fail https://pokenae.com/api/health
+curl --fail https://pokenae.com/api/auth/session
+```
+
+その後、ブラウザで Google OAuth2 ログインを行い、認証済み API リクエストに
+Google アクセストークンが付与されることを確認します。
 
 ## 環境モードの種類
 

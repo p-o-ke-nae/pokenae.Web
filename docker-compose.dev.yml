@@ -14,7 +14,6 @@ services:
       target: runner
       args:
         NEXT_PUBLIC_ENVIRONMENT: development
-    container_name: pokenae-web-dev
     ports:
       - "${PORT:-3002}:3000"
     environment:
@@ -44,7 +43,7 @@ services:
           cpus: '0.01'
           memory: 64M
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/auth/session || exit 1"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --output-document=/dev/null http://127.0.0.1:3000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

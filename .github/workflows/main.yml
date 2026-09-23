@@ -85,9 +85,9 @@ jobs:
     with:
       compose_file: docker-compose.prod.yml
       project_name: pokenae-prod
-      container_name: pokenae-web-prod
       image_tag: main
       port: "3001"
+      api_services: game-library-api
     secrets:
       host: ${{ secrets.HOST }}
       username: ${{ secrets.USERNAME }}
@@ -96,6 +96,8 @@ jobs:
       nextauth_secret: ${{ secrets.NEXTAUTH_SECRET }}
       google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
       google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      api_url: ${{ secrets.PROD_API_URL }}
+      admin_allowed_emails: ${{ secrets.ADMIN_ALLOWED_EMAILS }}
 
   # =================================================================
   # Azure Container Apps デプロイ（develop ブランチ → ACA 開発環境）
