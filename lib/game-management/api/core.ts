@@ -28,13 +28,21 @@ export class ApiError extends Error {
   public code: string;
   public statusCode: number | null;
   public details?: unknown;
+  public resourceLabel?: string;
 
-  constructor(statusCode: number | null, message: string, details?: unknown, code?: string) {
+  constructor(
+    statusCode: number | null,
+    message: string,
+    details?: unknown,
+    code?: string,
+    resourceLabel?: string,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.code = code ?? (statusCode != null ? `HTTP_${statusCode}` : 'UNKNOWN_ERROR');
     this.statusCode = statusCode;
     this.details = details;
+    this.resourceLabel = resourceLabel;
   }
 }
 
@@ -70,6 +78,11 @@ function getGenericTemplateForCode(code: string): MessageTemplate {
   const generic = resources.apiError.generic;
 
   switch (code) {
+    case 'UNAUTHORIZED':
+      return { title: resources.apiError.status[401], detail: resources.apiError.statusDetail[401] };
+    case 'INVALID_SERVICE':
+    case 'SERVICE_CONFIGURATION_ERROR':
+      return { title: generic.serviceConfiguration, detail: generic.serviceConfigurationDetail };
     case 'TIMEOUT':
       return { title: generic.timeout, detail: generic.timeoutDetail };
     case 'NETWORK_ERROR':
@@ -80,6 +93,19 @@ function getGenericTemplateForCode(code: string): MessageTemplate {
     default:
       return { title: generic.unexpected, detail: generic.unexpectedDetail };
   }
+}
+
+function addResourceContext(resourceLabel: string | undefined, detail?: string | null): string | undefined {
+  const resourceDetail = resourceLabel ? `${resourceLabel}の取得に失敗しました。` : undefined;
+  const combined = [resourceDetail, detail].filter((value): value is string => Boolean(value));
+  return combined.length > 0 ? combined.join('\n') : undefined;
+}
+
+export function addApiErrorResourceContext(error: unknown, resourceLabel: string): unknown {
+  if (error instanceof ApiError) {
+    error.resourceLabel = resourceLabel;
+  }
+  return error;
 }
 
 export function getLocalizedErrorMessage(
@@ -117,19 +143,28 @@ export function getGameManagementErrorMessage(error: unknown, options: GameManag
   if (error.statusCode === 400 || error.statusCode === 422) {
     return formatMessageParts(
       options.fallback.title,
-      serverDetail ?? options.fallback.detail ?? resources.apiError.statusDetail[error.statusCode],
+      addResourceContext(
+        error.resourceLabel,
+        serverDetail ?? resources.apiError.statusDetail[error.statusCode] ?? options.fallback.detail,
+      ),
     );
   }
 
   if (error.statusCode != null && resources.apiError.status[error.statusCode]) {
     return formatMessageParts(
       options.fallback.title,
-      options.fallback.detail ?? resources.apiError.statusDetail[error.statusCode],
+      addResourceContext(
+        error.resourceLabel,
+        resources.apiError.statusDetail[error.statusCode] ?? options.fallback.detail,
+      ),
     );
   }
 
   const genericTemplate = getGenericTemplateForCode(error.code);
-  return formatMessageParts(options.fallback.title, options.fallback.detail ?? genericTemplate.detail);
+  return formatMessageParts(
+    options.fallback.title,
+    addResourceContext(error.resourceLabel, genericTemplate.detail ?? options.fallback.detail),
+  );
 }
 
 // ---------------------------------------------------------------------------

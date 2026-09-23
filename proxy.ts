@@ -4,10 +4,11 @@
  * 
  * 保護対象:
  * - /api/fetch-user: ユーザー情報取得API
- * - /api/services/*: バックエンドプロキシAPI
+ * - /game-management/*: 管理画面
  * 
  * 除外対象:
  * - /api/auth/*: NextAuth.jsの認証エンドポイント（認証フロー自体）
+ * - /api/services/*: Route Handler が JSON 401 を返すため Proxy ではリダイレクトしない
  * - /: ホームページ（ログインボタンを含む）
  * - /_next/*: Next.jsの静的アセット
  */
@@ -26,7 +27,6 @@ export const config = {
   // /api/auth/* は除外（NextAuth.jsの内部エンドポイント）
   matcher: [
     '/api/fetch-user/:path*',
-    '/api/services/:path*',
     '/api-example/:path*',
     '/game-management/:path*',
   ],

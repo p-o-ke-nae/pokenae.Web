@@ -15,6 +15,17 @@ export type ApiServiceName = 'user-api' | 'service1' | 'service2' | 'service3' |
 
 export const BACKEND_API_DEFAULT_TIMEOUT_MS = 60000;
 
+export class ApiServiceConfigurationError extends Error {
+  public readonly code = 'SERVICE_CONFIGURATION_ERROR';
+  public readonly serviceName: ApiServiceName;
+
+  constructor(serviceName: ApiServiceName, message: string) {
+    super(message);
+    this.name = 'ApiServiceConfigurationError';
+    this.serviceName = serviceName;
+  }
+}
+
 const BUILTIN_SERVICE_CONFIG: Record<string, { baseUrlEnv: string; apiKeyEnv?: string; defaultPath?: string }> = {
   service1: {
     baseUrlEnv: 'API_SERVICE_1_BASE_URL',
@@ -68,6 +79,22 @@ function getAdditionalServices(): string[] {
     .filter(Boolean);
 }
 
+function validateBaseUrl(serviceName: ApiServiceName, baseUrl: string): string {
+  try {
+    const parsedUrl = new URL(baseUrl);
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      throw new Error('Unsupported protocol');
+    }
+  } catch {
+    throw new ApiServiceConfigurationError(
+      serviceName,
+      `API service "${serviceName}" has an invalid base URL.`,
+    );
+  }
+
+  return baseUrl;
+}
+
 /**
  * 各AppServiceの設定を取得
  * 
@@ -80,8 +107,9 @@ export function getApiConfig(serviceName: ApiServiceName): ApiServiceConfig {
 
   const builtinConfig = BUILTIN_SERVICE_CONFIG[serviceName];
   if (builtinConfig) {
+    const baseUrl = process.env[builtinConfig.baseUrlEnv] || joinBaseUrl(apiBaseUrl, builtinConfig.defaultPath || '');
     return {
-      baseUrl: process.env[builtinConfig.baseUrlEnv] || joinBaseUrl(apiBaseUrl, builtinConfig.defaultPath || ''),
+      baseUrl: validateBaseUrl(serviceName, baseUrl),
       apiKey: builtinConfig.apiKeyEnv ? process.env[builtinConfig.apiKeyEnv] : undefined,
       timeout: BACKEND_API_DEFAULT_TIMEOUT_MS,
     };
@@ -90,9 +118,17 @@ export function getApiConfig(serviceName: ApiServiceName): ApiServiceConfig {
   const normalizedServiceName = normalizeServiceNameForEnv(serviceName);
   const dynamicBaseUrlEnvName = `API_SERVICE_${normalizedServiceName}_BASE_URL`;
   const dynamicApiKeyEnvName = `API_SERVICE_${normalizedServiceName}_API_KEY`;
+  const configuredBaseUrl = process.env[dynamicBaseUrlEnvName];
+
+  if (!configuredBaseUrl) {
+    throw new ApiServiceConfigurationError(
+      serviceName,
+      `Environment variable ${dynamicBaseUrlEnvName} is required for API service "${serviceName}".`,
+    );
+  }
 
   return {
-    baseUrl: process.env[dynamicBaseUrlEnvName] || joinBaseUrl(apiBaseUrl, serviceName),
+    baseUrl: validateBaseUrl(serviceName, configuredBaseUrl),
     apiKey: process.env[dynamicApiKeyEnvName],
     timeout: BACKEND_API_DEFAULT_TIMEOUT_MS,
   };

@@ -39,11 +39,26 @@ key: string;
 direction: SortDirection;
 };
 
-export type DataTableColumn<T extends Record<string, unknown> = Record<string, unknown>> = {
+export type DataTableRowDropEvent<T extends Record<string, unknown> = Record<string, unknown>> = {
+  sourceIndex: number;
+  targetIndex: number;
+  sourceRow: T;
+  targetRow: T;
+  draggedRows: T[];
+  draggedRowKeys: string[];
+  selectedRows: T[];
+  selectedRowKeys: string[];
+};
+
+type DataTableColumnRender<T extends Record<string, unknown> = Record<string, unknown>> = (
+  value: unknown,
+  row: T,
+  rowIndex: number,
+) => React.ReactNode;
+
+type DataTableColumnBase<T extends Record<string, unknown> = Record<string, unknown>> = {
 /** データのどのキーを表示するか */
 key: keyof T & string;
-/** ヘッダーに表示する名称（省略時はヘッダーなし） */
-header?: string;
 /** 列幅の初期値（CSS 値、省略時は auto） */
 width?: string;
 /** 列幅の最大値（省略時は共通 max 幅を適用） */
@@ -70,23 +85,90 @@ type?: DataTableColumnType;
  * }
  * ```
  */
-render?: (value: unknown, row: T, rowIndex: number) => React.ReactNode;
-/** ソート可能にするか（デフォルト: false） */
-sortable?: boolean;
-/** フィルタ入力欄を表示するか（デフォルト: false） */
-filterable?: boolean;
+render?: DataTableColumnRender<T>;
+};
+
+type DataTableColumnDisplayConfig<T extends Record<string, unknown> = Record<string, unknown>> =
+  | {
+    /** カスタムレンダラー指定時は type を併用しません。 */
+    render: DataTableColumnRender<T>;
+    type?: never;
+  }
+  | {
+    /** セルの表示タイプ（デフォルト: 'text'） */
+    type?: DataTableColumnType;
+    render?: undefined;
+  };
+
+type DataTableColumnSortConfig<T extends Record<string, unknown> = Record<string, unknown>> =
+  | {
+    /** ソート可能にするか */
+    sortable: true;
 /**
  * ソート・フィルタに使う値の変換関数
  * 省略時は String() で変換します。数値ソートが必要な場合は number を返してください。
  */
-sortValue?: (value: unknown, row: T) => string | number;
+    sortValue?: (value: unknown, row: T) => string | number;
+  }
+  | {
+    /** ソートしない列 */
+    sortable?: false;
+    sortValue?: never;
+  };
+
+type DataTableColumnFilterConfig =
+  | {
+    /** フィルタ入力欄を表示するか */
+    filterable: true;
 /**
  * フィルタモード（filterable が true のとき有効。省略時は 'text'）
  * - 'text': テキスト部分一致
  * - 'select': 値選択（複数選択）
  */
-filterMode?: 'text' | 'select';
+    filterMode?: 'text' | 'select';
+  }
+  | {
+    /** フィルタしない列 */
+    filterable?: false;
+    filterMode?: never;
+  };
+
+export type VisibleDataTableColumn<T extends Record<string, unknown> = Record<string, unknown>> =
+  DataTableColumnBase<T>
+  & DataTableColumnDisplayConfig<T>
+  & DataTableColumnSortConfig<T>
+  & DataTableColumnFilterConfig
+  & {
+/** ヘッダーに表示する名称 */
+header: string;
+/** 表示対象の列であることを示します。省略時も表示列として扱います。 */
+hidden?: false;
+  };
+
+export type HiddenDataTableColumn<T extends Record<string, unknown> = Record<string, unknown>> = DataTableColumnBase<T> & {
+/** 非表示列は DataTable 内では描画・フィルタ対象にしません。 */
+hidden: true;
+/** 非表示列では表示向けの props を指定しません。 */
+header?: never;
+width?: never;
+maxWidth?: never;
+type?: never;
+render?: never;
+sortable?: never;
+filterable?: never;
+sortValue?: never;
+filterMode?: never;
 };
+
+export type DataTableColumn<T extends Record<string, unknown> = Record<string, unknown>> =
+  | VisibleDataTableColumn<T>
+  | HiddenDataTableColumn<T>;
+
+export function isVisibleDataTableColumn<T extends Record<string, unknown>>(
+  column: DataTableColumn<T>,
+): column is VisibleDataTableColumn<T> {
+  return column.hidden !== true;
+}
 
 export type DataTableProps<T extends Record<string, unknown> = Record<string, unknown>> = {
 /** 列定義 */
@@ -97,6 +179,8 @@ data: T[];
 rowKey?: keyof T & string;
 /** 行選択チェックボックスを表示するか */
 selectable?: boolean;
+/** 複数行選択を許可するか（デフォルト: true） */
+multiRowSelectionEnabled?: boolean;
 /** 選択済み行のキー一覧 */
 selectedKeys?: string[];
 /** 選択状態変更コールバック */
@@ -155,23 +239,23 @@ onSortChange?: (sort: SortState | null) => void;
 /**
  * 「行を追加」ボタンを押したときのコールバック
  * 指定するとテーブル上部にボタンが表示されます。
- * データの追加ロジックは `useTableData` フック側で実装してください。
+ * データの追加ロジックは呼び出し元の状態管理フック側で実装してください。
  */
 onAddRow?: () => void;
 /**
  * 行のドラッグ並び替えを有効にするか（デフォルト: false）
  * 有効にすると各行の先頭にドラッグハンドルが表示されます。
  */
-rowReorderEnabled?: boolean;
+rowDragAndDropEnabled?: boolean;
 /**
  * 行並び替えが無効の場合にツールチップで表示する理由（省略可）
  */
-rowReorderDisabledReason?: string;
+rowDragAndDropDisabledReason?: string;
 /**
- * 行がドラッグ＆ドロップで移動されたときのコールバック
- * fromIndex / toIndex は現在表示中の rows（フィルタ・ソート後）のインデックスです。
+ * 行がドラッグ＆ドロップで移動されたときのコールバック。
+ * sourceIndex / targetIndex は現在表示中の rows（フィルタ・ソート後）のインデックスです。
  */
-onRowMove?: (fromIndex: number, toIndex: number) => void;
+onRowDrop?: (event: DataTableRowDropEvent<T>) => void;
 /** 一覧の幅（CSS 値、省略時はコンテナ幅に追従） */
 width?: string;
 /** 一覧表全体の固定高さ（CSS 値、指定時は records 領域が縦スクロール） */
@@ -254,6 +338,7 @@ columns,
 data,
 rowKey,
 selectable = false,
+multiRowSelectionEnabled = true,
 selectedKeys = [],
 onSelectionChange,
 onRowClick,
@@ -273,9 +358,9 @@ filterOptionsData,
 sortState: sortStateProp,
 onSortChange,
 onAddRow,
-rowReorderEnabled = false,
-rowReorderDisabledReason,
-onRowMove,
+rowDragAndDropEnabled = false,
+rowDragAndDropDisabledReason,
+onRowDrop,
 width,
 height,
 maxHeight,
@@ -292,13 +377,17 @@ const recordsRef = useRef<HTMLDivElement>(null);
 const [scrollbarOffset, setScrollbarOffset] = useState(0);
 const [currentPage, setCurrentPage] = useState(0);
 const [internalPageSize, setInternalPageSize] = useState(pageSizeProp);
+const visibleColumns = useMemo(
+  () => columns.filter(isVisibleDataTableColumn),
+  [columns],
+);
 // --- Hooks ---
 const {
   orderedColumns,
   dragOverKey,
   didDrag,
   columnDrag,
-} = useColumnOrder({ columns, columnOrderProp, onColumnOrderChange });
+} = useColumnOrder({ columns: visibleColumns, columnOrderProp, onColumnOrderChange });
 
 const { colWidths, setColumnWidth, handleResizeMouseDown } = useColumnResize();
 
@@ -312,21 +401,16 @@ const {
   handleSortClick,
 } = useDataTableProcessing({
   data,
-  columns,
+  columns: visibleColumns,
   sortStateProp,
   onSortChange,
   onFilteredDataChange,
 });
 
-const {
-  dragOverRowIndex,
-  rowDrag,
-} = useRowReorder({ onRowMove });
-
-const effectiveRowReorderEnabled = rowReorderEnabled && !childrenKey;
+const effectiveRowDragAndDropEnabled = rowDragAndDropEnabled && !childrenKey;
 
 // --- Pagination ---
-const effectivePaginated = paginated && !effectiveRowReorderEnabled;
+const effectivePaginated = paginated && !effectiveRowDragAndDropEnabled;
 const totalItems = processedData.length;
 const totalPages = effectivePaginated ? Math.max(1, Math.ceil(totalItems / internalPageSize)) : 1;
 const safeCurrentPage = Math.min(currentPage, totalPages - 1);
@@ -434,6 +518,10 @@ return String(index);
 );
 
 const processedRowKeys = useMemo(() => processedData.map((row, index) => getRowKey(row, index)), [processedData, getRowKey]);
+const selectedDisplayRows = useMemo(() => processedData.flatMap((row, index) => {
+const key = getRowKey(row, index);
+return selectedKeys.includes(key) ? [{ key, row }] : [];
+}), [processedData, getRowKey, selectedKeys]);
 
 // 選択ロジック
 const isSelected = useCallback(
@@ -452,12 +540,13 @@ anchorKey: selectionAnchorKeyRef.current,
 targetKey: key,
 mode: 'checkbox',
 checked,
+allowMultiple: multiRowSelectionEnabled,
 ...readModifierKeys(nativeEvent),
 });
 onSelectionChange(next.selectedKeys);
 selectionAnchorKeyRef.current = next.anchorKey;
 },
-[onSelectionChange, processedRowKeys, selectedKeys, getRowKey]
+[getRowKey, multiRowSelectionEnabled, onSelectionChange, processedRowKeys, selectedKeys]
 );
 
 const handleSelectAll = useCallback(
@@ -487,13 +576,48 @@ selectedKeys,
 anchorKey: selectionAnchorKeyRef.current,
 targetKey: key,
 mode: 'row',
+allowMultiple: multiRowSelectionEnabled,
 shiftKey: nativeEvent.shiftKey,
 metaKey: nativeEvent.metaKey,
 ctrlKey: nativeEvent.ctrlKey,
 });
 onSelectionChange(next.selectedKeys);
 selectionAnchorKeyRef.current = next.anchorKey;
-}, [getRowKey, onSelectionChange, processedRowKeys, selectable, selectedKeys]);
+}, [getRowKey, multiRowSelectionEnabled, onSelectionChange, processedRowKeys, selectable, selectedKeys]);
+
+const handleRowDrop = useCallback((sourceIndex: number, targetIndex: number) => {
+if (!onRowDrop) return;
+
+const sourceRow = processedData[sourceIndex];
+const targetRow = processedData[targetIndex];
+
+if (!sourceRow || !targetRow) {
+return;
+}
+
+const sourceKey = getRowKey(sourceRow, sourceIndex);
+const selectedRowKeys = selectedDisplayRows.map((entry) => entry.key);
+const selectedRows = selectedDisplayRows.map((entry) => entry.row);
+const draggedEntries = multiRowSelectionEnabled && selectedRowKeys.includes(sourceKey) && selectedDisplayRows.length > 1
+? selectedDisplayRows
+: [{ key: sourceKey, row: sourceRow }];
+
+onRowDrop({
+sourceIndex,
+targetIndex,
+sourceRow,
+targetRow,
+draggedRows: draggedEntries.map((entry) => entry.row),
+draggedRowKeys: draggedEntries.map((entry) => entry.key),
+selectedRows,
+selectedRowKeys,
+});
+}, [getRowKey, multiRowSelectionEnabled, onRowDrop, processedData, selectedDisplayRows]);
+
+const {
+  dragOverRowIndex,
+  rowDrag,
+} = useRowReorder({ onDrop: handleRowDrop });
 
 useEffect(() => {
 if (selectedKeys.length === 0) {
@@ -539,10 +663,11 @@ onSelectionChange([]);
 
 const pageRowsForSelection = effectivePaginated ? paginatedData : processedData;
 const pageStartForSelection = effectivePaginated ? pageStartIndex : 0;
+const multiSelectEnabled = selectable && multiRowSelectionEnabled;
 const allSelected =
-pageRowsForSelection.length > 0 && pageRowsForSelection.every((row, i) => isSelected(row, pageStartForSelection + i));
-const someSelected = selectedKeys.length > 0 && !allSelected;
-const hasHeaders = orderedColumns.some(col => col.header !== undefined) || selectable;
+multiSelectEnabled && pageRowsForSelection.length > 0 && pageRowsForSelection.every((row, i) => isSelected(row, pageStartForSelection + i));
+const someSelected = multiSelectEnabled && selectedKeys.length > 0 && !allSelected;
+const hasHeaders = orderedColumns.length > 0 || selectable;
 
 const handleAutoSizeColumn = useCallback((key: string) => {
   const root = tableRootRef.current;
@@ -637,17 +762,17 @@ const children = childrenKey ? (row[childrenKey] as T[] | undefined) : undefined
 const hasChildren = Array.isArray(children) && children.length > 0;
 const canExpand = isRowExpandable ? isRowExpandable(row, rowIndex) : hasChildren;
 const expanded = effectiveExpandedKeys.includes(key);
-const isRowDragOver = effectiveRowReorderEnabled && dragOverRowIndex === rowIndex;
+const isRowDragOver = effectiveRowDragAndDropEnabled && dragOverRowIndex === rowIndex;
 
 return (
 <Fragment key={key}>
 <tr
-draggable={effectiveRowReorderEnabled}
-onDragStart={effectiveRowReorderEnabled ? (e) => rowDrag.handleRowDragStart(e, rowIndex) : undefined}
-onDragEnter={effectiveRowReorderEnabled ? (e) => rowDrag.handleRowDragEnter(e, rowIndex) : undefined}
-onDragOver={effectiveRowReorderEnabled ? (e) => rowDrag.handleRowDragOver(e, rowIndex) : undefined}
-onDrop={effectiveRowReorderEnabled ? (e) => rowDrag.handleRowDrop(e, rowIndex) : undefined}
-onDragEnd={effectiveRowReorderEnabled ? rowDrag.handleRowDragEnd : undefined}
+draggable={effectiveRowDragAndDropEnabled}
+onDragStart={effectiveRowDragAndDropEnabled ? (e) => rowDrag.handleRowDragStart(e, rowIndex) : undefined}
+onDragEnter={effectiveRowDragAndDropEnabled ? (e) => rowDrag.handleRowDragEnter(e, rowIndex) : undefined}
+onDragOver={effectiveRowDragAndDropEnabled ? (e) => rowDrag.handleRowDragOver(e, rowIndex) : undefined}
+onDrop={effectiveRowDragAndDropEnabled ? (e) => rowDrag.handleRowDrop(e, rowIndex) : undefined}
+onDragEnd={effectiveRowDragAndDropEnabled ? rowDrag.handleRowDragEnd : undefined}
 className={[
 styles.row,
 rowIndex % 2 === 1 ? styles.rowStripe : '',
@@ -678,11 +803,11 @@ tabIndex={onRowClick || selectable ? 0 : undefined}
 aria-selected={selectable ? selected : undefined}
 aria-expanded={canExpand ? expanded : undefined}
 >
-{effectiveRowReorderEnabled && (
+{effectiveRowDragAndDropEnabled && (
 <td
 className={cx(styles.bodyCell, styles.dragHandleCell)}
 style={getFixedColumnStyle(ROW_REORDER_COLUMN_WIDTH)}
-title={rowReorderDisabledReason}
+title={rowDragAndDropDisabledReason}
 >
 <span className={styles.dragGrip} aria-hidden="true">⠿</span>
 </td>
@@ -776,11 +901,11 @@ renderCellContent(col, row, rowIndex)
 );
 });
 
-const colSpan = (effectiveRowReorderEnabled ? 1 : 0) + (selectable ? 1 : 0) + orderedColumns.length;
+const colSpan = (effectiveRowDragAndDropEnabled ? 1 : 0) + (selectable ? 1 : 0) + orderedColumns.length;
 
 const renderColGroup = () => (
 <colgroup>
-{effectiveRowReorderEnabled ? <col style={getFixedColumnStyle(ROW_REORDER_COLUMN_WIDTH)} /> : null}
+{effectiveRowDragAndDropEnabled ? <col style={getFixedColumnStyle(ROW_REORDER_COLUMN_WIDTH)} /> : null}
 {selectable ? <col style={getFixedColumnStyle(SELECTION_COLUMN_WIDTH)} /> : null}
 {orderedColumns.map(col => {
 const colWidth = getColumnWidth(col, colWidths);
@@ -796,11 +921,12 @@ return effectiveSortState.direction === 'asc' ? '↑' : '↓';
 
 const headerRow = hasHeaders ? (
 <tr>
-{effectiveRowReorderEnabled && (
+{effectiveRowDragAndDropEnabled && (
 <th className={cx(styles.headCell, styles.dragHandleHeader)} style={getFixedColumnStyle(ROW_REORDER_COLUMN_WIDTH)} aria-label="並び替え" />
 )}
 {selectable && (
 <th className={cx(styles.headCell, styles.checkboxHeader)} style={getFixedColumnStyle(SELECTION_COLUMN_WIDTH)}>
+{multiSelectEnabled ? (
 <CustomCheckBox
 checked={allSelected}
 ref={el => {
@@ -809,6 +935,7 @@ if (el) el.indeterminate = someSelected;
 onChange={e => handleSelectAll(e.target.checked)}
 aria-label={resources.dataTable.selectAll}
 />
+) : null}
 </th>
 )}
 {orderedColumns.map(col => {
@@ -873,7 +1000,7 @@ title={resources.dataTable.autoSizeColumn}
 
 const filterRow = hasActiveFilter ? (
 <tr>
-{effectiveRowReorderEnabled && (
+{effectiveRowDragAndDropEnabled && (
 <th className={cx(styles.headCell, styles.filterCell, styles.dragHandleHeader)} style={getFixedColumnStyle(ROW_REORDER_COLUMN_WIDTH)} />
 )}
 {selectable && (
@@ -1098,7 +1225,7 @@ setCurrentPage(0);
 </div>
  </div>
 )}
-{paginated && effectiveRowReorderEnabled && (
+{paginated && effectiveRowDragAndDropEnabled && (
 <div className={styles.paginationReorderNote}>
 並び替え中はすべての行を表示しています
 </div>

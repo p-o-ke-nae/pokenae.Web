@@ -220,20 +220,20 @@ function ContentGroupChildTable({
     });
   }, [orderedChildRows, selectedKeys]);
 
-  const handleRowMove = useCallback((fromIndex: number, toIndex: number) => {
+  const handleRowDrop = useCallback(({ sourceIndex, targetIndex }: { sourceIndex: number; targetIndex: number }) => {
     setLocalRowOrder((prev) => {
-      const draggedRow = orderedChildRows[fromIndex];
+      const draggedRow = orderedChildRows[sourceIndex];
       if (!draggedRow) return prev;
       const selectedVisibleIds = orderedChildRows
         .filter((row) => selectedKeys.includes(row.tableRowKey))
         .map((row) => row.id);
       const next = selectedKeys.includes(draggedRow.tableRowKey) && selectedVisibleIds.length > 1
-        ? moveSelectedItemsToTarget(prev, selectedVisibleIds, fromIndex, toIndex)
+        ? moveSelectedItemsToTarget(prev, selectedVisibleIds, sourceIndex, targetIndex)
         : (() => {
             const arr = [...prev];
-            const [moved] = arr.splice(fromIndex, 1);
+            const [moved] = arr.splice(sourceIndex, 1);
             if (moved == null) return prev;
-            arr.splice(toIndex, 0, moved);
+            arr.splice(targetIndex, 0, moved);
             return arr;
           })();
       if (ordersEqual(prev, next)) return prev;
@@ -272,13 +272,19 @@ function ContentGroupChildTable({
 
   const columns = useMemo<DataTableColumn<SaveDataListRow>[]>(() => {
     return getGameSoftwareMasterChildTableColumns().map((column) => {
+      if (column.hidden === true) {
+        return column as DataTableColumn<SaveDataListRow>;
+      }
+
       if (column.key !== 'edit') {
         return column as DataTableColumn<SaveDataListRow>;
       }
 
       return {
         ...column,
+        header: column.header ?? '',
         width: '11rem',
+        type: undefined,
         render: (_: unknown, row: SaveDataListRow, rowIndex: number) => (
           <span className="inline-flex items-center gap-2">
             <RowMoveButtons
@@ -341,9 +347,9 @@ function ContentGroupChildTable({
         resizable
         emptyMessage="子データがありません。"
         className="game-management__child-table"
-        rowReorderEnabled={effectiveReorderEnabled}
-        rowReorderDisabledReason={reorderDisabledReason}
-        onRowMove={handleRowMove}
+        rowDragAndDropEnabled={effectiveReorderEnabled}
+        rowDragAndDropDisabledReason={reorderDisabledReason}
+        onRowDrop={handleRowDrop}
         sortState={sortState}
         onSortChange={setSortState}
         onFilteredDataChange={handleFilteredDataChange}
@@ -904,12 +910,12 @@ export function GameManagementDashboard({
   }, [editorDefinition, session?.user]);
 
   // 行移動ハンドラ
-  const handleRowMove = useCallback((fromIndex: number, toIndex: number) => {
+  const handleRowDrop = useCallback(({ sourceIndex, targetIndex }: { sourceIndex: number; targetIndex: number }) => {
     setLocalRowOrder((prev) => {
       if (!prev) return prev;
 
       const visibleRowIds = rows.map((row) => row.id);
-      const draggedRow = rows[fromIndex];
+      const draggedRow = rows[sourceIndex];
       if (!draggedRow) {
         return prev;
       }
@@ -918,16 +924,16 @@ export function GameManagementDashboard({
         .filter((row) => selectedRowKeys.includes(row.tableRowKey))
         .map((row) => row.id);
       const nextVisibleRowIds = selectedRowKeys.includes(draggedRow.tableRowKey) && selectedVisibleRowIds.length > 1
-        ? moveSelectedItemsToTarget(visibleRowIds, selectedVisibleRowIds, fromIndex, toIndex)
+        ? moveSelectedItemsToTarget(visibleRowIds, selectedVisibleRowIds, sourceIndex, targetIndex)
         : (() => {
           const next = [...visibleRowIds];
-          const [movedRowId] = next.splice(fromIndex, 1);
+          const [movedRowId] = next.splice(sourceIndex, 1);
 
           if (movedRowId == null) {
             return visibleRowIds;
           }
 
-          next.splice(toIndex, 0, movedRowId);
+          next.splice(targetIndex, 0, movedRowId);
           return next;
         })();
 
@@ -1032,7 +1038,7 @@ export function GameManagementDashboard({
   // 操作列に上下ボタンを含めた columns を構築
   const listColumns = useMemo((): DataTableColumn<SaveDataListRow>[] => {
     const baseColumns = getTableColumns(resourceKey) as DataTableColumn<SaveDataListRow>[];
-    const dynamicColumns = resourceKey === 'save-datas' && selectedContentGroupIdNumber != null
+    const dynamicColumns: DataTableColumn<SaveDataListRow>[] = resourceKey === 'save-datas' && selectedContentGroupIdNumber != null
       ? saveDataFieldHeaders.map((field) => ({
         key: `dynamic:${field.fieldKey}`,
         header: field.label,
@@ -1043,7 +1049,7 @@ export function GameManagementDashboard({
       } satisfies DataTableColumn<SaveDataListRow>))
       : [];
 
-    const columns = resourceKey === 'save-datas' && dynamicColumns.length > 0
+    const columns: DataTableColumn<SaveDataListRow>[] = resourceKey === 'save-datas' && dynamicColumns.length > 0
       ? (() => {
         const storyProgressIndex = baseColumns.findIndex((column) => column.key === 'storyProgress');
         if (storyProgressIndex === -1) {
@@ -1059,9 +1065,15 @@ export function GameManagementDashboard({
       : baseColumns;
 
     return columns.map((col) => {
+      if (col.hidden === true) {
+        return col;
+      }
+
       if (col.key === 'operation') {
         return {
           ...col,
+          header: col.header ?? '',
+          type: undefined,
           render: (_: unknown, row: SaveDataListRow, rowIndex: number) => (
             <RowMoveButtons
               isFirst={rowIndex === 0}
@@ -1078,6 +1090,8 @@ export function GameManagementDashboard({
         if (resourceKey === 'save-datas') {
           return {
             ...col,
+            header: col.header ?? '',
+            type: undefined,
             render: (_: unknown, row: SaveDataListRow) => (
               <button
                 type="button"
@@ -1094,7 +1108,9 @@ export function GameManagementDashboard({
         if (resourceKey === 'game-software-content-groups') {
           return {
             ...col,
+            header: col.header ?? '',
             width: '18rem',
+            type: undefined,
             render: (_: unknown, row: SaveDataListRow, rowIndex: number) => {
               const isExpanded = expandedRowKeys.includes(row.tableRowKey);
 
@@ -1136,7 +1152,9 @@ export function GameManagementDashboard({
         if (resourceKey === 'accounts' && !isTrial) {
           return {
             ...col,
+            header: col.header ?? '',
             width: '14rem',
+            type: undefined,
             render: (_: unknown, row: SaveDataListRow, rowIndex: number) => (
               <span className="inline-flex items-center gap-2">
                 <RowMoveButtons
@@ -1170,7 +1188,9 @@ export function GameManagementDashboard({
 
         return {
           ...col,
+          header: col.header ?? '',
           width: '11rem',
+          type: undefined,
           render: (_: unknown, row: SaveDataListRow, rowIndex: number) => (
             <span className="inline-flex items-center gap-2">
               <RowMoveButtons
@@ -1355,9 +1375,9 @@ export function GameManagementDashboard({
               expandedKeys={resourceKey === 'game-software-content-groups' ? expandedRowKeys : undefined}
               onExpandChange={resourceKey === 'game-software-content-groups' ? setExpandedRowKeys : undefined}
               emptyMessage="データがありません。"
-              rowReorderEnabled={reorderEnabled}
-              rowReorderDisabledReason={reorderDisabledReason}
-              onRowMove={handleRowMove}
+              rowDragAndDropEnabled={reorderEnabled}
+              rowDragAndDropDisabledReason={reorderDisabledReason}
+              onRowDrop={handleRowDrop}
               sortState={sortState}
               onSortChange={setSortState}
               onFilteredDataChange={handleFilteredDataChange}

@@ -10,6 +10,7 @@
 import { NextRequest } from 'next/server';
 import { getApiClient } from '@/lib/api/client-factory';
 import { createSuccessResponse, createSafeErrorResponse } from '@/lib/api/route-helpers';
+import { ApiServiceConfigurationError } from '@/lib/config/api-config';
 
 /** 許可するパスプレフィックス（先頭スラッシュなし） */
 const ALLOWED_PREFIXES = [
@@ -75,8 +76,24 @@ export async function GET(request: NextRequest, context: RouteParams) {
       ? parseInt(response.error.code.replace('HTTP_', ''), 10)
       : 500;
 
+    console.error('Public backend API request failed.', {
+      service: 'game-library-api',
+      method: 'GET',
+      endpoint,
+      code: response.error.code,
+      statusCode,
+    });
     return createSafeErrorResponse(response.error.code, statusCode, response.error.details);
   } catch (error) {
+    if (error instanceof ApiServiceConfigurationError) {
+      console.error('Public backend API service configuration is invalid.', {
+        service: error.serviceName,
+        method: 'GET',
+        code: error.code,
+      });
+      return createSafeErrorResponse(error.code, 500);
+    }
+
     console.error('Public API Route Error:', error);
     return createSafeErrorResponse('INTERNAL_ERROR', 500);
   }

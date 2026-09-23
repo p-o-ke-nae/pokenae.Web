@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { DataTableColumn } from './index';
+import type { DataTableColumn, VisibleDataTableColumn } from './index';
 
 /**
  * 列順序管理とヘッダーのドラッグ＆ドロップ。
@@ -14,23 +14,27 @@ export function useColumnOrder<T extends Record<string, unknown>>({
   onColumnOrderChange?: (order: string[]) => void;
 }) {
   const [columnOrderOverride, setColumnOrderOverride] = useState<string[] | null>(null);
+  const visibleColumns = useMemo(
+    () => columns.filter((column): column is VisibleDataTableColumn<T> => column.hidden !== true),
+    [columns],
+  );
 
   const effectiveColumnOrder = useMemo(() => {
-    const defaultOrder = columns.map(c => c.key);
+    const defaultOrder = visibleColumns.map(c => c.key);
     const source = columnOrderProp ?? columnOrderOverride;
     if (!source) return defaultOrder;
     const validSet = new Set(defaultOrder);
     const valid = source.filter(k => validSet.has(k));
     const added = defaultOrder.filter(k => !source.includes(k));
     return [...valid, ...added];
-  }, [columns, columnOrderProp, columnOrderOverride]);
+  }, [visibleColumns, columnOrderProp, columnOrderOverride]);
 
   const orderedColumns = useMemo(
     () =>
       effectiveColumnOrder
-        .map(key => columns.find(c => c.key === key))
-        .filter((c): c is DataTableColumn<T> => c !== undefined),
-    [effectiveColumnOrder, columns],
+        .map(key => visibleColumns.find(c => c.key === key))
+        .filter((c): c is VisibleDataTableColumn<T> => c !== undefined),
+    [effectiveColumnOrder, visibleColumns],
   );
 
   const draggedKey = useRef<string | null>(null);

@@ -10,6 +10,7 @@ export type SelectionInteractionOptions = {
   shiftKey?: boolean;
   metaKey?: boolean;
   ctrlKey?: boolean;
+  allowMultiple?: boolean;
 };
 
 function uniqueKeys(keys: string[]): string[] {
@@ -52,10 +53,25 @@ export function applySelectionInteraction({
   shiftKey = false,
   metaKey = false,
   ctrlKey = false,
+  allowMultiple = true,
 }: SelectionInteractionOptions): { selectedKeys: string[]; anchorKey: string } {
   const effectiveAnchorKey = anchorKey && orderedKeys.includes(anchorKey) ? anchorKey : null;
   const isTargetSelected = selectedKeys.includes(targetKey);
   const shouldToggle = metaKey || ctrlKey;
+
+  if (!allowMultiple) {
+    if (mode === 'checkbox') {
+      return {
+        selectedKeys: checked === false ? [] : [targetKey],
+        anchorKey: targetKey,
+      };
+    }
+
+    return {
+      selectedKeys: [targetKey],
+      anchorKey: targetKey,
+    };
+  }
 
   if (shiftKey) {
     const rangeKeys = getSelectionRangeKeys(orderedKeys, effectiveAnchorKey, targetKey);

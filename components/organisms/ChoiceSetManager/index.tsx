@@ -534,23 +534,23 @@ export default function ChoiceSetManager() {
     });
   }, [selectedOptionKeys, selectedVisibleOptions]);
 
-  const handleOptRowMove = useCallback((fromIndex: number, toIndex: number) => {
+  const handleOptRowDrop = useCallback(({ sourceIndex, targetIndex }: { sourceIndex: number; targetIndex: number }) => {
     setOptRowOrder((prev) => {
       if (!prev) return prev;
       const selectedIds = selectedVisibleOptions
         .map((item) => item.id)
         .filter((selectedId) => prev.includes(selectedId));
-      const draggedId = prev[fromIndex];
+      const draggedId = prev[sourceIndex];
       const moveIds = draggedId !== undefined && selectedOptionKeys.includes(String(draggedId)) && selectedIds.length > 1
         ? selectedIds
         : [];
       const next = moveIds.length > 1
-        ? moveSelectedItemsToTarget(prev, moveIds, fromIndex, toIndex)
+        ? moveSelectedItemsToTarget(prev, moveIds, sourceIndex, targetIndex)
         : (() => {
             const arr = [...prev];
-            const [moved] = arr.splice(fromIndex, 1);
+          const [moved] = arr.splice(sourceIndex, 1);
             if (moved == null) return prev;
-            arr.splice(toIndex, 0, moved);
+          arr.splice(targetIndex, 0, moved);
             return arr;
           })();
       if (next.every((value, index) => value === prev[index])) {
@@ -739,9 +739,9 @@ export default function ChoiceSetManager() {
                     onSelectionChange={setSelectedOptionKeys}
                     emptyMessage="候補値がありません。"
                     paginated
-                    rowReorderEnabled={effectiveOptReorderEnabled}
-                    rowReorderDisabledReason={optReorderDisabledReason}
-                    onRowMove={handleOptRowMove}
+                    rowDragAndDropEnabled={effectiveOptReorderEnabled}
+                    rowDragAndDropDisabledReason={optReorderDisabledReason}
+                    onRowDrop={handleOptRowDrop}
                     sortState={optSortState}
                     onSortChange={setOptSortState}
                     onFilteredDataChange={handleOptFilteredDataChange}

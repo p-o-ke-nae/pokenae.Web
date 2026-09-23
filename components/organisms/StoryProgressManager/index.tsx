@@ -594,23 +594,23 @@ export default function StoryProgressManager() {
     setDefReorderDirty(true);
   }, [selectedDefinitionKeys, selectedVisibleDefinitions]);
 
-  const handleDefRowMove = useCallback((fromIndex: number, toIndex: number) => {
+  const handleDefRowDrop = useCallback(({ sourceIndex, targetIndex }: { sourceIndex: number; targetIndex: number }) => {
     setDefRowOrder((prev) => {
       if (!prev) return prev;
       const selectedIds = selectedVisibleDefinitions
         .map((item) => item.id)
         .filter((selectedId) => prev.includes(selectedId));
-      const draggedId = prev[fromIndex];
+      const draggedId = prev[sourceIndex];
       const moveIds = draggedId !== undefined && selectedDefinitionKeys.includes(String(draggedId)) && selectedIds.length > 1
         ? selectedIds
         : [];
       const next = moveIds.length > 1
-        ? moveSelectedItemsToTarget(prev, moveIds, fromIndex, toIndex)
+        ? moveSelectedItemsToTarget(prev, moveIds, sourceIndex, targetIndex)
         : (() => {
             const arr = [...prev];
-            const [moved] = arr.splice(fromIndex, 1);
+            const [moved] = arr.splice(sourceIndex, 1);
             if (moved == null) return prev;
-            arr.splice(toIndex, 0, moved);
+            arr.splice(targetIndex, 0, moved);
             return arr;
           })();
       if (next.every((value, index) => value === prev[index])) {
@@ -809,9 +809,9 @@ export default function StoryProgressManager() {
               onSelectionChange={setSelectedDefinitionKeys}
               emptyMessage="進行度定義がありません。"
               paginated
-              rowReorderEnabled={effectiveDefReorderEnabled}
-              rowReorderDisabledReason={defReorderDisabledReason}
-              onRowMove={handleDefRowMove}
+              rowDragAndDropEnabled={effectiveDefReorderEnabled}
+              rowDragAndDropDisabledReason={defReorderDisabledReason}
+              onRowDrop={handleDefRowDrop}
               sortState={defSortState}
               onSortChange={setDefSortState}
               onFilteredDataChange={handleDefFilteredDataChange}

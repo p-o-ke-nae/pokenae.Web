@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { DataTableColumn, SortState } from './index';
+import type { DataTableColumn, SortState, VisibleDataTableColumn } from './index';
+
+function getVisibleColumns<T extends Record<string, unknown>>(
+  columns: DataTableColumn<T>[],
+): VisibleDataTableColumn<T>[] {
+  return columns.filter((column): column is VisibleDataTableColumn<T> => column.hidden !== true);
+}
 
 function getCellComparableValue<T extends Record<string, unknown>>(
   row: T,
   key: string,
-  columns: DataTableColumn<T>[],
+  columns: VisibleDataTableColumn<T>[],
 ): string | number {
   const col = columns.find((column) => column.key === key);
   const raw = row[key];
@@ -27,12 +33,13 @@ export function processTableData<T extends Record<string, unknown>>({
   sortState: SortState | null;
   excludeSelectFilterKey?: string;
 }): T[] {
+  const visibleColumns = getVisibleColumns(columns);
   let result = [...data];
 
   for (const [key, filterVal] of Object.entries(filters)) {
     if (!filterVal) continue;
     const lower = filterVal.toLowerCase();
-    result = result.filter((row) => String(getCellComparableValue(row, key, columns)).toLowerCase().includes(lower));
+    result = result.filter((row) => String(getCellComparableValue(row, key, visibleColumns)).toLowerCase().includes(lower));
   }
 
   for (const [key, selectedValues] of Object.entries(selectFilters)) {
@@ -43,7 +50,7 @@ export function processTableData<T extends Record<string, unknown>>({
     }
 
     result = result.filter((row) => {
-      const str = String(getCellComparableValue(row, key, columns));
+      const str = String(getCellComparableValue(row, key, visibleColumns));
       return selectedValues.includes(str);
     });
   }
@@ -51,8 +58,8 @@ export function processTableData<T extends Record<string, unknown>>({
   if (sortState) {
     const { key, direction } = sortState;
     result = [...result].sort((a, b) => {
-      const av = getCellComparableValue(a, key, columns);
-      const bv = getCellComparableValue(b, key, columns);
+      const av = getCellComparableValue(a, key, visibleColumns);
+      const bv = getCellComparableValue(b, key, visibleColumns);
       let cmp: number;
 
       if (typeof av === 'number' && typeof bv === 'number') {
@@ -81,14 +88,15 @@ export function buildSelectFilterOptions<T extends Record<string, unknown>>({
   selectFilters: Partial<Record<string, string[]>>;
   sortState: SortState | null;
 }): Record<string, string[]> {
+  const visibleColumns = getVisibleColumns(columns);
   const result: Record<string, string[]> = {};
 
-  for (const col of columns) {
+  for (const col of visibleColumns) {
     if (!col.filterable || (col.filterMode ?? 'text') !== 'select') continue;
 
     const orderedRows = processTableData({
       data,
-      columns,
+      columns: visibleColumns,
       filters,
       selectFilters,
       sortState,
@@ -98,7 +106,7 @@ export function buildSelectFilterOptions<T extends Record<string, unknown>>({
     const values: string[] = [];
 
     for (const row of orderedRows) {
-      const value = String(getCellComparableValue(row, col.key, columns));
+      const value = String(getCellComparableValue(row, col.key, visibleColumns));
       if (seen.has(value)) continue;
       seen.add(value);
       values.push(value);

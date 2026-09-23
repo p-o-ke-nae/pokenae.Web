@@ -77,27 +77,44 @@ GitHub Actions でのデプロイ時は、GitHub Secrets に登録した値を�
 
 ### 1. **DEBUG モード**（ローカル開発）
 
-- **実行コマンド**: `npm run dev`
+- **実行コマンド**:
+  `docker compose --env-file .env.docker.debug -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml up --build`
 - **用途**: ローカルマシンでの開発時
 - **特徴**:
-  - Next.js 開発サーバーが起動（ポート 5000）
+  - Docker 内で Next.js 開発サーバーが起動（ホスト側ポート 5000）
   - ホットリロード機能が有効
+  - Docker Compose secrets が `NEXTAUTH_SECRET`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` として注入される
   - 詳細なエラーメッセージが表示
   - ナビゲーションバーに赤色の「DEBUG」バッジが表示
 
-#### 設定方法：
+#### 起動方法
 
-```bash
-# .env.local ファイルを作成または編集
-echo "NEXT_PUBLIC_ENVIRONMENT=debug" >> .env.local
-npm run dev
-```
+1. Game Library WebAPI リポジトリで Debug 用 Docker Compose を起動します。
 
-または環境変数を直接指定：
+   ```powershell
+   docker compose -p gamelibrarytool-debug up -d --build
+   curl.exe -k https://localhost:10081/health
+   ```
 
-```bash
-NEXT_PUBLIC_ENVIRONMENT=debug npm run dev
-```
+2. Web リポジトリで Debug 用 Docker Compose を起動します。
+
+   ```powershell
+   docker compose --env-file .env.docker.debug -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml up --build
+   ```
+
+3. `http://localhost:5000/api/auth/session` が JSON を返すことを確認してから、Google でログインします。
+
+> 認証を含む動作確認では、ホスト上で `npm run dev` を直接実行しないでください。Docker Compose secrets が注入されないため、`NEXTAUTH_SECRET` などが未設定になり、`/api/auth/session` が失敗します。
+
+#### ゲームライブラリのトラブルシュート
+
+| 症状 | 確認内容 |
+| --- | --- |
+| Docker CLI が Linux Engine に接続できない | Docker Desktop を起動し、`docker info` が成功することを確認する |
+| `/api/auth/session` が HTML または 500 を返す | Web を Debug Compose で起動し、`secrets/nextauth_secret`、`secrets/google_client_id`、`secrets/google_client_secret` が存在することを確認する |
+| 公開マスタを取得できない | `curl.exe -k https://localhost:10081/health` と WebAPI の `/api/public/...` を確認する |
+| 認証付き一覧だけ 401 になる | WebAPI の `GOOGLE_CLIENT_ID` と Web が転送する Google OAuth2 access token を確認する。ID token で代用しない |
+| 10081 に接続できない | Game Library WebAPI の Debug Compose と DB の health、Web の `API_SERVICE_GAME_LIBRARY_API_BASE_URL` を確認する |
 
 ### 2. **DEVELOPMENT モード**（開発環境サーバー）
 

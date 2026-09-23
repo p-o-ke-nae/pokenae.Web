@@ -317,11 +317,11 @@ export const WithExternalSort: Story = {
   render: () => <ExternalSortDemo />,
 };
 
-// 行追加・変更追跡（useTableData フック）
-import { useTableData, omitTrackedFields } from '../lib/hooks/useTableData';
+// 行追加・変更追跡（useTrackedCollection フック）
+import { useTrackedCollection, omitTrackedFields } from '../lib/hooks/useTrackedCollection';
 
 const WithAddRowDemo = () => {
-  const tableData = useTableData<SampleRow>({
+  const collection = useTrackedCollection<SampleRow>({
     data: sampleData,
     rowKey: 'id',
     newRowTemplate: { name: '', category: '', active: false, score: '0' },
@@ -330,23 +330,23 @@ const WithAddRowDemo = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <DataTable<SampleRow>
         columns={sampleColumns}
-        data={tableData.rows as SampleRow[]}
+        data={collection.rows}
         rowKey="id"
-        onAddRow={tableData.addRow}
+        onAddRow={collection.addRow}
       />
       <p style={{ fontSize: '0.875rem' }}>
-        追加行: {tableData.addedRows.length} 件　変更行: {tableData.modifiedRows.length} 件
+        追加行: {collection.addedRows.length} 件　変更行: {collection.modifiedRows.length} 件
       </p>
-      {tableData.addedRows.length > 0 && (
+      {collection.addedRows.length > 0 && (
         <details>
           <summary style={{ fontSize: '0.75rem', cursor: 'pointer' }}>追加行データ (JSON)</summary>
           <pre style={{ fontSize: '0.75rem', background: '#f5f5f5', padding: '0.5rem', borderRadius: '0.25rem' }}>
-            {JSON.stringify(tableData.addedRows.map(omitTrackedFields), null, 2)}
+            {JSON.stringify(collection.addedRows.map(omitTrackedFields), null, 2)}
           </pre>
         </details>
       )}
-      {(tableData.addedRows.length > 0) && (
-        <button type="button" onClick={tableData.resetAll} style={{ fontSize: '0.75rem' }}>
+      {collection.hasChanges && (
+        <button type="button" onClick={collection.rollbackChanges} style={{ fontSize: '0.75rem' }}>
           変更をリセット
         </button>
       )}

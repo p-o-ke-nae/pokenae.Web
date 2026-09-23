@@ -9,7 +9,11 @@ import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/lib/auth/auth-options';
 import { getApiClient } from '@/lib/api/client-factory';
-import { getAvailableServices, type ApiServiceName } from '@/lib/config/api-config';
+import {
+  ApiServiceConfigurationError,
+  getAvailableServices,
+  type ApiServiceName,
+} from '@/lib/config/api-config';
 import { createSuccessResponse, createErrorResponse, createSafeErrorResponse, parseRequestBody } from '@/lib/api/route-helpers';
 
 interface RouteParams {
@@ -140,9 +144,25 @@ async function handleRequest(
         ? parseInt(response.error.code.replace('HTTP_', ''), 10)
         : 500;
 
+      console.error('Backend API request failed.', {
+        service,
+        method,
+        endpoint,
+        code: response.error.code,
+        statusCode,
+      });
       return createSafeErrorResponse(response.error.code, statusCode, response.error.details);
     }
   } catch (error) {
+    if (error instanceof ApiServiceConfigurationError) {
+      console.error('Backend API service configuration is invalid.', {
+        service: error.serviceName,
+        method,
+        code: error.code,
+      });
+      return createSafeErrorResponse(error.code, 500);
+    }
+
     console.error('API Route Error:', error);
     return createSafeErrorResponse('INTERNAL_ERROR', 500);
   }

@@ -60,6 +60,37 @@ describe('applySelectionInteraction', () => {
       anchorKey: 'c',
     });
   });
+
+  it('keeps row selection single when allowMultiple is false', () => {
+    expect(applySelectionInteraction({
+      orderedKeys: ['a', 'b', 'c'],
+      selectedKeys: ['a'],
+      anchorKey: 'a',
+      targetKey: 'c',
+      mode: 'row',
+      ctrlKey: true,
+      allowMultiple: false,
+    })).toEqual({
+      selectedKeys: ['c'],
+      anchorKey: 'c',
+    });
+  });
+
+  it('keeps checkbox selection single when allowMultiple is false', () => {
+    expect(applySelectionInteraction({
+      orderedKeys: ['a', 'b', 'c'],
+      selectedKeys: ['a'],
+      anchorKey: 'a',
+      targetKey: 'b',
+      mode: 'checkbox',
+      checked: true,
+      shiftKey: true,
+      allowMultiple: false,
+    })).toEqual({
+      selectedKeys: ['b'],
+      anchorKey: 'b',
+    });
+  });
 });
 
 describe('moveSelectedItemsByOne', () => {

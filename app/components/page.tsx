@@ -1,4 +1,4 @@
- 'use client';
+'use client';
 
 import { useRef, useState } from 'react';
 import { getSession } from 'next-auth/react';
@@ -18,12 +18,14 @@ import CheckboxField from '@/components/molecules/CheckboxField';
 import Dialog from '@/components/molecules/Dialog';
 import RadioField from '@/components/molecules/RadioField';
 import SearchField, { type SearchOption, type SearchFieldColumn } from '@/components/molecules/SearchField';
+import { moveSelectedItemsToTarget } from '@/components/molecules/DataTable/selection-utils';
 import DataTable, { DATA_TABLE_DEFAULT_PAGE_HEIGHT, type DataTableColumn, type SortState } from '@/components/molecules/DataTable';
-import { useTableData, omitTrackedFields } from '@/lib/hooks/useTableData';
+import { useTrackedCollection, omitTrackedFields } from '@/lib/hooks/useTrackedCollection';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 
 type AddRowPokemon = { id: string; name: string; type: string; active: boolean; score: string };
-type EditablePokemon = { id: string; name: string; type: string; active: boolean; score: string };
+type EditablePokemon = { id: string; name: string; type: string; active: boolean; score: string; displayOrder: number };
+type GridTestRow = { id: string; label: string; edition: string; memo: string; active: boolean; displayOrder: number };
 
 const ADD_ROW_INITIAL_DATA: AddRowPokemon[] = [
   { id: '001', name: 'フシギダネ', type: '草/毒', active: true, score: '91' },
@@ -44,18 +46,42 @@ const ADD_ROW_COLUMNS: DataTableColumn<AddRowPokemon>[] = [
 ];
 
 const EDITABLE_INITIAL_DATA: EditablePokemon[] = [
-  { id: '001', name: 'フシギダネ', type: '草/毒', active: true, score: '91' },
-  { id: '004', name: 'ヒトカゲ', type: '炎', active: true, score: '85' },
-  { id: '007', name: 'ゼニガメ', type: '水', active: false, score: '68' },
-  { id: '025', name: 'ピカチュウ', type: '電気', active: true, score: '78' },
+  { id: '001', name: 'フシギダネ', type: '草/毒', active: true, score: '91', displayOrder: 1 },
+  { id: '004', name: 'ヒトカゲ', type: '炎', active: true, score: '85', displayOrder: 2 },
+  { id: '007', name: 'ゼニガメ', type: '水', active: false, score: '68', displayOrder: 3 },
+  { id: '025', name: 'ピカチュウ', type: '電気', active: true, score: '78', displayOrder: 4 },
 ];
 
 const EDITABLE_NEW_TEMPLATE: Partial<EditablePokemon> = {
   name: '', type: '', active: false, score: '0',
 };
 
+const GRID_TEST_INITIAL_DATA: GridTestRow[] = [
+  { id: '001', label: 'メイン機', edition: 'ポケモンエディション', memo: 'オンライン接続可能', active: true, displayOrder: 1 },
+  { id: '002', label: 'サブ機', edition: 'ポケモンエディション', memo: 'オフライン', active: false, displayOrder: 2 },
+  { id: '003', label: '予備機', edition: 'ポケモンエディション', memo: '貸出用', active: false, displayOrder: 3 },
+  { id: '004', label: '旧機材', edition: '旧世代エディション', memo: 'バックアップ保管', active: false, displayOrder: 4 },
+  { id: '005', label: '収録機', edition: '配信用エディション', memo: 'キャプチャ接続済み', active: true, displayOrder: 5 },
+  { id: '006', label: '検証機', edition: '開発用エディション', memo: '検証ビルド用', active: true, displayOrder: 6 },
+];
+
+const GRID_TEST_NEW_TEMPLATE: Partial<GridTestRow> = {
+  label: '新規機材', edition: '', memo: '', active: false,
+};
+
+function getDroppedRowKeys<T extends Record<string, unknown>>(
+  visibleRows: T[],
+  rowKey: keyof T & string,
+  sourceIndex: number,
+  targetIndex: number,
+  draggedRowKeys: string[],
+): string[] {
+  const visibleRowKeys = visibleRows.map((row) => String(row[rowKey]));
+  return moveSelectedItemsToTarget(visibleRowKeys, draggedRowKeys, sourceIndex, targetIndex);
+}
+
 function AddRowDemo() {
-  const tableData = useTableData<AddRowPokemon>({
+  const collection = useTrackedCollection<AddRowPokemon>({
     data: ADD_ROW_INITIAL_DATA,
     rowKey: 'id',
     newRowTemplate: ADD_ROW_NEW_TEMPLATE,
@@ -64,30 +90,40 @@ function AddRowDemo() {
     <div className="space-y-2">
       <DataTable<AddRowPokemon>
         columns={ADD_ROW_COLUMNS}
-        data={tableData.rows as AddRowPokemon[]}
+        data={collection.rows}
         height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
         rowKey="id"
-        onAddRow={tableData.addRow}
+        onAddRow={collection.addRow}
+        titleActions={
+          <div className="flex flex-wrap items-center gap-2">
+            <CustomButton variant="neutral" disabled={!collection.hasChanges} onClick={collection.commitChanges}>
+              変更をコミット
+            </CustomButton>
+            <CustomButton variant="ghost" disabled={!collection.hasChanges} onClick={collection.rollbackChanges}>
+              ロールバック
+            </CustomButton>
+          </div>
+        }
       />
       <div className="flex gap-2 flex-wrap items-center">
         <p className="text-xs text-zinc-500">
-          追加行: {tableData.addedRows.length} 件　変更行: {tableData.modifiedRows.length} 件
+          追加行: {collection.addedRows.length} 件　変更行: {collection.modifiedRows.length} 件　削除行: {collection.deletedRows.length} 件
         </p>
-        {(tableData.addedRows.length > 0 || tableData.modifiedRows.length > 0) && (
+        {collection.hasChanges && (
           <button
             type="button"
             className="text-xs text-red-500 underline"
-            onClick={tableData.resetAll}
+            onClick={collection.rollbackChanges}
           >
             変更を全て取り消す
           </button>
         )}
       </div>
-      {tableData.addedRows.length > 0 && (
+      {collection.hasChanges && (
         <details className="text-xs">
-          <summary className="cursor-pointer text-zinc-500">追加行データ (JSON)</summary>
+          <summary className="cursor-pointer text-zinc-500">変更セット (JSON)</summary>
           <pre className="mt-1 p-2 bg-zinc-100 dark:bg-zinc-800 rounded text-xs overflow-auto">
-            {JSON.stringify(tableData.addedRows.map(omitTrackedFields), null, 2)}
+            {JSON.stringify(collection.getChangeSet(), null, 2)}
           </pre>
         </details>
       )}
@@ -96,21 +132,52 @@ function AddRowDemo() {
 }
 
 function EditableDemo() {
-  const tableData = useTableData<EditablePokemon>({
+  const collection = useTrackedCollection<EditablePokemon>({
     data: EDITABLE_INITIAL_DATA,
     rowKey: 'id',
+    orderKey: 'displayOrder',
     newRowTemplate: EDITABLE_NEW_TEMPLATE,
   });
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [sortState, setSortState] = useState<SortState | null>(null);
+  const [filteredRows, setFilteredRows] = useState(collection.rows);
+  const [filteredCount, setFilteredCount] = useState(collection.rows.length);
+  const effectiveSelectedKeys = selectedKeys.filter((key) => collection.rows.some((row) => String(row.id) === key));
+
+  const reorderDisabledReason = sortState
+    ? 'ソート中は並び替えできません'
+    : filteredCount !== collection.rows.length
+      ? '絞り込み中は並び替えできません'
+      : undefined;
 
   const columns: DataTableColumn<EditablePokemon>[] = [
-    { key: 'id', header: 'No.', width: '4rem' },
+    { key: 'displayOrder', hidden: true },
+    {
+      key: 'id',
+      header: 'No.',
+      width: '8rem',
+      render: (value, row) => (
+        <div className="flex items-center justify-between gap-2">
+          <span>{String(value ?? '')}</span>
+          <button
+            type="button"
+            className="text-xs text-red-500 underline"
+            onClick={() => collection.deleteRow(String(row.id))}
+          >
+            削除
+          </button>
+        </div>
+      ),
+    },
     {
       key: 'name',
       header: '名前',
+      sortable: true,
+      filterable: true,
       render: (value, row) => (
         <CustomTextBox
           value={String(value ?? '')}
-          onChange={e => tableData.updateRow(String(row.id), { name: e.target.value })}
+          onChange={e => collection.updateRow(String(row.id), { name: e.target.value })}
           placeholder="名前"
           style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}
         />
@@ -120,10 +187,12 @@ function EditableDemo() {
       key: 'type',
       header: 'タイプ',
       width: '10rem',
+      sortable: true,
+      filterable: true,
       render: (value, row) => (
         <CustomTextBox
           value={String(value ?? '')}
-          onChange={e => tableData.updateRow(String(row.id), { type: e.target.value })}
+          onChange={e => collection.updateRow(String(row.id), { type: e.target.value })}
           placeholder="タイプ"
           style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}
         />
@@ -133,10 +202,12 @@ function EditableDemo() {
       key: 'score',
       header: 'スコア',
       width: '7rem',
+      sortable: true,
+      sortValue: (value) => Number(value),
       render: (value, row) => (
         <CustomTextBox
           value={String(value ?? '')}
-          onChange={e => tableData.updateRow(String(row.id), { score: e.target.value })}
+          onChange={e => collection.updateRow(String(row.id), { score: e.target.value })}
           placeholder="0"
           style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}
         />
@@ -149,33 +220,69 @@ function EditableDemo() {
       render: (value, row) => (
         <CustomCheckBox
           checked={Boolean(value)}
-          onChange={e => tableData.updateRow(String(row.id), { active: e.target.checked })}
+          onChange={e => collection.updateRow(String(row.id), { active: e.target.checked })}
           aria-label="有効"
         />
       ),
     },
   ];
 
-  const currentJson = tableData.rows.map(omitTrackedFields);
+  const currentJson = collection.rows.map(omitTrackedFields);
+  const handleDeleteSelected = () => {
+    effectiveSelectedKeys.forEach((key) => collection.deleteRow(key));
+    setSelectedKeys([]);
+  };
 
   return (
     <div className="space-y-3">
       <DataTable<EditablePokemon>
+        title="編集可能テーブル"
+        titleActions={
+          <div className="flex flex-wrap items-center gap-2">
+            <CustomButton variant="neutral" disabled={effectiveSelectedKeys.length === 0} onClick={handleDeleteSelected}>
+              選択削除
+            </CustomButton>
+            <CustomButton variant="neutral" disabled={!collection.hasChanges} onClick={collection.commitChanges}>
+              変更をコミット
+            </CustomButton>
+            <CustomButton variant="ghost" disabled={!collection.hasChanges} onClick={collection.rollbackChanges}>
+              ロールバック
+            </CustomButton>
+          </div>
+        }
         columns={columns}
-        data={tableData.rows as EditablePokemon[]}
+        data={collection.rows}
         height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
         rowKey="id"
-        onAddRow={tableData.addRow}
+        onAddRow={collection.addRow}
+        selectable
+        selectedKeys={effectiveSelectedKeys}
+        onSelectionChange={setSelectedKeys}
+        resizable
+        sortState={sortState}
+        onSortChange={setSortState}
+        onFilteredDataChange={(rows) => {
+          setFilteredRows(rows as EditablePokemon[]);
+          setFilteredCount(rows.length);
+        }}
+        rowDragAndDropEnabled={!reorderDisabledReason}
+        rowDragAndDropDisabledReason={reorderDisabledReason}
+        onRowDrop={({ sourceIndex, targetIndex, draggedRowKeys }) => {
+          collection.reorderRows(getDroppedRowKeys(filteredRows, 'id', sourceIndex, targetIndex, draggedRowKeys));
+        }}
       />
       <div className="flex gap-2 flex-wrap items-center">
         <p className="text-xs text-zinc-500">
-          追加行: {tableData.addedRows.length} 件　変更行: {tableData.modifiedRows.length} 件
+          追加行: {collection.addedRows.length} 件　変更行: {collection.modifiedRows.length} 件　削除行: {collection.deletedRows.length} 件　表示件数: {filteredCount} 件
         </p>
-        {(tableData.addedRows.length > 0 || tableData.modifiedRows.length > 0) && (
+        {reorderDisabledReason && (
+          <p className="text-xs text-amber-600 dark:text-amber-300">{reorderDisabledReason}</p>
+        )}
+        {collection.hasChanges && (
           <button
             type="button"
             className="text-xs text-red-500 underline"
-            onClick={tableData.resetAll}
+            onClick={collection.rollbackChanges}
           >
             変更を全て取り消す
           </button>
@@ -187,6 +294,173 @@ function EditableDemo() {
         </summary>
         <pre className="mt-1 p-3 bg-zinc-100 dark:bg-zinc-800 rounded text-xs overflow-auto max-h-64 leading-relaxed">
           {JSON.stringify(currentJson, null, 2)}
+        </pre>
+      </details>
+      <details className="text-xs">
+        <summary className="cursor-pointer text-zinc-500 font-medium select-none">
+          変更セット（追加・変更・削除）
+        </summary>
+        <pre className="mt-1 p-3 bg-zinc-100 dark:bg-zinc-800 rounded text-xs overflow-auto max-h-64 leading-relaxed">
+          {JSON.stringify(collection.getChangeSet(), null, 2)}
+        </pre>
+      </details>
+    </div>
+  );
+}
+
+function GridTestDemo() {
+  const collection = useTrackedCollection<GridTestRow>({
+    data: GRID_TEST_INITIAL_DATA,
+    rowKey: 'id',
+    orderKey: 'displayOrder',
+    newRowTemplate: GRID_TEST_NEW_TEMPLATE,
+  });
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [sortState, setSortState] = useState<SortState | null>(null);
+  const [filteredRows, setFilteredRows] = useState(collection.rows);
+  const [filteredCount, setFilteredCount] = useState(collection.rows.length);
+  const effectiveSelectedKeys = selectedKeys.filter((key) => collection.rows.some((row) => String(row.id) === key));
+
+  const reorderDisabledReason = sortState
+    ? 'ソート中は並び替えできません'
+    : filteredCount !== collection.rows.length
+      ? '絞り込み中は並び替えできません'
+      : undefined;
+
+  const columns: DataTableColumn<GridTestRow>[] = [
+    { key: 'displayOrder', hidden: true },
+    {
+      key: 'id',
+      header: '',
+      width: '7rem',
+      render: (value, row) => (
+        <div className="flex items-center justify-between gap-2">
+          <span>{String(value ?? '')}</span>
+          <button
+            type="button"
+            className="text-xs text-red-500 underline"
+            onClick={() => collection.deleteRow(String(row.id))}
+          >
+            削除
+          </button>
+        </div>
+      ),
+    },
+    {
+      key: 'label',
+      header: 'ラベル',
+      width: '11rem',
+      sortable: true,
+      filterable: true,
+      render: (value, row) => (
+        <CustomTextBox
+          value={String(value ?? '')}
+          onChange={e => collection.updateRow(String(row.id), { label: e.target.value })}
+          placeholder="ラベル"
+          style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}
+        />
+      ),
+    },
+    {
+      key: 'edition',
+      header: 'エディション',
+      width: '16rem',
+      sortable: true,
+      filterable: true,
+      filterMode: 'select',
+      render: (value, row) => (
+        <CustomTextBox
+          value={String(value ?? '')}
+          onChange={e => collection.updateRow(String(row.id), { edition: e.target.value })}
+          placeholder="エディション"
+          style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}
+        />
+      ),
+    },
+    {
+      key: 'memo',
+      header: 'メモ',
+      width: '20rem',
+      filterable: true,
+      render: (value, row) => (
+        <CustomTextBox
+          value={String(value ?? '')}
+          onChange={e => collection.updateRow(String(row.id), { memo: e.target.value })}
+          placeholder="メモ"
+          style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}
+        />
+      ),
+    },
+    {
+      key: 'active',
+      header: '有効',
+      width: '4rem',
+      render: (value, row) => (
+        <CustomCheckBox
+          checked={Boolean(value)}
+          onChange={e => collection.updateRow(String(row.id), { active: e.target.checked })}
+          aria-label="有効"
+        />
+      ),
+    },
+  ];
+
+  const handleDeleteSelected = () => {
+    effectiveSelectedKeys.forEach((key) => collection.deleteRow(key));
+    setSelectedKeys([]);
+  };
+
+  return (
+    <div className="space-y-3">
+      <DataTable<GridTestRow>
+        title="グリッドテスト"
+        titleActions={
+          <div className="flex flex-wrap items-center gap-2">
+            <CustomButton variant="neutral" disabled={effectiveSelectedKeys.length === 0} onClick={handleDeleteSelected}>
+              選択削除
+            </CustomButton>
+            <CustomButton variant="neutral" disabled={!collection.hasChanges} onClick={collection.commitChanges}>
+              変更をコミット
+            </CustomButton>
+            <CustomButton variant="ghost" disabled={!collection.hasChanges} onClick={collection.rollbackChanges}>
+              ロールバック
+            </CustomButton>
+          </div>
+        }
+        columns={columns}
+        data={collection.rows}
+        rowKey="id"
+        height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
+        selectable
+        selectedKeys={effectiveSelectedKeys}
+        onSelectionChange={setSelectedKeys}
+        onAddRow={collection.addRow}
+        resizable
+        sortState={sortState}
+        onSortChange={setSortState}
+        onFilteredDataChange={(rows) => {
+          setFilteredRows(rows as GridTestRow[]);
+          setFilteredCount(rows.length);
+        }}
+        rowDragAndDropEnabled={!reorderDisabledReason}
+        rowDragAndDropDisabledReason={reorderDisabledReason}
+        onRowDrop={({ sourceIndex, targetIndex, draggedRowKeys }) => {
+          collection.reorderRows(getDroppedRowKeys(filteredRows, 'id', sourceIndex, targetIndex, draggedRowKeys));
+        }}
+      />
+      <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+        <span>表示件数: {filteredCount} 件</span>
+        <span>追加: {collection.addedRows.length} 件</span>
+        <span>変更: {collection.modifiedRows.length} 件</span>
+        <span>削除: {collection.deletedRows.length} 件</span>
+        {reorderDisabledReason ? <span className="text-amber-600 dark:text-amber-300">{reorderDisabledReason}</span> : null}
+      </div>
+      <details className="text-xs">
+        <summary className="cursor-pointer text-zinc-500 font-medium select-none">
+          グリッド変更セット
+        </summary>
+        <pre className="mt-1 p-3 bg-zinc-100 dark:bg-zinc-800 rounded text-xs overflow-auto max-h-64 leading-relaxed">
+          {JSON.stringify(collection.getChangeSet(), null, 2)}
         </pre>
       </details>
     </div>
@@ -568,6 +842,12 @@ export default function ComponentsPage() {
           </div>
         </section>
 
+        <section className="space-y-4">
+          <CustomHeader level={2}>グリッドテスト</CustomHeader>
+          <CustomButton variant="accent" onClick={() => fetchDebugHeaders(false)}>teest</CustomButton>
+          <GridTestDemo />
+        </section>
+
         {/* DataTable (Molecule) */}
         <section className="space-y-4">
           <CustomHeader level={2}>DataTable（分子粒度・Molecule）</CustomHeader>
@@ -673,10 +953,10 @@ export default function ComponentsPage() {
               />
             </div>
 
-            {/* 4. useTableData による行追加・変更追跡 */}
+            {/* 4. useTrackedCollection による行追加・変更追跡 */}
             <div className="space-y-2">
               <p className="text-xs font-medium text-zinc-500">
-                ④ 行追加・変更追跡（useTableData フック）
+                ④ 行追加・変更追跡（useTrackedCollection フック）
               </p>
               <AddRowDemo />
             </div>

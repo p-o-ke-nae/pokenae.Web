@@ -16,12 +16,20 @@ import type {
   MemoryCardDto,
   SaveDataDto,
 } from '@/lib/game-management/types';
-import { client, fetchResourceList, unwrap } from './core';
+import { addApiErrorResourceContext, client, fetchResourceList, unwrap } from './core';
 import { fetchPublicMasterLookups } from './public';
 
 type UserLookupOptions = {
   maintenanceHealthFilter?: MaintenanceHealthFilter;
 };
+
+async function fetchLookup<T>(resourceLabel: string, request: () => Promise<T>): Promise<T> {
+  try {
+    return await request();
+  } catch (error) {
+    throw addApiErrorResourceContext(error, resourceLabel);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Admin master lookups
@@ -61,11 +69,11 @@ export async function fetchUserLookups(options: UserLookupOptions = {}): Promise
     saveDatas,
   ] = await Promise.all([
     fetchPublicMasterLookups(),
-    fetchResourceList<AccountDto>('accounts'),
-    fetchResourceList<GameConsoleDto>('game-consoles', { query: { maintenanceHealthFilter } }),
-    fetchResourceList<GameSoftwareDto>('game-softwares', { query: { maintenanceHealthFilter } }),
-    fetchResourceList<MemoryCardDto>('memory-cards', { query: { maintenanceHealthFilter } }),
-    fetchResourceList<SaveDataDto>('save-datas'),
+    fetchLookup('アカウント', () => fetchResourceList<AccountDto>('accounts')),
+    fetchLookup('ゲーム機', () => fetchResourceList<GameConsoleDto>('game-consoles', { query: { maintenanceHealthFilter } })),
+    fetchLookup('ゲームソフト', () => fetchResourceList<GameSoftwareDto>('game-softwares', { query: { maintenanceHealthFilter } })),
+    fetchLookup('メモリーカード', () => fetchResourceList<MemoryCardDto>('memory-cards', { query: { maintenanceHealthFilter } })),
+    fetchLookup('セーブデータ', () => fetchResourceList<SaveDataDto>('save-datas')),
   ]);
   return {
     ...masterLookups,
@@ -92,11 +100,11 @@ export async function fetchAuthenticatedUserLookups(options: UserLookupOptions =
     saveDatas,
   ] = await Promise.all([
     fetchPublicMasterLookups(),
-    fetchResourceList<AccountDto>('accounts'),
-    fetchResourceList<GameConsoleDto>('game-consoles', { query: { maintenanceHealthFilter } }),
-    fetchResourceList<GameSoftwareDto>('game-softwares', { query: { maintenanceHealthFilter } }),
-    fetchResourceList<MemoryCardDto>('memory-cards', { query: { maintenanceHealthFilter } }),
-    fetchResourceList<SaveDataDto>('save-datas'),
+    fetchLookup('アカウント', () => fetchResourceList<AccountDto>('accounts')),
+    fetchLookup('ゲーム機', () => fetchResourceList<GameConsoleDto>('game-consoles', { query: { maintenanceHealthFilter } })),
+    fetchLookup('ゲームソフト', () => fetchResourceList<GameSoftwareDto>('game-softwares', { query: { maintenanceHealthFilter } })),
+    fetchLookup('メモリーカード', () => fetchResourceList<MemoryCardDto>('memory-cards', { query: { maintenanceHealthFilter } })),
+    fetchLookup('セーブデータ', () => fetchResourceList<SaveDataDto>('save-datas')),
   ]);
   return {
     ...masterLookups,

@@ -56,6 +56,8 @@ export function getSafeRouteErrorMessage(code: string, status: number = 500): st
       return serverMessages.unauthorized;
     case 'INVALID_SERVICE':
       return serverMessages.invalidService;
+    case 'SERVICE_CONFIGURATION_ERROR':
+      return serverMessages.serviceConfiguration;
     case 'METHOD_NOT_ALLOWED':
       return serverMessages.methodNotAllowed;
     case 'NOT_FOUND':

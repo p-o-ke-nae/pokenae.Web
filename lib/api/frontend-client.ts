@@ -21,6 +21,38 @@ export interface FrontendApiClientOptions {
   includeAuth?: boolean;
 }
 
+function isApiResponse(value: unknown): value is ApiResponse<unknown> {
+  if (!value || typeof value !== 'object' || !('success' in value)) {
+    return false;
+  }
+
+  const candidate = value as { success?: unknown; error?: unknown };
+  if (candidate.success === true) {
+    return true;
+  }
+
+  if (candidate.success !== false || !candidate.error || typeof candidate.error !== 'object') {
+    return false;
+  }
+
+  const error = candidate.error as { code?: unknown; message?: unknown };
+  return typeof error.code === 'string' && typeof error.message === 'string';
+}
+
+function createInvalidResponse<T>(response: Response): ApiResponse<T> {
+  return {
+    success: false,
+    error: {
+      code: 'INVALID_RESPONSE',
+      message: resources.apiError.generic.invalidResponse,
+      details: {
+        statusCode: response.status,
+        contentType: response.headers.get('content-type'),
+      },
+    },
+  };
+}
+
 /**
  * フロントエンドからNext.js API Routes経由でAppServiceにアクセスするクライアント
  */
@@ -73,8 +105,22 @@ export class FrontendApiClient {
       // Next.js API Routes経由でリクエスト
       const url = `/api/services/${this.serviceName}${endpoint}`;
       const response = await fetch(url, fetchOptions);
+      const contentType = response.headers.get('content-type');
 
-      const data = await response.json();
+      if (!contentType?.toLowerCase().includes('application/json')) {
+        return createInvalidResponse<T>(response);
+      }
+
+      let data: unknown;
+      try {
+        data = await response.json();
+      } catch {
+        return createInvalidResponse<T>(response);
+      }
+
+      if (!isApiResponse(data)) {
+        return createInvalidResponse<T>(response);
+      }
 
       return data as ApiResponse<T>;
     } catch (error) {

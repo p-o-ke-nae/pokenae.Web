@@ -4,9 +4,9 @@ import { useCallback, useRef, useState } from 'react';
  * 行ドラッグ＆ドロップによる並び替え。
  */
 export function useRowReorder({
-  onRowMove,
+  onDrop,
 }: {
-  onRowMove?: (fromIndex: number, toIndex: number) => void;
+  onDrop?: (sourceIndex: number, targetIndex: number) => void;
 }) {
   const draggedRowIndex = useRef<number | null>(null);
   const [dragOverRowIndex, setDragOverRowIndex] = useState<number | null>(null);
@@ -34,10 +34,10 @@ export function useRowReorder({
       setDragOverRowIndex(null);
       const sourceIndex = draggedRowIndex.current;
       if (sourceIndex === null || sourceIndex === targetIndex) return;
-      onRowMove?.(sourceIndex, targetIndex);
+      onDrop?.(sourceIndex, targetIndex);
       draggedRowIndex.current = null;
     },
-    [onRowMove],
+    [onDrop],
   );
 
   const handleRowDragEnd = useCallback(() => {
