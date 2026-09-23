@@ -19,6 +19,9 @@ on:
         required: false
         type: string
         default: game-library-api
+      game_library_api_base_url:
+        required: true
+        type: string
     secrets:
       host:
         required: true
@@ -53,6 +56,27 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Validate deployment configuration
+        env:
+          GAME_LIBRARY_API_BASE_URL: ${{ inputs.game_library_api_base_url }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$GAME_LIBRARY_API_BASE_URL" ]; then
+            echo "::error::PROD_GAME_LIBRARY_API_BASE_URL is not configured"
+            exit 1
+          fi
+
+          node -e "
+            const url = new URL(process.env.GAME_LIBRARY_API_BASE_URL);
+            if (url.protocol !== 'https:') {
+              throw new Error('PROD_GAME_LIBRARY_API_BASE_URL must use HTTPS');
+            }
+            if (url.username || url.password || url.search || url.hash) {
+              throw new Error('PROD_GAME_LIBRARY_API_BASE_URL must be a base URL without credentials, query, or fragment');
+            }
+          "
 
       - name: Create .ssh directory and add known hosts
         env:
@@ -105,6 +129,7 @@ jobs:
           NEXTAUTH_URL: ${{ secrets.nextauth_url }}
           API_URL: ${{ secrets.api_url }}
           API_SERVICES: ${{ inputs.api_services }}
+          GAME_LIBRARY_API_BASE_URL: ${{ inputs.game_library_api_base_url }}
           ADMIN_ALLOWED_EMAILS: ${{ secrets.admin_allowed_emails }}
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key
@@ -113,6 +138,7 @@ jobs:
           NEXTAUTH_URL_B64="$(printf '%s' "$NEXTAUTH_URL" | base64 -w 0)"
           API_URL_B64="$(printf '%s' "$API_URL" | base64 -w 0)"
           API_SERVICES_B64="$(printf '%s' "$API_SERVICES" | base64 -w 0)"
+          GAME_LIBRARY_API_BASE_URL_B64="$(printf '%s' "$GAME_LIBRARY_API_BASE_URL" | base64 -w 0)"
           ADMIN_ALLOWED_EMAILS_B64="$(printf '%s' "$ADMIN_ALLOWED_EMAILS" | base64 -w 0)"
 
           ssh "$USERNAME@$HOST" -i private_key -p 22 \
@@ -124,6 +150,7 @@ jobs:
              NEXTAUTH_URL_B64=${NEXTAUTH_URL_B64} \
              API_URL_B64=${API_URL_B64} \
              API_SERVICES_B64=${API_SERVICES_B64} \
+             GAME_LIBRARY_API_BASE_URL_B64=${GAME_LIBRARY_API_BASE_URL_B64} \
              ADMIN_ALLOWED_EMAILS_B64=${ADMIN_ALLOWED_EMAILS_B64} \
              GITHUB_TOKEN=${{ github.token }} \
              GITHUB_ACTOR=${{ github.actor }} \
@@ -135,7 +162,7 @@ jobs:
           export NEXT_PUBLIC_API_BASE_URL="$(printf '%s' "${API_URL_B64}" | base64 -d)"
           export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_BASE_URL}"
           export API_SERVICES="$(printf '%s' "${API_SERVICES_B64}" | base64 -d)"
-          export API_SERVICE_GAME_LIBRARY_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL}"
+          export API_SERVICE_GAME_LIBRARY_API_BASE_URL="$(printf '%s' "${GAME_LIBRARY_API_BASE_URL_B64}" | base64 -d)"
           export ADMIN_ALLOWED_EMAILS="$(printf '%s' "${ADMIN_ALLOWED_EMAILS_B64}" | base64 -d)"
 
           get_container_id() {
@@ -288,3 +315,7 @@ jobs:
           curl --fail --silent --show-error \
             --retry 5 --retry-all-errors --retry-delay 5 \
             "${SITE_URL%/}/api/health" > /dev/null
+
+          curl --fail --silent --show-error \
+            --retry 5 --retry-all-errors --retry-delay 5 \
+            "${SITE_URL%/}/api/public/account-type-masters" > /dev/null
