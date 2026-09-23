@@ -271,6 +271,19 @@ ADMIN_ALLOWED_EMAILS=admin@example.com,another-admin@example.com
 - サービス名にハイフンが含まれる場合は `_` に変換して大文字で指定します。
   - 例: `inventory-api` → `API_SERVICE_INVENTORY_API_BASE_URL`
 
+### CI/CD での game-library API 設定
+
+GitHub Actions からデプロイする本番 game-library API の接続先には、`.env.docker.production` を使用しません。このファイルは Git 管理対象外であり、デプロイ時に VPS へ転送されないため、既存ファイルの有無や内容に依存しないよう Repository Variable から明示的に上書きします。
+
+GitHub の **Settings → Secrets and variables → Actions → Variables** に、環境ごとの接続先を登録します。
+
+| Variable 名                     | 用途                                                         |
+| ------------------------------- | ------------------------------------------------------------ |
+| `PROD_GAME_LIBRARY_API_BASE_URL` | `main` から VPS へデプロイする本番 Web の game-library API |
+| `DEV_GAME_LIBRARY_API_BASE_URL`  | `develop` から ACA へデプロイする開発 Web の game-library API |
+
+`PROD_GAME_LIBRARY_API_BASE_URL` は HTTPS のベース URL として必須です。未設定、不正な URL、または疎通不能な場合、本番デプロイは失敗します。API キーなどの機密値が必要な場合は Variable ではなく Secret に登録してください。
+
 ### 管理画面用の許可リスト
 
 - `/game-management` 配下は管理者専用です。

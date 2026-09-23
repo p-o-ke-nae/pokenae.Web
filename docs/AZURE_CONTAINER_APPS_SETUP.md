@@ -229,10 +229,13 @@ GitHub Actions のワークフローが参照するシークレットと変数�
 | `AZURE_RESOURCE_GROUP`          | `ASPGroup`                                                       | リソースグループ名                                   |
 | `PROD_NEXTAUTH_URL_ACA`         | `https://pokenae-web-prod.<リージョン>.azurecontainerapps.io`    | 本番 ACA の FQDN                                     |
 | `DEV_NEXTAUTH_URL_ACA`          | `https://pokenae-web-develop.<リージョン>.azurecontainerapps.io` | 開発 ACA の FQDN                                     |
+| `PROD_GAME_LIBRARY_API_BASE_URL` | `https://game-library.example.com`                              | 現在の本番 VPS が参照する game-library-api のベース URL |
 | `DEV_GAME_LIBRARY_API_BASE_URL` | `https://game-library-dev.example.com`                           | develop ACA が参照する game-library-api のベース URL |
 | `COPILOT_NEXTAUTH_URL_ACA`      | `https://pokenae-web-copilot.<リージョン>.azurecontainerapps.io` | Copilot 検証用 ACA の FQDN                           |
 
 > **FQDN の確認方法**: Azure Portal → Container App → **「概要」** → **「アプリケーション URL」** に表示されます。
+>
+> 現在の本番 Web は VPS へデプロイされます。`PROD_GAME_LIBRARY_API_BASE_URL` は `.env.docker.production` ではなく GitHub Actions の Repository Variable から本番コンテナへ注入されます。
 
 ---
 
