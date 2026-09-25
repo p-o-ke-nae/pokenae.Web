@@ -3,7 +3,7 @@
 本ドキュメントでは、GitHub Actions から Azure Container Apps へ Docker コンテナをデプロイするために必要な Azure 側の準備手順を説明します。
 
 > **対象読者**: Azure Portal の GUI 操作でセットアップを行う方  
-> **CLI で自動化する場合**: [`scripts/setup-azure-aca.sh`](../scripts/setup-azure-aca.sh) を参照してください。各セクションに対応する CLI コマンドを記載しています。
+> **注意**: `scripts/setup-azure-aca.sh` は GHCR を前提とした旧ブートストラップ用です。現在のデプロイは ACR + OIDC + user-assigned managed identity を前提とするため、新規構築・復旧では本書の ACR 手順と GitHub Actions を使用してください。
 
 ---
 
@@ -25,8 +25,8 @@
 
 - Azure アカウント（無料アカウントでも可）
 - GitHub リポジトリへの管理者権限
-- GHCR（GitHub Container Registry）に Docker イメージが push 済み  
-  （既存の CI/CD ワークフローで `build-main` / `build-develop` ジョブが成功していれば OK）
+- Azure Container Registry (ACR) と GitHub Actions の OIDC が設定済み
+- ACR に対する GitHub Actions の `AcrPush`、ACA の user-assigned managed identity に対する `AcrPull`
 
 ---
 
@@ -104,10 +104,9 @@ Container Apps 環境は、複数の Container App が共有するネットワ�
 4. **「コンテナー」** タブ:
    | 項目 | 値 |
    |------|-----|
-   | イメージソース | **Docker Hub またはその他のレジストリ** |
-   | イメージの種類 | **パブリック** または **プライベート** |
-   | レジストリサーバー | `ghcr.io` |
-   | イメージとタグ | `<GitHubユーザー名>/pokenae-web:develop` |
+   | イメージソース | **Azure Container Registry** |
+   | レジストリサーバー | `<ACR名>.azurecr.io` |
+   | イメージとタグ | `pokenae-web:sha-<commit-sha>` |
 
    **リソース割り当て**:
    | 項目 | 値 |
@@ -124,6 +123,35 @@ Container Apps 環境は、複数の Container App が共有するネットワ�
    | トランスポート | **HTTP/1** |
 
 6. **「確認および作成」** → **「作成」** をクリック
+
+### ACR と managed identity
+
+GitHub Actions の短命な `GITHUB_TOKEN` や ACR admin password を ACA のレジストリ認証に保存しない。`gamelibrarytool` と同じく、次の構成を使用する。
+
+| 対象 | 認証方式 | 必要な権限 |
+|------|----------|------------|
+| GitHub Actions → ACR | Azure OIDC | `AcrPush` |
+| Container Apps → ACR | user-assigned managed identity | `AcrPull` |
+
+1. ACR を作成し、admin user を無効にする。
+2. ACA が使用する user-assigned managed identity を作成する。
+3. ACR のリソーススコープに UAMI の `AcrPull` を付与する。
+4. GitHub Actions の Azure service principal に ACR の `AcrPush` を付与する。
+5. `az containerapp registry set --identity <UAMI resource ID>` で各 ACA に pull identity を設定する。
+
+確認コマンド:
+
+```powershell
+az acr show `
+  --resource-group ASPGroup `
+  --name <ACR_NAME> `
+  --query "{loginServer:loginServer,adminUserEnabled:adminUserEnabled,roleAssignmentMode:roleAssignmentMode}"
+
+az containerapp show `
+  --resource-group ASPGroup `
+  --name pokenae-web-develop `
+  --query "{identity:identity.type,registries:properties.configuration.registries,image:properties.template.containers[0].image,revision:properties.latestRevisionName}"
+```
 
 ### スケール設定の変更（作成後）
 
@@ -217,6 +245,9 @@ GitHub Actions のワークフローが参照するシークレットと変数�
 | `NEXTAUTH_SECRET`      | NextAuth のシークレット               | （既存のシークレットを流用） |
 | `GOOGLE_CLIENT_ID`     | Google OAuth クライアント ID          | （既存のシークレットを流用） |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth クライアントシークレット | （既存のシークレットを流用） |
+| `AZURE_CLIENT_ID`       | OIDC 用 Azure Client ID               | GitHub Environment の federated credential と対応 |
+| `AZURE_TENANT_ID`       | Azure Tenant ID                        | OIDC 用 |
+| `AZURE_SUBSCRIPTION_ID` | Azure Subscription ID                  | OIDC 用 |
 
 > **注**: `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` は既に VPS デプロイ用に登録済みの場合、追加不要です。
 
@@ -231,6 +262,9 @@ GitHub Actions のワークフローが参照するシークレットと変数�
 | `DEV_NEXTAUTH_URL_ACA`          | `https://pokenae-web-develop.<リージョン>.azurecontainerapps.io` | 開発 ACA の FQDN                                     |
 | `DEV_GAME_LIBRARY_API_BASE_URL` | `https://game-library-dev.example.com`                           | develop ACA が参照する game-library-api のベース URL |
 | `COPILOT_NEXTAUTH_URL_ACA`      | `https://pokenae-web-copilot.<リージョン>.azurecontainerapps.io` | Copilot 検証用 ACA の FQDN                           |
+| `ACR_NAME`                     | `pokenaewebacr`                                                    | ACR 名                                               |
+| `ACR_LOGIN_SERVER`             | `pokenaewebacr.azurecr.io`                                         | ACR login server                                     |
+| `ACR_PULL_IDENTITY_ID`         | `/subscriptions/.../userAssignedIdentities/pokenae-acr-pull`     | ACA pull 用 UAMI の完全な resource ID                |
 
 > **FQDN の確認方法**: Azure Portal → Container App → **「概要」** → **「アプリケーション URL」** に表示されます。
 
@@ -276,6 +310,16 @@ ACA ではカスタムドメインの設定とマネージド TLS 証明書の�
 2. リアルタイムのコンテナログが表示されます
 3. 詳細なログは **「ログ」** メニューから Log Analytics で KQL クエリを実行
 
+### GitHub Environment
+
+`development`、`production`、`copilot` Environment を作成し、Azure Entra ID の federated credential subject を次の形式にする。`copilot/**` はブランチ名ではなく固定の `copilot` Environment を使用する。
+
+```text
+repo:p-o-ke-nae/pokenae.Web:environment:development
+repo:p-o-ke-nae/pokenae.Web:environment:production
+repo:p-o-ke-nae/pokenae.Web:environment:copilot
+```
+
 ---
 
 ## 9. トラブルシューティング
@@ -290,7 +334,7 @@ ACA ではカスタムドメインの設定とマネージド TLS 証明書の�
 
 - **ポート不一致**: イングレスのターゲットポートとコンテナの EXPOSE ポートが一致しているか確認
 - **環境変数不足**: `NEXTAUTH_SECRET` 等のシークレットが正しく設定されているか確認
-- **イメージ pull 失敗**: GHCR の認証情報が正しいか確認
+- **イメージ pull 失敗**: revision の image URI、ACA に設定された UAMI、UAMI の `AcrPull`、ACR の RBAC 設定を確認
 
 ### Google OAuth が動作しない
 
@@ -326,19 +370,20 @@ GitHub (push to main / develop / copilot/**)
   ├── test（lint + テスト）
   │
   ├── build-main / build-develop / build-copilot
-  │     └── Docker イメージを GHCR に push
-  │         └── copilot/** ブランチは全て :copilot タグで上書き
+  │     └── Docker イメージを ACR に push（branch + sha タグ）
+  │         └── copilot/** は copilot Environment を使用
   │
   ├── deploy-*-vps（既存の VPS デプロイ）
   │
   └── deploy-*-aca（Azure Container Apps デプロイ）
-        ├── Azure にログイン（サービスプリンシパル）
+        ├── Azure にログイン（OIDC またはサービスプリンシパル）
+        ├── UAMI を使う ACR pull 設定を適用
         ├── シークレットを ACA に登録
         ├── コンテナイメージを更新
-        └── ヘルスチェックで検証
+        └── revision / replica / system event / HTTP で検証
 
       branch と Container App の対応:
-        main       → pokenae-web-prod    (GHCR タグ: :main)
-        develop    → pokenae-web-develop (GHCR タグ: :develop)
-        copilot/** → pokenae-web-copilot (GHCR タグ: :copilot)
+        main       → pokenae-web-prod    (ACR タグ: :main / :sha-*)
+        develop    → pokenae-web-develop (ACR タグ: :develop / :sha-*)
+        copilot/** → pokenae-web-copilot (ACR タグ: :copilot / :sha-*)
 ```

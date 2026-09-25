@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # ===========================================================================
-# Azure Container Apps 環境セットアップスクリプト
+# Azure Container Apps 環境セットアップスクリプト（旧 GHCR ブートストラップ）
+#
+# 注意:
+#   現行の GitHub Actions は ACR + OIDC + user-assigned managed identity を
+#   使用するため、新規構築・復旧では docs/AZURE_CONTAINER_APPS_SETUP.md
+#   の ACR 手順を使用してください。本スクリプトは既存環境の参照用です。
 #
 # 本スクリプトは docs/AZURE_CONTAINER_APPS_SETUP.md の手順を自動化します。
 # 各ステップのコメントに対応するドキュメントのセクション番号を記載しています。
