@@ -10,6 +10,8 @@ services:
       target: dev  # Dockerfile の dev ステージを使用（next dev でホットリロード）
       args:
         NEXT_PUBLIC_ENVIRONMENT: debug
+    # root で secrets を読み、entrypoint が nextjs:nodejs (1001:1001) へ降格する
+    user: "0:0"
     container_name: pokenae-web-debug
     ports:
       - "${PORT:-5000}:3000"

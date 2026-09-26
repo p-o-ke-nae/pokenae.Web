@@ -50,8 +50,11 @@ Get-ChildItem secrets/ -Name
 
 1. `docker-compose.yml` のトップレベル `secrets` で `secrets/` ディレクトリのファイルを定義
 2. コンテナ起動時にファイルが `/run/secrets/` にマウントされる
-3. `docker/entrypoint.sh` が `/run/secrets/` 内のファイルを読み取り、ファイル名を大文字に変換して環境変数に展開
-4. アプリケーションが `process.env.NEXTAUTH_SECRET` 等で参照
+3. runner コンテナは root で entrypoint を開始し、`docker/entrypoint.sh` が `/run/secrets/` 内の `600` ファイルを読み取る
+4. ファイル名を大文字に変換して環境変数へ展開した後、`su-exec` で `nextjs:nodejs`（UID/GID 1001）へ権限降格する
+5. `node server.js` は非 root で実行され、アプリケーションが `process.env.NEXTAUTH_SECRET` 等で参照する
+
+entrypoint 自体を非 root で起動した場合は追加の権限変更を行わず、そのユーザーのままコマンドを `exec` します。デバッグ用 dev ステージも `nextjs:nodejs` で動作し、ホットリロード用の `/app/.next` は書き込み可能に設定されています。
 
 > **CI/CD 環境**: VPS デプロイでは GitHub Secrets を一時ファイルとして安全に転送し、VPS の `secrets/` ディレクトリから Docker Compose secrets として読み込みます。
 
@@ -71,7 +74,13 @@ GitHub Actions でのデプロイ時は、GitHub Secrets に登録した値を�
 | `PROD_NEXTAUTH_URL`    | 本番環境のNextAuth URL（例: `https://pokenae.example.com`）     |
 | `DEV_NEXTAUTH_URL`     | 開発環境のNextAuth URL（例: `https://dev.pokenae.example.com`） |
 
-デプロイワークフロー（`.github/workflows/main.yml`）が自動的に VPS 上の `~/pokenae-web/secrets/` にファイルを作成し、Docker Compose secrets として利用します。VPS 上ではデプロイ用ユーザーを所有者として、`secrets/` を `700`、既存ファイルを含む配下の全シークレットファイルを `600` に毎回矯正します。Docker Compose はデプロイ用ユーザーで実行されるため、この権限でもシークレットファイルを読み取れます。
+デプロイワークフロー（`.github/workflows/main.yml`）が自動的に VPS 上の `~/pokenae-web/secrets/` にファイルを作成し、Docker Compose secrets として利用します。VPS 上ではデプロイ用ユーザーを所有者として、`secrets/` を `700`、既存ファイルを含む配下の全シークレットファイルを `600` に毎回矯正します。Docker runner は secrets の読み取り時だけ root で動作し、読み取り後は必ず UID/GID 1001 に降格します。デプロイ検証では Node.js プロセスの UID が 1001 であることも確認します。
+
+entrypoint のコンテナ単体テストは、Docker daemon が利用可能な環境で次のように実行できます。
+
+```bash
+docker build --target entrypoint-test -f docker/Dockerfile .
+```
 
 ## 環境モードの種類
 

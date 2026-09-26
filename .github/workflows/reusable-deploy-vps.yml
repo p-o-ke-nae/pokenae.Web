@@ -73,16 +73,12 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
 
-          ssh "$USERNAME@$HOST" -i private_key -p 22 "mkdir -p ~/pokenae-web/secrets ~/pokenae-web/docker"
+          ssh "$USERNAME@$HOST" -i private_key -p 22 "mkdir -p ~/pokenae-web/secrets"
 
           scp -i private_key -P 22 \
             docker-compose.yml \
             "${{ inputs.compose_file }}" \
             "$USERNAME@$HOST:~/pokenae-web/"
-
-          scp -i private_key -P 22 \
-            docker/entrypoint.sh \
-            "$USERNAME@$HOST:~/pokenae-web/docker/"
 
       - name: Create secrets on VPS
         env:
@@ -254,4 +250,35 @@ jobs:
           docker ps -a --filter "name=${CONTAINER_NAME}" || true
           docker logs "${CONTAINER_NAME}" --tail 100 2>/dev/null || true
           exit 1
+          EOF
+
+      - name: Verify application privilege drop
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
+          HOST: ${{ secrets.host }}
+          USERNAME: ${{ secrets.username }}
+        run: |
+          printf '%s' "$SSH_PRIVATE_KEY" > private_key
+          chmod 600 private_key
+
+          ssh "$USERNAME@$HOST" -i private_key -p 22 \
+            "CONTAINER_NAME=${{ inputs.container_name }} bash -s" <<'EOF'
+          set -euo pipefail
+
+          node_uid="$(
+            docker exec "${CONTAINER_NAME}" sh -c '
+              for status in /proc/[0-9]*/status; do
+                [ "$(awk "/^Name:/ { print \$2 }" "$status")" = "node" ] || continue
+                awk "/^Uid:/ { print \$2; exit }" "$status"
+                exit
+              done
+            '
+          )"
+
+          if [ "${node_uid}" != "1001" ]; then
+            echo "[ERROR] Node.js is not running as UID 1001"
+            exit 1
+          fi
+
+          echo "[SUCCESS] Node.js is running as UID 1001"
           EOF

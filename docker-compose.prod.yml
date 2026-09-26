@@ -14,6 +14,8 @@ services:
       target: runner
       args:
         NEXT_PUBLIC_ENVIRONMENT: production
+    # root で 0600 の secrets を読み、entrypoint が nextjs:nodejs (1001:1001) へ降格する
+    user: "0:0"
     container_name: pokenae-web-prod
     ports:
       - "${PORT:-3001}:3000"
