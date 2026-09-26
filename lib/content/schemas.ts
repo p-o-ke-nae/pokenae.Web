@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const optionalUrl = z.string().url().or(z.string().startsWith("/")).or(z.string().startsWith(".")).optional();
 const nullableDate = z.string().nullable().optional();
+export const gitCommitShaSchema = z.string().regex(/^[0-9a-fA-F]{40}$/).transform((revision) => revision.toLowerCase());
 
 export const postFrontmatterSchema = z.object({
   slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
@@ -20,6 +21,14 @@ export const postFrontmatterSchema = z.object({
   showInPickup: z.boolean().default(false),
   embed: z.object({ component: z.literal("CollectionDex"), data: z.string().startsWith("./") }).optional(),
 });
+
+export const postWriteRequestSchema = z.object({
+  baseRevision: gitCommitShaSchema,
+  post: postFrontmatterSchema,
+  body: z.string().trim().min(1),
+});
+
+export type PostWriteRequest = z.infer<typeof postWriteRequestSchema>;
 
 export const toolContentSchema = z.object({
   slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),

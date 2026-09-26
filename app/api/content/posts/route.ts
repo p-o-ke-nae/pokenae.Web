@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { getAdminAuthorization } from "@/lib/auth/admin";
 import { getContentSnapshot } from "@/lib/content/repository";
-import { postFrontmatterSchema } from "@/lib/content/schemas";
+import { gitCommitShaSchema, postWriteRequestSchema } from "@/lib/content/schemas";
 import { createContentPullRequest } from "@/lib/github/content-writer";
 import { isContentConflictError } from "@/lib/github/content-conflict";
 
@@ -19,18 +19,32 @@ export async function POST(request: Request) {
   if (!auth.authorized) return NextResponse.json({ error: auth.status === 401 ? "認証が必要です。" : "管理者権限が必要です。" }, { status: auth.status });
   try {
     const form = await request.formData();
-    const expectedRevision = String(form.get("baseRevision") ?? "");
-    const payload = JSON.parse(String(form.get("post") ?? "{}")) as unknown;
-    const parsed = postFrontmatterSchema.safeParse(payload);
-    if (!parsed.success) return NextResponse.json({ error: "記事メタデータが不正です。", issues: parsed.error.issues }, { status: 400 });
-    const body = String(form.get("body") ?? "");
-    if (!body.trim()) return NextResponse.json({ error: "本文は必須です。" }, { status: 400 });
+    const revision = gitCommitShaSchema.safeParse(form.get("baseRevision"));
+    if (!revision.success) return NextResponse.json({ error: "base revisionが不正です。" }, { status: 400 });
+    let post: unknown;
+    try {
+      post = JSON.parse(String(form.get("post") ?? "{}")) as unknown;
+    } catch {
+      return NextResponse.json({ error: "記事メタデータが不正です。" }, { status: 400 });
+    }
+    const parsed = postWriteRequestSchema.safeParse({
+      baseRevision: revision.data,
+      post,
+      body: String(form.get("body") ?? ""),
+    });
+    if (!parsed.success) {
+      const invalidBody = parsed.error.issues.some((issue) => issue.path[0] === "body");
+      return NextResponse.json(
+        invalidBody ? { error: "本文は必須です。" } : { error: "記事メタデータが不正です。", issues: parsed.error.issues },
+        { status: 400 },
+      );
+    }
     const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
-    const branch = `content/${parsed.data.slug}-${timestamp}`;
-    const frontmatter = Object.entries(parsed.data).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join("\n");
+    const branch = `content/${parsed.data.post.slug}-${timestamp}`;
+    const frontmatter = Object.entries(parsed.data.post).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join("\n");
     const files: { path: string; content: Buffer | string }[] = [
-      { path: `content/posts/${parsed.data.slug}/index.md`, content: `---\n${frontmatter}\n---\n\n${body.trim()}\n` },
-      { path: `content/updates/${parsed.data.slug}-${timestamp}.json`, content: JSON.stringify({ id: `${parsed.data.slug}-${timestamp}`, publishedAt: new Date().toISOString(), target: "post", summary: parsed.data.changeNote || `${parsed.data.title}を更新`, href: `/blog/${parsed.data.slug}` }, null, 2) + "\n" },
+      { path: `content/posts/${parsed.data.post.slug}/index.md`, content: `---\n${frontmatter}\n---\n\n${parsed.data.body}\n` },
+      { path: `content/updates/${parsed.data.post.slug}-${timestamp}.json`, content: JSON.stringify({ id: `${parsed.data.post.slug}-${timestamp}`, publishedAt: new Date().toISOString(), target: "post", summary: parsed.data.post.changeNote || `${parsed.data.post.title}を更新`, href: `/blog/${parsed.data.post.slug}` }, null, 2) + "\n" },
     ];
     for (const entry of form.getAll("images")) {
       if (!(entry instanceof File) || entry.size === 0) continue;
@@ -41,13 +55,13 @@ export async function POST(request: Request) {
       if (!metadata.width || !metadata.height || metadata.width > 4096 || metadata.height > 4096) return NextResponse.json({ error: "画像寸法は4096×4096以下にしてください。" }, { status: 400 });
       const safeName = entry.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 80) || "image";
       const optimized = await sharp(buffer).rotate().resize({ width: 2400, height: 2400, fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
-      files.push({ path: `content/posts/${parsed.data.slug}/images/${safeName}.webp`, content: optimized });
+      files.push({ path: `content/posts/${parsed.data.post.slug}/images/${safeName}.webp`, content: optimized });
     }
     const pr = await createContentPullRequest({
       branch,
-      title: `content: ${parsed.data.title}`,
+      title: `content: ${parsed.data.post.title}`,
       body: `管理画面から作成\n\n投稿者: ${auth.session.user?.email ?? "unknown"}`,
-      ...(expectedRevision ? { expectedRevision } : {}),
+      expectedRevision: parsed.data.baseRevision,
       files,
     });
     return NextResponse.json({ pullRequestUrl: pr.html_url, number: pr.number }, { status: 201 });

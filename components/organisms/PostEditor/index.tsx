@@ -2,11 +2,17 @@
 
 import { FormEvent, useState } from "react";
 import type { Post } from "@/lib/content/types";
+import type { PostWriteRequest } from "@/lib/content/schemas";
 import SafeMarkdown from "@/components/organisms/SafeMarkdown";
 
 const blank: Post = { slug: "", title: "", summary: "", publishedAt: new Date().toISOString().slice(0, 10), status: "draft", category: "blog", tags: [], relatedTags: [], priority: 0, showInPickup: false, body: "" };
 
-export default function PostEditor({ initial = blank, baseRevision }: { initial?: Post; baseRevision: string }) {
+type PostEditorProps = {
+  initial?: Post;
+  baseRevision: PostWriteRequest["baseRevision"];
+};
+
+export default function PostEditor({ initial = blank, baseRevision }: PostEditorProps) {
   const [post, setPost] = useState(initial);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
@@ -14,9 +20,11 @@ export default function PostEditor({ initial = blank, baseRevision }: { initial?
     event.preventDefault();
     setSaving(true); setMessage("");
     const form = new FormData(event.currentTarget);
-    form.set("post", JSON.stringify({ ...post, body: undefined }));
-    form.set("body", post.body);
-    form.set("baseRevision", baseRevision);
+    const { body, ...frontmatter } = post;
+    const payload = { baseRevision, post: frontmatter, body } satisfies PostWriteRequest;
+    form.set("post", JSON.stringify(payload.post));
+    form.set("body", payload.body);
+    form.set("baseRevision", payload.baseRevision);
     const response = await fetch("/api/content/posts", { method: "POST", body: form });
     const data = await response.json() as { code?: string; error?: string; pullRequestUrl?: string };
     setMessage(response.ok

@@ -73,7 +73,7 @@ export const contentFixture: ContentSnapshot = {
 };
 
 export const contentAdminFixture: ContentAdminSnapshot = {
-  revision: "fixture-revision",
+  revision: "0000000000000000000000000000000000000000",
   banners: [
     { id: "welcome", image: "/mock/slide1.svg", alt: "pokenae ポケモン攻略ツール集", href: "/tools", order: 1 },
   ],
