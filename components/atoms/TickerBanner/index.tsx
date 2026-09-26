@@ -24,6 +24,7 @@ export default function TickerBanner({
 }: TickerBannerProps) {
 	const trackRef = useRef<HTMLDivElement>(null);
 	const [duration, setDuration] = useState<number>(30);
+	const [paused, setPaused] = useState(false);
 
 	// シームレスループのためにアイテムを複製する倍数
 	const DUPLICATION_FACTOR = 2;
@@ -48,12 +49,12 @@ export default function TickerBanner({
 			<div
 				className={`ticker${className ? ` ${className}` : ''}`}
 				aria-label="お知らせ"
-				role="marquee"
 			>
 				<div
 					ref={trackRef}
 					className="ticker__track"
 					style={{ animationDuration: `${duration}s` }}
+					data-paused={paused}
 				>
 					{allItems.map((item, index) => (
 						<span
@@ -70,6 +71,9 @@ export default function TickerBanner({
 						</span>
 					))}
 				</div>
+				<button type="button" className="ticker__pause" onClick={() => setPaused((value) => !value)}>
+					{paused ? "ニュースを再生" : "ニュースを停止"}
+				</button>
 			</div>
 
 			<style jsx>{`
@@ -78,9 +82,12 @@ export default function TickerBanner({
 					background: #1a1a2e;
 					color: #f0f0f0;
 					overflow: hidden;
+					position: relative;
 					border-top: 8px solid var(--color-accent-25);
 					border-bottom: 8px solid var(--color-accent-25);
 				}
+				.ticker__track[data-paused=true] { animation-play-state:paused; }
+				.ticker__pause { position:absolute; right:.5rem; top:50%; transform:translateY(-50%); z-index:2; min-height:36px; border:1px solid #fff; border-radius:.25rem; color:#fff; background:#292538; padding:.25rem .55rem; }
 
 				.ticker__track {
 					display: inline-flex;
@@ -124,6 +131,10 @@ export default function TickerBanner({
 
 				.ticker__link:hover {
 					text-decoration-color: currentColor;
+				}
+				@media (prefers-reduced-motion: reduce) {
+					.ticker__track { animation:none; display:flex; flex-wrap:wrap; white-space:normal; padding-right:9rem; gap:.5rem 1.5rem; }
+					.ticker__item:nth-child(n + ${items.length + 1}) { display:none; }
 				}
 			`}</style>
 		</>

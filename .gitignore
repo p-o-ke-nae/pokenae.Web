@@ -46,3 +46,6 @@ next-env.d.ts
 
 *storybook.log
 storybook-static
+
+# 移行元の参照資料（入力専用・コミット禁止）
+/reference/

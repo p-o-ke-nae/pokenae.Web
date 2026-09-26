@@ -14,7 +14,7 @@ export type PokenaeLogoProps = HTMLAttributes<SVGSVGElement> & {
 };
 
 const PokenaeLogo = forwardRef<PokenaeLogo, PokenaeLogoProps>(
-	({ width = 200, height = 60, autoPlay = true, className = "", ...rest }, ref) => {
+	({ width = 200, height = 60, autoPlay = false, className = "", ...rest }, ref) => {
 		const pathRef = useRef<SVGTextElement>(null);
 
 		useImperativeHandle(ref, () => ({
@@ -61,15 +61,17 @@ const PokenaeLogo = forwardRef<PokenaeLogo, PokenaeLogoProps>(
 						font-family: var(--font-geist-sans, sans-serif);
 						font-size: ${Math.round(height * 0.65)}px;
 						font-weight: 800;
-						fill: transparent;
+						fill: var(--color-accent-25);
 						stroke: var(--color-accent-25);
-						stroke-width: 1.5px;
+						stroke-width: 1px;
 						stroke-dasharray: 600;
-						stroke-dashoffset: 600;
+						stroke-dashoffset: 0;
 						letter-spacing: 0.01em;
 					}
 
-					.pokenae-logo__text--animate {
+					.pokenae-logo__text--animate,
+					.pokenae-logo:hover .pokenae-logo__text,
+					.pokenae-logo:focus .pokenae-logo__text {
 						animation: pokenae-draw 2s ease forwards;
 					}
 
@@ -86,6 +88,9 @@ const PokenaeLogo = forwardRef<PokenaeLogo, PokenaeLogoProps>(
 							stroke-dashoffset: 0;
 							fill: var(--color-accent-25);
 						}
+					}
+					@media (prefers-reduced-motion: reduce) {
+						.pokenae-logo__text { animation: none !important; stroke-dashoffset: 0; fill: var(--color-accent-25); }
 					}
 				`}</style>
 			</>

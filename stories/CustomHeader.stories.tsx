@@ -13,6 +13,10 @@ const meta = {
       control: 'select',
       options: [1, 2, 3, 4, 5, 6],
     },
+    variant: {
+      control: 'select',
+      options: ['title', 'section', 'subtle', 'plain'],
+    },
   },
   args: {
     children: '見出しテキスト',

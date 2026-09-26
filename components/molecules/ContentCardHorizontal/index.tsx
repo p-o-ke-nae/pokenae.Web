@@ -1,3 +1,5 @@
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -44,7 +46,7 @@ export default function ContentCardHorizontal({
 		<style jsx>{`
 			.card-h {
 				display: flex;
-				flex-direction: column;
+				flex-direction: row;
 				background: var(--background);
 				border: 2px solid var(--color-base-70-dark);
 				border-top: 5px solid var(--color-accent-25);
@@ -63,10 +65,14 @@ export default function ContentCardHorizontal({
 
 			.card-h__image-wrap {
 				position: relative;
-				width: 100%;
-				aspect-ratio: 16 / 9;
+				flex: 0 0 36%;
+				min-height: 150px;
 				background: var(--color-base-70);
 				overflow: hidden;
+			}
+			@media(max-width:560px) {
+				.card-h { flex-direction:column; }
+				.card-h__image-wrap { flex-basis:auto; width:100%; aspect-ratio:16/9; min-height:0; }
 			}
 
 			.card-h__body {

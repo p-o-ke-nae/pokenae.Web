@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 
 export type SlideItem = {
 	id: string;
 	src: string;
 	alt: string;
+	href?: string;
 };
 
 export type ImageSlideshowProps = {
@@ -26,6 +28,7 @@ export default function ImageSlideshow({
 	className = '',
 }: ImageSlideshowProps) {
 	const [currentIndex, setCurrentIndex] = useState(0);
+	const [paused, setPaused] = useState(false);
 	const touchStartX = useRef<number | null>(null);
 
 	const goTo = useCallback(
@@ -37,12 +40,12 @@ export default function ImageSlideshow({
 
 	// 自動送り
 	useEffect(() => {
-		if (slides.length <= 1) return;
+		if (slides.length <= 1 || paused) return;
 		const timer = setInterval(() => {
 			setCurrentIndex((prev) => (prev + 1) % slides.length);
 		}, interval);
 		return () => clearInterval(timer);
-	}, [slides.length, interval]);
+	}, [slides.length, interval, paused]);
 
 	// スワイプ開始
 	const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -85,7 +88,8 @@ export default function ImageSlideshow({
 						style={{ transform: `translateX(-${currentIndex * 100}%)` }}
 					>
 						{slides.map((slide, i) => (
-							<div key={slide.id} className="slideshow__slide">
+							<div key={slide.id} className="slideshow__slide" aria-hidden={i !== currentIndex}>
+								{slide.href ? <Link href={slide.href} className="slideshow__link" tabIndex={i === currentIndex ? 0 : -1}>
 								<Image
 									src={slide.src}
 									alt={slide.alt}
@@ -95,6 +99,7 @@ export default function ImageSlideshow({
 									style={{ objectFit: 'cover' }}
 									priority={i === 0}
 								/>
+								</Link> : <Image src={slide.src} alt={slide.alt} fill unoptimized sizes="(max-width: 1280px) 100vw, 1280px" style={{ objectFit: 'cover' }} priority={i === 0} />}
 							</div>
 						))}
 					</div>
@@ -112,6 +117,13 @@ export default function ImageSlideshow({
 									onClick={() => goTo(i)}
 								/>
 							))}
+						</div>
+					)}
+					{slides.length > 1 && (
+						<div className="slideshow__controls">
+							<button type="button" onClick={() => goTo((currentIndex - 1 + slides.length) % slides.length)} aria-label="前のスライド">‹</button>
+							<button type="button" onClick={() => setPaused((value) => !value)}>{paused ? "再生" : "停止"}</button>
+							<button type="button" onClick={() => goTo((currentIndex + 1) % slides.length)} aria-label="次のスライド">›</button>
 						</div>
 					)}
 				</div>
@@ -173,6 +185,9 @@ export default function ImageSlideshow({
 					flex: 0 0 100%;
 					height: 100%;
 				}
+				.slideshow__link { display:block; position:relative; width:100%; height:100%; }
+				.slideshow__controls { position:absolute; right:.75rem; bottom:.65rem; z-index:11; display:flex; gap:.3rem; }
+				.slideshow__controls button { min-width:36px; min-height:36px; border:1px solid rgba(255,255,255,.8); border-radius:.25rem; background:rgba(25,25,30,.78); color:#fff; font-weight:700; }
 
 				.slideshow__dots {
 					position: absolute;
@@ -234,6 +249,10 @@ export default function ImageSlideshow({
 
 				.slideshow__thumb:hover:not(.slideshow__thumb--active) {
 					opacity: 0.8;
+				}
+				@media(max-width:640px) {
+					.slideshow { aspect-ratio: 16 / 9; }
+					.slideshow__thumbnails { display:none; }
 				}
 			`}</style>
 		</>
