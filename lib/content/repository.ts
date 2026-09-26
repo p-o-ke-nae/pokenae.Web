@@ -19,12 +19,15 @@ const OWNER = process.env.CONTENT_REPOSITORY_OWNER ?? "p-o-ke-nae";
 const REPOSITORY = process.env.CONTENT_REPOSITORY_NAME ?? "pokenae.Content";
 const REF = process.env.CONTENT_REPOSITORY_REF ?? "main";
 const API_ROOT = `https://api.github.com/repos/${OWNER}/${REPOSITORY}`;
-const RAW_ROOT = `https://raw.githubusercontent.com/${OWNER}/${REPOSITORY}/${REF}`;
 
 type GitTree = {
   sha: string;
   truncated: boolean;
   tree: Array<{ path: string; type: "blob" | "tree"; sha: string }>;
+};
+type GitHubCommit = {
+  sha: string;
+  commit: { tree: { sha: string } };
 };
 
 export type ContentAdminSnapshot = {
@@ -51,7 +54,13 @@ export async function fetchRepositoryFiles(
   fetcher: typeof fetch,
   token?: string,
 ): Promise<{ revision: string; files: Map<string, string> }> {
-  const treeResponse = await fetcher(`${API_ROOT}/git/trees/${encodeURIComponent(REF)}?recursive=1`, {
+  const commitResponse = await fetcher(`${API_ROOT}/commits/${encodeURIComponent(REF)}`, {
+    headers: githubHeaders(token),
+    cache: "no-store",
+  });
+  if (!commitResponse.ok) throw new Error(`Content commit API ${commitResponse.status}`);
+  const commit = await commitResponse.json() as GitHubCommit;
+  const treeResponse = await fetcher(`${API_ROOT}/git/trees/${commit.commit.tree.sha}?recursive=1`, {
     headers: githubHeaders(token),
     cache: "no-store",
   });
@@ -62,14 +71,14 @@ export async function fetchRepositoryFiles(
     .filter((entry) => entry.type === "blob" && entry.path.startsWith("content/") && /\.(json|md)$/i.test(entry.path))
     .map((entry) => entry.path);
   const entries = await Promise.all(paths.map(async (path) => {
-    const response = await fetcher(`${RAW_ROOT}/${path}`, {
+    const response = await fetcher(`${rawRoot(commit.sha)}/${path}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       cache: "no-store",
     });
     if (!response.ok) throw new Error(`Content raw ${response.status}: ${path}`);
     return [path, await response.text()] as const;
   }));
-  return { revision: tree.sha, files: new Map(entries) };
+  return { revision: commit.sha, files: new Map(entries) };
 }
 
 const getRemoteFileRecord = unstable_cache(
@@ -99,7 +108,11 @@ function jsonFiles<T>(files: ReadonlyMap<string, string>, directory: string, par
     .map(([, source]) => parse(JSON.parse(source)));
 }
 
-function resolveContentUrl(value: string | undefined, directory: string) {
+function rawRoot(revision: string) {
+  return `https://raw.githubusercontent.com/${OWNER}/${REPOSITORY}/${revision}`;
+}
+
+function resolveContentUrl(value: string | undefined, directory: string, revision: string) {
   if (!value || !value.startsWith(".")) return value;
   const normalized: string[] = [];
   for (const part of `${directory}/${value}`.split("/")) {
@@ -107,19 +120,19 @@ function resolveContentUrl(value: string | undefined, directory: string) {
     if (part === "..") normalized.pop();
     else normalized.push(part);
   }
-  return `${RAW_ROOT}/${normalized.join("/")}`;
+  return `${rawRoot(revision)}/${normalized.join("/")}`;
 }
 
-export function parseContentSnapshot(files: ReadonlyMap<string, string>): ContentSnapshot {
+export function parseContentSnapshot(files: ReadonlyMap<string, string>, revision: string): ContentSnapshot {
   const postPaths = [...files.keys()].filter((path) => /^content\/posts\/[^/]+\/index\.md$/.test(path)).sort();
   const posts = postPaths.map((path): Post => {
     const parsed = matter(requiredFile(files, path));
     const metadata = postFrontmatterSchema.parse(parsed.data);
     const directory = path.slice(0, -"/index.md".length);
-    const base = `${RAW_ROOT}/${directory}`;
+    const base = `${rawRoot(revision)}/${directory}`;
     return {
       ...metadata,
-      thumbnail: resolveContentUrl(metadata.thumbnail, directory),
+      thumbnail: resolveContentUrl(metadata.thumbnail, directory, revision),
       body: parsed.content.replace(/\]\(\.\/([^)]+)\)/g, `](${base}/$1)`),
     };
   });
@@ -127,7 +140,7 @@ export function parseContentSnapshot(files: ReadonlyMap<string, string>): Conten
     posts,
     tools: jsonFiles(files, "content/tools", (value) => toolSchema.parse(value)),
     banners: bannerSchema.array().parse(JSON.parse(requiredFile(files, "content/home/banners.json")))
-      .map((banner) => ({ ...banner, image: resolveContentUrl(banner.image, "content/home") ?? banner.image })),
+      .map((banner) => ({ ...banner, image: resolveContentUrl(banner.image, "content/home", revision) ?? banner.image })),
     announcements: announcementSchema.array().parse(JSON.parse(requiredFile(files, "content/home/announcements.json"))),
     updates: jsonFiles(files, "content/updates", (value) => updateSchema.parse(value)),
   };
@@ -146,7 +159,13 @@ export function parseContentAdminSnapshot(files: ReadonlyMap<string, string>, re
 
 export async function getContentSnapshot(): Promise<ContentSnapshot> {
   if (shouldUseFixtures()) return structuredClone(contentFixture);
-  return parseContentSnapshot((await getRemoteFiles()).files);
+  return (await getContentSnapshotWithRevision()).content;
+}
+
+export async function getContentSnapshotWithRevision(): Promise<{ revision: string; content: ContentSnapshot }> {
+  if (shouldUseFixtures()) return { revision: contentAdminFixture.revision, content: structuredClone(contentFixture) };
+  const snapshot = await getRemoteFiles();
+  return { revision: snapshot.revision, content: parseContentSnapshot(snapshot.files, snapshot.revision) };
 }
 
 export async function getContentAdminSnapshot(): Promise<ContentAdminSnapshot> {
@@ -178,7 +197,8 @@ export async function getPublishedPost(slug: string) {
 
 export async function getCollectionDexRecords(post: Post): Promise<CollectionDexRecord[]> {
   if (!post.embed || post.embed.component !== "CollectionDex" || shouldUseFixtures()) return [];
-  const { files } = await getRemoteFiles();
+  const snapshot = await getRemoteFiles();
+  const { files } = snapshot;
   const raw = JSON.parse(requiredFile(files, `content/posts/${post.slug}/${post.embed.data.replace(/^\.\//, "")}`)) as { records?: unknown[] };
   if (!Array.isArray(raw.records)) return [];
   return raw.records.flatMap((entry) => {
@@ -189,7 +209,7 @@ export async function getCollectionDexRecords(post: Post): Promise<CollectionDex
       region: entry[0] <= 151 ? "カントー" : entry[0] <= 251 ? "ジョウト" : entry[0] <= 386 ? "ホウエン" : "シンオウ",
       status: typeof entry[15] === "string" ? entry[15] : typeof entry[5] === "string" ? entry[5] : "未設定",
       color: typeof entry[14] === "string" ? entry[14] : undefined,
-      image: typeof entry[3] === "string" ? resolveContentUrl(entry[3], `content/posts/${post.slug}`) : undefined,
+      image: typeof entry[3] === "string" ? resolveContentUrl(entry[3], `content/posts/${post.slug}`, snapshot.revision) : undefined,
       location: typeof entry[11] === "string" ? entry[11] : undefined,
     }];
   });

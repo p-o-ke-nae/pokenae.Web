@@ -4,6 +4,7 @@ import { announcementContentSchema, bannerContentSchema, toolContentSchema } fro
 import { createContentPullRequest } from "@/lib/github/content-writer";
 import { getFreshContentAdminSnapshot } from "@/lib/content/repository";
 import { buildToolContentChanges } from "@/lib/content/admin-config";
+import { isContentConflictError } from "@/lib/github/content-conflict";
 
 type ConfigKind = "banners" | "announcements" | "tools";
 
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
       branch,
       title: `content: ${data.kind} を更新`,
       body: `管理画面から作成\n\n投稿者: ${auth.session.user?.email ?? "unknown"}`,
+      expectedRevision: data.baseRevision,
       files: [
         ...contentFiles,
         { path: `content/updates/${data.kind}-${timestamp}.json`, content: `${JSON.stringify({ id: `${data.kind}-${timestamp}`, publishedAt: new Date().toISOString(), target: data.kind === "tools" ? "tool" : "home", summary: data.changeNote || `${data.kind}を更新` }, null, 2)}\n` },
@@ -51,6 +53,9 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ pullRequestUrl: pr.html_url }, { status: 201 });
   } catch (error) {
+    if (isContentConflictError(error)) {
+      return NextResponse.json({ code: "CONTENT_CONFLICT", error: error.message }, { status: 409 });
+    }
     return NextResponse.json({ error: error instanceof Error ? error.message : "PR作成に失敗しました。" }, { status: 502 });
   }
 }

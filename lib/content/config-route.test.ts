@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getAdminAuthorization: vi.fn(),
   getFreshContentAdminSnapshot: vi.fn(),
   createContentPullRequest: vi.fn(),
+  buildToolContentChanges: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/admin", () => ({ getAdminAuthorization: mocks.getAdminAuthorization }));
@@ -14,7 +15,10 @@ vi.mock("@/lib/content/schemas", () => ({
   bannerContentSchema: { array: () => ({ safeParse: () => ({ success: true, data: [] }) }) },
   toolContentSchema: { array: () => ({ safeParse: () => ({ success: true, data: [] }) }) },
 }));
-vi.mock("@/lib/content/admin-config", () => ({ buildToolContentChanges: vi.fn() }));
+vi.mock("@/lib/content/admin-config", () => ({ buildToolContentChanges: mocks.buildToolContentChanges }));
+vi.mock("@/lib/github/content-conflict", () => ({
+  isContentConflictError: (error: unknown) => error instanceof Error && error.name === "ContentConflictError",
+}));
 
 describe("POST /api/content/config", () => {
   beforeEach(() => {
@@ -31,6 +35,7 @@ describe("POST /api/content/config", () => {
       tools: [],
       toolPaths: ["content/tools/new-tool.json"],
     });
+    mocks.buildToolContentChanges.mockReturnValue([]);
   });
 
   it("returns 409 before generating deletions when the base revision is stale", async () => {
@@ -47,5 +52,20 @@ describe("POST /api/content/config", () => {
       error: expect.stringContaining("再読込"),
     });
     expect(mocks.createContentPullRequest).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when main changes again inside the writer", async () => {
+    mocks.createContentPullRequest.mockRejectedValue(Object.assign(new Error("再読込してください。"), { name: "ContentConflictError" }));
+    const { POST } = await import("../../app/api/content/config/route");
+    const response = await POST(new Request("http://localhost/api/content/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "tools", value: [], baseRevision: "current-tree" }),
+    }));
+
+    expect(response.status).toBe(409);
+    expect(mocks.createContentPullRequest).toHaveBeenCalledWith(expect.objectContaining({
+      expectedRevision: "current-tree",
+    }));
   });
 });

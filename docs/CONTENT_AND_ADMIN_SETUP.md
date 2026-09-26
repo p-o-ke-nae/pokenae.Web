@@ -1,6 +1,6 @@
 # コンテンツ・管理画面設定
 
-公開ページは `p-o-ke-nae/pokenae.Content` の `main` にある `content/posts`、`content/tools`、`content/home`、`content/updates` を Server Component から取得し、300秒キャッシュします。Git Trees APIで対象ファイル一覧を一度だけ取得し、本文はraw配信から取得します。GitHub App設定時は読み取りにもinstallation tokenを使用します。未設定時は公開リポジトリを匿名で読み取ります。
+公開ページは `p-o-ke-nae/pokenae.Content` の `main` にある `content/posts`、`content/tools`、`content/home`、`content/updates` を Server Component から取得し、300秒キャッシュします。最初に `main` のcommit SHAとtree SHAを解決し、Git Trees APIとraw配信の双方をその不変commitへ固定します。GitHub App設定時は読み取りにもinstallation tokenを使用します。未設定時は公開リポジトリを匿名で読み取ります。
 
 ローカル・E2Eでは `.env.docker.debug` に `CONTENT_SOURCE=fixture` を明示してください。fixtureへの切替は明示設定またはtest環境だけで行い、GitHub取得失敗をfixture成功として隠しません。`reference/` は入力専用でGit管理対象外です。
 
@@ -13,7 +13,7 @@
 
 管理APIは画面表示とは別に毎回再認可します。保存は `content/<slug>-<timestamp>` ブランチ、単一commit、Pull Requestを作成し、mainへ直接書き込みません。資格情報不足時は失敗として扱います。
 
-ホーム・ツール編集画面は取得時のGit tree revisionを保存要求へ含めます。保存時のmain revisionと一致しない場合はHTTP 409で拒否し、削除entryやPRを生成しません。画面を再読込して最新内容から編集し直してください。
+記事・ホーム・ツール編集画面は取得時のcommit SHAをbase revisionとして保存要求へ含めます。保存直前とcommit作成直前にmainのcommit SHAを再確認し、不一致ならHTTP 409で拒否します。writerは検証済みcommitをparent/base treeとして使用するため、競合時にbranch、commit、Pull Requestは生成されません。画面を再読込して最新内容から編集し直してください。
 
 ## GitHub Actions / VPS / ACA
 

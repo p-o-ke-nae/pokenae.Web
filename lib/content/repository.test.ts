@@ -35,10 +35,13 @@ const tool = {
 describe("GitHub content snapshot", () => {
   beforeEach(() => vi.restoreAllMocks());
 
-  it("uses one Git Trees API request and authenticated raw requests", async () => {
+  it("pins the tree and authenticated raw files to one immutable commit", async () => {
     const { fetchRepositoryFiles } = await import("./repository");
     const fetcher = vi.fn<typeof fetch>(async (input, init) => {
       const url = String(input);
+      if (url.includes("/commits/")) {
+        return Response.json({ sha: "commit-revision", commit: { tree: { sha: "tree-revision" } } });
+      }
       if (url.includes("/git/trees/")) {
         return Response.json({
           sha: "tree-revision",
@@ -50,6 +53,7 @@ describe("GitHub content snapshot", () => {
           ],
         });
       }
+      expect(url).toContain("/commit-revision/");
       const text = url.endsWith("banners.json") ? JSON.stringify(banners) : JSON.stringify(announcements);
       expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer installation-token");
       return new Response(text, { status: 200 });
@@ -57,16 +61,16 @@ describe("GitHub content snapshot", () => {
 
     const snapshot = await fetchRepositoryFiles(fetcher, "installation-token");
 
-    expect(snapshot.revision).toBe("tree-revision");
+    expect(snapshot.revision).toBe("commit-revision");
     expect(snapshot.files.size).toBe(2);
-    expect(fetcher.mock.calls.filter(([url]) => String(url).includes("api.github.com")).length).toBe(1);
+    expect(fetcher.mock.calls.filter(([url]) => String(url).includes("api.github.com")).length).toBe(2);
     expect(new Headers(fetcher.mock.calls[0][1]?.headers).get("Authorization")).toBe("Bearer installation-token");
   });
 
   it("does not convert a repository failure into fixture success", async () => {
     const { fetchRepositoryFiles } = await import("./repository");
     const fetcher = vi.fn<typeof fetch>(async () => new Response("rate limited", { status: 403 }));
-    await expect(fetchRepositoryFiles(fetcher)).rejects.toThrow("Content tree API 403");
+    await expect(fetchRepositoryFiles(fetcher)).rejects.toThrow("Content commit API 403");
   });
 
   it("round-trips the current storage model without losing fields", async () => {

@@ -6,7 +6,7 @@ import SafeMarkdown from "@/components/organisms/SafeMarkdown";
 
 const blank: Post = { slug: "", title: "", summary: "", publishedAt: new Date().toISOString().slice(0, 10), status: "draft", category: "blog", tags: [], relatedTags: [], priority: 0, showInPickup: false, body: "" };
 
-export default function PostEditor({ initial = blank }: { initial?: Post }) {
+export default function PostEditor({ initial = blank, baseRevision }: { initial?: Post; baseRevision: string }) {
   const [post, setPost] = useState(initial);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
@@ -16,9 +16,14 @@ export default function PostEditor({ initial = blank }: { initial?: Post }) {
     const form = new FormData(event.currentTarget);
     form.set("post", JSON.stringify({ ...post, body: undefined }));
     form.set("body", post.body);
+    form.set("baseRevision", baseRevision);
     const response = await fetch("/api/content/posts", { method: "POST", body: form });
-    const data = await response.json() as { error?: string; pullRequestUrl?: string };
-    setMessage(response.ok ? `Pull Request を作成しました: ${data.pullRequestUrl}` : data.error ?? "保存に失敗しました。");
+    const data = await response.json() as { code?: string; error?: string; pullRequestUrl?: string };
+    setMessage(response.ok
+      ? `Pull Request を作成しました: ${data.pullRequestUrl}`
+      : data.code === "CONTENT_CONFLICT"
+        ? "公開コンテンツが画面表示後に更新されました。ページを再読込してから編集し直してください。"
+        : data.error ?? "保存に失敗しました。");
     setSaving(false);
   }
   return <form className="post-editor" onSubmit={submit}>
