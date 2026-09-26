@@ -53,7 +53,7 @@ Get-ChildItem secrets/ -Name
 3. `docker/entrypoint.sh` が `/run/secrets/` 内のファイルを読み取り、ファイル名を大文字に変換して環境変数に展開
 4. アプリケーションが `process.env.NEXTAUTH_SECRET` 等で参照
 
-> **CI/CD 環境**: GitHub Actions では GitHub Secrets から直接環境変数として渡すため、`secrets/` ディレクトリは不要です。
+> **CI/CD 環境**: VPS デプロイでは GitHub Secrets を一時ファイルとして安全に転送し、VPS の `secrets/` ディレクトリから Docker Compose secrets として読み込みます。
 
 ### CI/CD（GitHub Actions）でのシークレット管理
 
@@ -71,7 +71,7 @@ GitHub Actions でのデプロイ時は、GitHub Secrets に登録した値を�
 | `PROD_NEXTAUTH_URL`    | 本番環境のNextAuth URL（例: `https://pokenae.example.com`）     |
 | `DEV_NEXTAUTH_URL`     | 開発環境のNextAuth URL（例: `https://dev.pokenae.example.com`） |
 
-デプロイワークフロー（`.github/workflows/main.yml`）が自動的に VPS 上の `~/pokenae-web/secrets/` にファイルを作成し、Docker Compose secrets として利用します。
+デプロイワークフロー（`.github/workflows/main.yml`）が自動的に VPS 上の `~/pokenae-web/secrets/` にファイルを作成し、Docker Compose secrets として利用します。VPS 上ではデプロイ用ユーザーを所有者として、`secrets/` を `700`、既存ファイルを含む配下の全シークレットファイルを `600` に毎回矯正します。Docker Compose はデプロイ用ユーザーで実行されるため、この権限でもシークレットファイルを読み取れます。
 
 ## 環境モードの種類
 

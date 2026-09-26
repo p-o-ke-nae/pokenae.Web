@@ -89,20 +89,57 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
           HOST: ${{ secrets.host }}
           USERNAME: ${{ secrets.username }}
+          NEXTAUTH_SECRET: ${{ secrets.nextauth_secret }}
+          GOOGLE_CLIENT_ID: ${{ secrets.google_client_id }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.google_client_secret }}
+          ADMIN_EMAILS: ${{ secrets.admin_emails }}
+          GITHUB_APP_ID: ${{ secrets.github_app_id }}
+          GITHUB_APP_INSTALLATION_ID: ${{ secrets.github_app_installation_id }}
+          GITHUB_APP_PRIVATE_KEY_BASE64: ${{ secrets.github_app_private_key_base64 }}
         run: |
-          echo "$SSH_PRIVATE_KEY" > private_key
+          set -euo pipefail
+          umask 077
+
+          secret_upload_dir=".deploy-secrets"
+          trap 'rm -rf "$secret_upload_dir" private_key' EXIT
+
+          printf '%s' "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
 
+          rm -rf "$secret_upload_dir"
+          mkdir -m 700 "$secret_upload_dir"
+          printf '%s' "$NEXTAUTH_SECRET" > "$secret_upload_dir/nextauth_secret"
+          printf '%s' "$GOOGLE_CLIENT_ID" > "$secret_upload_dir/google_client_id"
+          printf '%s' "$GOOGLE_CLIENT_SECRET" > "$secret_upload_dir/google_client_secret"
+          printf '%s' "$ADMIN_EMAILS" > "$secret_upload_dir/admin_emails"
+          printf '%s' "$GITHUB_APP_ID" > "$secret_upload_dir/github_app_id"
+          printf '%s' "$GITHUB_APP_INSTALLATION_ID" > "$secret_upload_dir/github_app_installation_id"
+          printf '%s' "$GITHUB_APP_PRIVATE_KEY_BASE64" > "$secret_upload_dir/github_app_private_key_base64"
+          chmod 600 "$secret_upload_dir"/*
+
+          ssh "$USERNAME@$HOST" -i private_key -p 22 'set -eu
+            secret_dir="$HOME/pokenae-web/secrets"
+            deploy_owner="$(id -u):$(id -g)"
+            install -d -m 700 "$secret_dir"
+            chown "$deploy_owner" "$secret_dir"
+            find "$secret_dir" -type f -exec chown "$deploy_owner" {} +
+            find "$secret_dir" -type f -exec chmod 600 {} +
+            chmod 700 "$secret_dir"
+          '
+
+          scp -i private_key -P 22 \
+            "$secret_upload_dir"/* \
+            "$USERNAME@$HOST:~/pokenae-web/secrets/"
+
           ssh "$USERNAME@$HOST" -i private_key -p 22 \
-            "cd ~/pokenae-web && \
-             printf '%s' '${{ secrets.nextauth_secret }}' > secrets/nextauth_secret && \
-             printf '%s' '${{ secrets.google_client_id }}' > secrets/google_client_id && \
-             printf '%s' '${{ secrets.google_client_secret }}' > secrets/google_client_secret && \
-             printf '%s' '${{ secrets.admin_emails }}' > secrets/admin_emails && \
-             printf '%s' '${{ secrets.github_app_id }}' > secrets/github_app_id && \
-             printf '%s' '${{ secrets.github_app_installation_id }}' > secrets/github_app_installation_id && \
-             printf '%s' '${{ secrets.github_app_private_key_base64 }}' > secrets/github_app_private_key_base64 && \
-             chmod 644 secrets/*"
+            'set -eu
+              secret_dir="$HOME/pokenae-web/secrets"
+              deploy_owner="$(id -u):$(id -g)"
+              chown "$deploy_owner" "$secret_dir"
+              find "$secret_dir" -type f -exec chown "$deploy_owner" {} +
+              find "$secret_dir" -type f -exec chmod 600 {} +
+              chmod 700 "$secret_dir"
+            '
 
       - name: Deploy to VPS
         env:
