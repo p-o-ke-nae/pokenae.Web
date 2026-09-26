@@ -24,4 +24,6 @@ Repository/Environment Secrets:
 - `GITHUB_APP_INSTALLATION_ID`
 - `GITHUB_APP_PRIVATE_KEY_BASE64`
 
+ACAデプロイでは、スペース区切りの `KEY=VALUE` のうち値が設定されたsecretだけを登録します。未設定の管理用secretは警告して省略されるため公開サイトのデプロイは継続しますが、管理APIは資格情報不足としてfail closedのままです。空または環境変数名として不正なKEYは設定ミスとしてデプロイを停止します。`NEXTAUTH_SECRET`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` は従来どおり、設定されている場合にACAへsecret参照として渡されます。
+
 公開設定 `CONTENT_REPOSITORY_OWNER`、`CONTENT_REPOSITORY_NAME`、`CONTENT_REPOSITORY_REF` はVariablesまたはCompose環境変数として注入します。秘密鍵はクライアント向け `NEXT_PUBLIC_*` に設定しないでください。

@@ -65,7 +65,8 @@ on:
         required: false
         description: >
           機密性のある環境変数（スペース区切り KEY=VALUE 形式）。
-          ACA シークレットとして登録され、secretref で参照される。
+          値が設定された項目だけが ACA シークレットとして登録され、
+          secretref で参照される。空値の項目は警告後に省略される。
 
 jobs:
   deploy:
@@ -133,37 +134,15 @@ jobs:
           tenant-id: ${{ secrets.azure_tenant_id }}
           subscription-id: ${{ secrets.azure_subscription_id }}
 
+      - name: Check out deployment scripts
+        uses: actions/checkout@v4
+
       - name: Prepare secret references
         id: secrets
         shell: bash
         env:
           SECRET_ENV_VARS: ${{ secrets.secret_env_vars }}
-        run: |
-          set -euo pipefail
-
-          if [ -z "${SECRET_ENV_VARS}" ]; then
-            echo "set_secrets_args=" >> "$GITHUB_OUTPUT"
-            echo "set_secret_env_args=" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          SECRETS_ARGS=""
-          ENV_ARGS=""
-
-          for pair in ${SECRET_ENV_VARS}; do
-            KEY="${pair%%=*}"
-            VALUE="${pair#*=}"
-            if [ -z "${KEY}" ] || [ -z "${VALUE}" ]; then
-              echo "[ERROR] Secret environment entries must use KEY=VALUE."
-              exit 1
-            fi
-            SECRET_NAME=$(echo "${KEY}" | tr '[:upper:]_' '[:lower:]-')
-            SECRETS_ARGS="${SECRETS_ARGS} ${SECRET_NAME}=${VALUE}"
-            ENV_ARGS="${ENV_ARGS} ${KEY}=secretref:${SECRET_NAME}"
-          done
-
-          echo "set_secrets_args=${SECRETS_ARGS}" >> "$GITHUB_OUTPUT"
-          echo "set_secret_env_args=${ENV_ARGS}" >> "$GITHUB_OUTPUT"
+        run: bash scripts/prepare-aca-secret-references.sh
 
       - name: Deploy to Azure Container Apps
         uses: azure/cli@v2
@@ -184,15 +163,21 @@ jobs:
 
             if [ -n "${SET_SECRETS}" ]; then
               echo "[INFO] Setting ACA secrets..."
+              read -r -a SECRET_ARGS <<< "${SET_SECRETS}"
               az containerapp secret set \
                 --name "${{ inputs.container_app_name }}" \
                 --resource-group "${{ inputs.resource_group }}" \
-                --secrets ${SET_SECRETS}
+                --secrets "${SECRET_ARGS[@]}"
             fi
 
-            ENV_ARGS="${PUBLIC_ENV_VARS:-}"
+            ENV_ARGS=()
+            if [ -n "${PUBLIC_ENV_VARS:-}" ]; then
+              read -r -a PUBLIC_ENV_ARGS <<< "${PUBLIC_ENV_VARS}"
+              ENV_ARGS+=("${PUBLIC_ENV_ARGS[@]}")
+            fi
             if [ -n "${SET_SECRET_ENV}" ]; then
-              ENV_ARGS="${ENV_ARGS} ${SET_SECRET_ENV}"
+              read -r -a SECRET_ENV_ARGS <<< "${SET_SECRET_ENV}"
+              ENV_ARGS+=("${SECRET_ENV_ARGS[@]}")
             fi
 
             UPDATE_ARGS=(
@@ -201,8 +186,8 @@ jobs:
               --resource-group "${{ inputs.resource_group }}"
               --image "${{ inputs.image }}"
             )
-            if [ -n "${ENV_ARGS}" ]; then
-              UPDATE_ARGS+=(--set-env-vars ${ENV_ARGS})
+            if [ "${#ENV_ARGS[@]}" -gt 0 ]; then
+              UPDATE_ARGS+=(--set-env-vars "${ENV_ARGS[@]}")
             fi
 
             echo "[INFO] Deploying image: ${{ inputs.image }}"
