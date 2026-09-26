@@ -64,9 +64,9 @@ on:
       secret_env_vars:
         required: false
         description: >
-          機密性のある環境変数（スペース区切り KEY=VALUE 形式）。
-          値が設定された項目だけが ACA シークレットとして登録され、
-          secretref で参照される。空値の項目は警告後に省略される。
+          機密性のある環境変数（1 行 1 KEY=VALUE 形式）。
+          必須値は空を許可せず、未設定の optional 値は無効値で上書きして
+          常に同じ secretref で参照する。
 
 jobs:
   deploy:
@@ -137,22 +137,16 @@ jobs:
       - name: Check out deployment scripts
         uses: actions/checkout@v4
 
-      - name: Prepare secret references
-        id: secrets
-        shell: bash
-        env:
-          SECRET_ENV_VARS: ${{ secrets.secret_env_vars }}
-        run: bash scripts/prepare-aca-secret-references.sh
-
       - name: Deploy to Azure Container Apps
         uses: azure/cli@v2
         env:
-          SET_SECRETS: ${{ steps.secrets.outputs.set_secrets_args }}
-          SET_SECRET_ENV: ${{ steps.secrets.outputs.set_secret_env_args }}
+          SECRET_ENV_VARS: ${{ secrets.secret_env_vars }}
           PUBLIC_ENV_VARS: ${{ inputs.env_vars }}
         with:
           inlineScript: |
             set -euo pipefail
+            source scripts/prepare-aca-secret-references.sh
+            prepare_aca_secret_references "${SECRET_ENV_VARS:-}"
 
             echo "[INFO] Setting managed identity registry access for ${{ inputs.registry_server }}..."
             az containerapp registry set \
@@ -161,24 +155,18 @@ jobs:
               --server "${{ inputs.registry_server }}" \
               --identity "${{ inputs.registry_identity }}"
 
-            if [ -n "${SET_SECRETS}" ]; then
-              echo "[INFO] Setting ACA secrets..."
-              read -r -a SECRET_ARGS <<< "${SET_SECRETS}"
-              az containerapp secret set \
-                --name "${{ inputs.container_app_name }}" \
-                --resource-group "${{ inputs.resource_group }}" \
-                --secrets "${SECRET_ARGS[@]}"
-            fi
+            echo "[INFO] Setting ACA secrets..."
+            az containerapp secret set \
+              --name "${{ inputs.container_app_name }}" \
+              --resource-group "${{ inputs.resource_group }}" \
+              --secrets "${ACA_SECRET_ARGS[@]}"
 
             ENV_ARGS=()
             if [ -n "${PUBLIC_ENV_VARS:-}" ]; then
               read -r -a PUBLIC_ENV_ARGS <<< "${PUBLIC_ENV_VARS}"
               ENV_ARGS+=("${PUBLIC_ENV_ARGS[@]}")
             fi
-            if [ -n "${SET_SECRET_ENV}" ]; then
-              read -r -a SECRET_ENV_ARGS <<< "${SET_SECRET_ENV}"
-              ENV_ARGS+=("${SECRET_ENV_ARGS[@]}")
-            fi
+            ENV_ARGS+=("${ACA_SECRET_ENV_ARGS[@]}")
 
             UPDATE_ARGS=(
               containerapp update
