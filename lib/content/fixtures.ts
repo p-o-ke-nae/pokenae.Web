@@ -1,4 +1,5 @@
 import type { ContentSnapshot } from "./types";
+import type { ContentAdminSnapshot } from "./repository";
 
 export const contentFixture: ContentSnapshot = {
   banners: [
@@ -69,4 +70,28 @@ export const contentFixture: ContentSnapshot = {
   updates: [
     { id: "renewal", publishedAt: "2026-09-26", target: "site", summary: "サイト構成とデザインを刷新しました。", href: "/" },
   ],
+};
+
+export const contentAdminFixture: ContentAdminSnapshot = {
+  banners: [
+    { id: "welcome", image: "/mock/slide1.svg", alt: "pokenae ポケモン攻略ツール集", href: "/tools", order: 1 },
+  ],
+  announcements: [
+    { id: "site-renewal", text: "pokenae.com をリニューアルしました", href: "/blog/site-renewal", variant: "highlight" },
+  ],
+  tools: [
+    {
+      slug: "blink-observer-tool",
+      displayName: "BlinkObserverTool",
+      summary: "映像の変化を認識して作業を支援する Windows アプリです。",
+      repository: "p-o-ke-nae/BlinkObserverTool",
+      kind: "windows-app",
+      docs: { readme: "README.md", paths: ["docs/"] },
+      release: { channel: "stable", manifestRequired: true, unsignedInstaller: true },
+      supportedOs: ["Windows 10 以降 (x64)"],
+      showInPickup: true,
+      priority: 100,
+    },
+  ],
+  toolPaths: ["content/tools/blink-observer-tool.json"],
 };

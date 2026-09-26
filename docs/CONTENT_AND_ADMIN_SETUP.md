@@ -1,8 +1,8 @@
 # コンテンツ・管理画面設定
 
-公開ページは `p-o-ke-nae/pokenae.Content` の `main` にある `content/posts`、`content/tools`、`content/home`、`content/updates` を Server Component から取得し、300秒キャッシュします。GitHub障害時は安全な組み込みfixtureへフォールバックします。
+公開ページは `p-o-ke-nae/pokenae.Content` の `main` にある `content/posts`、`content/tools`、`content/home`、`content/updates` を Server Component から取得し、300秒キャッシュします。Git Trees APIで対象ファイル一覧を一度だけ取得し、本文はraw配信から取得します。GitHub App設定時は読み取りにもinstallation tokenを使用します。未設定時は公開リポジトリを匿名で読み取ります。
 
-ローカル・E2Eでは `.env.docker.debug` に `CONTENT_SOURCE=fixture` を明示してください。`reference/` は入力専用でGit管理対象外です。
+ローカル・E2Eでは `.env.docker.debug` に `CONTENT_SOURCE=fixture` を明示してください。fixtureへの切替は明示設定またはtest環境だけで行い、GitHub取得失敗をfixture成功として隠しません。`reference/` は入力専用でGit管理対象外です。
 
 ## 管理者
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const optionalUrl = z.string().url().or(z.string().startsWith("/")).or(z.string().startsWith(".")).optional();
-const optionalDate = z.preprocess((value) => value === null ? undefined : value, z.string().optional());
+const nullableDate = z.string().nullable().optional();
 
 export const postFrontmatterSchema = z.object({
   slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
@@ -50,26 +50,37 @@ export const toolSchema = toolContentSchema.transform((value) => ({
   priority: value.priority,
 }));
 
-export const bannerSchema = z.object({
+export const bannerContentSchema = z.object({
   id: z.string().min(1),
   image: z.string().url().or(z.string().startsWith("/")).or(z.string().startsWith(".")),
   alt: z.string().min(1),
   href: optionalUrl,
   order: z.number().int(),
-  startsAt: optionalDate,
-  endsAt: optionalDate,
+  startsAt: nullableDate,
+  endsAt: nullableDate,
 });
+export const bannerSchema = bannerContentSchema.transform((value) => ({
+  ...value,
+  startsAt: value.startsAt ?? undefined,
+  endsAt: value.endsAt ?? undefined,
+}));
 
-export const announcementSchema = z.object({
+export const announcementContentSchema = z.object({
   id: z.string().min(1),
   text: z.string().min(1),
   href: optionalUrl,
   variant: z.enum(["normal", "highlight", "urgent"]).default("normal"),
-  startsAt: optionalDate,
-  endsAt: optionalDate,
-}).transform((value) => ({ ...value, severity: value.variant }));
+  startsAt: nullableDate,
+  endsAt: nullableDate,
+});
+export const announcementSchema = announcementContentSchema.transform((value) => ({
+  ...value,
+  startsAt: value.startsAt ?? undefined,
+  endsAt: value.endsAt ?? undefined,
+  severity: value.variant,
+}));
 
-export const updateSchema = z.object({
+export const updateContentSchema = z.object({
   id: z.string().min(1),
   publishedAt: z.string(),
   target: z.enum(["post", "tool", "home", "site"]),
@@ -77,7 +88,8 @@ export const updateSchema = z.object({
   href: optionalUrl,
   skipInfo: z.boolean().optional(),
   visible: z.boolean().optional(),
-}).transform((value) => ({ ...value, skipInfo: value.skipInfo ?? value.visible === false }));
+});
+export const updateSchema = updateContentSchema.transform((value) => ({ ...value, skipInfo: value.skipInfo ?? value.visible === false }));
 
 export const releaseManifestSchema = z.object({
   version: z.string().regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/),
