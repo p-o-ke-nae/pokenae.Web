@@ -7,6 +7,12 @@ const OWNER = process.env.CONTENT_REPOSITORY_OWNER ?? "p-o-ke-nae";
 const REPOSITORY = process.env.CONTENT_REPOSITORY_NAME ?? "pokenae.Content";
 const BASE_BRANCH = process.env.CONTENT_REPOSITORY_REF ?? "main";
 
+type CreatedPullRequest = {
+  html_url: string;
+  number: number;
+  base: { sha: string };
+};
+
 async function api<T>(path: string, init: RequestInit, token: string): Promise<T> {
   const response = await fetch(`https://api.github.com/repos/${OWNER}/${REPOSITORY}${path}`, {
     ...init,
@@ -27,6 +33,14 @@ async function assertExpectedMainRevision(token: string, expectedRevision: strin
   if (currentBase.object.sha !== expectedRevision) throw new ContentConflictError();
 }
 
+async function deleteContentBranch(token: string, branch: string, context: string) {
+  try {
+    await api(`/git/refs/heads/${encodeRefPath(branch)}`, { method: "DELETE" }, token);
+  } catch {
+    console.error(`Content branch cleanup failed ${context}`);
+  }
+}
+
 export async function createContentPullRequest(input: { branch: string; title: string; body: string; expectedRevision?: string; files: ContentFileChange[] }) {
   const token = await getRequiredInstallationToken();
   const baseRevision = input.expectedRevision ?? (await api<{ object: { sha: string } }>(`/git/ref/heads/${encodeRefPath(BASE_BRANCH)}`, {}, token)).object.sha;
@@ -44,15 +58,21 @@ export async function createContentPullRequest(input: { branch: string; title: s
       await assertExpectedMainRevision(token, baseRevision);
     } catch (error) {
       if (!(error instanceof ContentConflictError)) throw error;
-      try {
-        await api(`/git/refs/heads/${encodeRefPath(input.branch)}`, { method: "DELETE" }, token);
-      } catch (cleanupError) {
-        console.error("Content branch cleanup failed after revision conflict", cleanupError);
-      }
+      await deleteContentBranch(token, input.branch, "after revision conflict");
       throw error;
     }
   }
-  return api<{ html_url: string; number: number }>("/pulls", { method: "POST", body: JSON.stringify({ title: input.title, body: input.body, head: input.branch, base: BASE_BRANCH }) }, token);
+  const pullRequest = await api<CreatedPullRequest>("/pulls", { method: "POST", body: JSON.stringify({ title: input.title, body: input.body, head: input.branch, base: BASE_BRANCH }) }, token);
+  if (input.expectedRevision && pullRequest.base.sha !== input.expectedRevision) {
+    try {
+      await api(`/pulls/${pullRequest.number}`, { method: "PATCH", body: JSON.stringify({ state: "closed" }) }, token);
+    } catch {
+      console.error("Content pull request cleanup failed after base revision conflict");
+    }
+    await deleteContentBranch(token, input.branch, "after base revision conflict");
+    throw new ContentConflictError();
+  }
+  return pullRequest;
 }
 
 export async function getOpenContentPullRequests() {

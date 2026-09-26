@@ -64,6 +64,9 @@ describe("POST /api/content/config", () => {
     }));
 
     expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body).toMatchObject({ code: "CONTENT_CONFLICT" });
+    expect(body).not.toHaveProperty("pullRequestUrl");
     expect(mocks.createContentPullRequest).toHaveBeenCalledWith(expect.objectContaining({
       expectedRevision: "current-tree",
     }));

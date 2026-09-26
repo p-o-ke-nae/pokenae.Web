@@ -50,7 +50,10 @@ describe("POST /api/content/posts", () => {
     const response = await POST(new Request("http://localhost/api/content/posts", { method: "POST", body: form }));
 
     expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toMatchObject({ code: "CONTENT_CONFLICT" });
+    const body = await response.json();
+    expect(body).toMatchObject({ code: "CONTENT_CONFLICT" });
+    expect(body).not.toHaveProperty("pullRequestUrl");
+    expect(body).not.toHaveProperty("number");
     expect(mocks.createContentPullRequest).toHaveBeenCalledWith(expect.objectContaining({
       expectedRevision: "expected-main-commit",
     }));
