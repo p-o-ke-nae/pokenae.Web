@@ -13,6 +13,8 @@
 
 管理APIは画面表示とは別に毎回再認可します。保存は `content/<slug>-<timestamp>` ブランチ、単一commit、Pull Requestを作成し、mainへ直接書き込みません。資格情報不足時は失敗として扱います。
 
+ホーム・ツール編集画面は取得時のGit tree revisionを保存要求へ含めます。保存時のmain revisionと一致しない場合はHTTP 409で拒否し、削除entryやPRを生成しません。画面を再読込して最新内容から編集し直してください。
+
 ## GitHub Actions / VPS / ACA
 
 Repository/Environment Secrets:

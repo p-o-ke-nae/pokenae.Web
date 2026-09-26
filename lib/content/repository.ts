@@ -22,11 +22,13 @@ const API_ROOT = `https://api.github.com/repos/${OWNER}/${REPOSITORY}`;
 const RAW_ROOT = `https://raw.githubusercontent.com/${OWNER}/${REPOSITORY}/${REF}`;
 
 type GitTree = {
+  sha: string;
   truncated: boolean;
   tree: Array<{ path: string; type: "blob" | "tree"; sha: string }>;
 };
 
 export type ContentAdminSnapshot = {
+  revision: string;
   banners: Array<ReturnType<typeof bannerContentSchema.parse>>;
   announcements: Array<ReturnType<typeof announcementContentSchema.parse>>;
   tools: Array<ReturnType<typeof toolContentSchema.parse>>;
@@ -48,7 +50,7 @@ function githubHeaders(token?: string) {
 export async function fetchRepositoryFiles(
   fetcher: typeof fetch,
   token?: string,
-): Promise<Map<string, string>> {
+): Promise<{ revision: string; files: Map<string, string> }> {
   const treeResponse = await fetcher(`${API_ROOT}/git/trees/${encodeURIComponent(REF)}?recursive=1`, {
     headers: githubHeaders(token),
     cache: "no-store",
@@ -67,17 +69,21 @@ export async function fetchRepositoryFiles(
     if (!response.ok) throw new Error(`Content raw ${response.status}: ${path}`);
     return [path, await response.text()] as const;
   }));
-  return new Map(entries);
+  return { revision: tree.sha, files: new Map(entries) };
 }
 
 const getRemoteFileRecord = unstable_cache(
-  async () => Object.fromEntries(await fetchRepositoryFiles(fetch, await getOptionalInstallationToken())),
+  async () => {
+    const snapshot = await fetchRepositoryFiles(fetch, await getOptionalInstallationToken());
+    return { revision: snapshot.revision, files: Object.fromEntries(snapshot.files) };
+  },
   ["pokenae-content-snapshot", OWNER, REPOSITORY, REF],
   { revalidate: 300, tags: ["pokenae-content"] },
 );
 
 async function getRemoteFiles() {
-  return new Map(Object.entries(await getRemoteFileRecord()));
+  const snapshot = await getRemoteFileRecord();
+  return { revision: snapshot.revision, files: new Map(Object.entries(snapshot.files)) };
 }
 
 function requiredFile(files: ReadonlyMap<string, string>, path: string) {
@@ -127,9 +133,10 @@ export function parseContentSnapshot(files: ReadonlyMap<string, string>): Conten
   };
 }
 
-export function parseContentAdminSnapshot(files: ReadonlyMap<string, string>): ContentAdminSnapshot {
+export function parseContentAdminSnapshot(files: ReadonlyMap<string, string>, revision: string): ContentAdminSnapshot {
   const toolPaths = [...files.keys()].filter((path) => /^content\/tools\/[^/]+\.json$/.test(path)).sort();
   return {
+    revision,
     banners: bannerContentSchema.array().parse(JSON.parse(requiredFile(files, "content/home/banners.json"))),
     announcements: announcementContentSchema.array().parse(JSON.parse(requiredFile(files, "content/home/announcements.json"))),
     tools: toolPaths.map((path) => toolContentSchema.parse(JSON.parse(requiredFile(files, path)))),
@@ -139,12 +146,19 @@ export function parseContentAdminSnapshot(files: ReadonlyMap<string, string>): C
 
 export async function getContentSnapshot(): Promise<ContentSnapshot> {
   if (shouldUseFixtures()) return structuredClone(contentFixture);
-  return parseContentSnapshot(await getRemoteFiles());
+  return parseContentSnapshot((await getRemoteFiles()).files);
 }
 
 export async function getContentAdminSnapshot(): Promise<ContentAdminSnapshot> {
   if (shouldUseFixtures()) return structuredClone(contentAdminFixture);
-  return parseContentAdminSnapshot(await getRemoteFiles());
+  const snapshot = await getRemoteFiles();
+  return parseContentAdminSnapshot(snapshot.files, snapshot.revision);
+}
+
+export async function getFreshContentAdminSnapshot(): Promise<ContentAdminSnapshot> {
+  if (shouldUseFixtures()) return structuredClone(contentAdminFixture);
+  const snapshot = await fetchRepositoryFiles(fetch, await getOptionalInstallationToken());
+  return parseContentAdminSnapshot(snapshot.files, snapshot.revision);
 }
 
 export function isActiveContent(startsAt?: string, endsAt?: string, now = Date.now()) {
@@ -164,7 +178,7 @@ export async function getPublishedPost(slug: string) {
 
 export async function getCollectionDexRecords(post: Post): Promise<CollectionDexRecord[]> {
   if (!post.embed || post.embed.component !== "CollectionDex" || shouldUseFixtures()) return [];
-  const files = await getRemoteFiles();
+  const { files } = await getRemoteFiles();
   const raw = JSON.parse(requiredFile(files, `content/posts/${post.slug}/${post.embed.data.replace(/^\.\//, "")}`)) as { records?: unknown[] };
   if (!Array.isArray(raw.records)) return [];
   return raw.records.flatMap((entry) => {

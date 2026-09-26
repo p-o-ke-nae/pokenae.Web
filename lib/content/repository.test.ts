@@ -41,6 +41,7 @@ describe("GitHub content snapshot", () => {
       const url = String(input);
       if (url.includes("/git/trees/")) {
         return Response.json({
+          sha: "tree-revision",
           truncated: false,
           tree: [
             { path: "content/home/banners.json", type: "blob", sha: "1" },
@@ -54,9 +55,10 @@ describe("GitHub content snapshot", () => {
       return new Response(text, { status: 200 });
     });
 
-    const files = await fetchRepositoryFiles(fetcher, "installation-token");
+    const snapshot = await fetchRepositoryFiles(fetcher, "installation-token");
 
-    expect(files.size).toBe(2);
+    expect(snapshot.revision).toBe("tree-revision");
+    expect(snapshot.files.size).toBe(2);
     expect(fetcher.mock.calls.filter(([url]) => String(url).includes("api.github.com")).length).toBe(1);
     expect(new Headers(fetcher.mock.calls[0][1]?.headers).get("Authorization")).toBe("Bearer installation-token");
   });
@@ -75,8 +77,9 @@ describe("GitHub content snapshot", () => {
       ["content/tools/sample-tool.json", JSON.stringify(tool)],
     ]);
 
-    const snapshot = parseContentAdminSnapshot(files);
+    const snapshot = parseContentAdminSnapshot(files, "base-tree-sha");
 
+    expect(snapshot.revision).toBe("base-tree-sha");
     expect(snapshot.banners).toEqual(banners);
     expect(snapshot.announcements).toEqual(announcements);
     expect(snapshot.tools).toEqual([tool]);
