@@ -1,8 +1,16 @@
+import type { Metadata } from "next";
 import ImageSlideshow from "@/components/atoms/ImageSlideshow";
 import TickerBanner from "@/components/atoms/TickerBanner";
 import { BlogSection, InfoSection, PickupSection, SocialSection } from "@/components/organisms/HomeSections";
 import { getContentSnapshot, isActiveContent } from "@/lib/content/repository";
 import { toPublicContentItems } from "@/lib/content/presentation";
+
+export const metadata: Metadata = {
+  title: {
+    absolute: "pokenae",
+  },
+  description: "ポケモンに関するツール、Webアプリ、技術記事を公開する pokenae の公式サイトです。",
+};
 
 export default async function Home() {
   const snapshot = await getContentSnapshot();

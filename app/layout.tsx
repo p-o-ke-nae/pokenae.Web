@@ -32,6 +32,11 @@ export const metadata: Metadata = {
     template: "%s | pokenae",
   },
   description: "ポケモンに関するツール、Webアプリ、技術記事を公開する pokenae の公式サイトです。",
+  icons: {
+    icon: [{ url: "/pokenaeLogo.png", type: "image/png", sizes: "509x509" }],
+    shortcut: ["/pokenaeLogo.png"],
+    apple: [{ url: "/pokenaeLogo.png", type: "image/png", sizes: "509x509" }],
+  },
 };
 
 export default async function RootLayout({
