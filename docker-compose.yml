@@ -24,6 +24,10 @@ services:
       - nextauth_secret
       - google_client_id
       - google_client_secret
+      - admin_emails
+      - github_app_id
+      - github_app_installation_id
+      - github_app_private_key_base64
 
 # シークレット定義（secrets/ ディレクトリ内のファイルから読み取り）
 # secrets/ ディレクトリは .gitignore で除外されている
@@ -34,3 +38,11 @@ secrets:
     file: ./secrets/google_client_id
   google_client_secret:
     file: ./secrets/google_client_secret
+  admin_emails:
+    file: ./secrets/admin_emails
+  github_app_id:
+    file: ./secrets/github_app_id
+  github_app_installation_id:
+    file: ./secrets/github_app_installation_id
+  github_app_private_key_base64:
+    file: ./secrets/github_app_private_key_base64

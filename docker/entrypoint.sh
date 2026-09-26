@@ -6,6 +6,8 @@
 #   /run/secrets/nextauth_secret      → NEXTAUTH_SECRET
 #   /run/secrets/google_client_id     → GOOGLE_CLIENT_ID
 #   /run/secrets/google_client_secret → GOOGLE_CLIENT_SECRET
+#   /run/secrets/admin_emails → ADMIN_EMAILS
+#   /run/secrets/github_app_* → GITHUB_APP_*
 
 set -e
 

@@ -6,6 +6,8 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 - **[Google Auth Setup Guide](./docs/GOOGLE_AUTH_SETUP.md)** - Google OAuth2認証の設定ガイド（英語）
 - **[Google OAuth2認証機能について](./docs/GOOGLE_AUTH_SETUP_JA.md)** - Google OAuth2認証の詳細解説（日本語）
 - **[Kernel Stack Overflow Investigation](./docs/KERNEL_STACK_OVERFLOW_INVESTIGATION.md)** - スタックオーバーフロー問題の調査と修正レポート
+- **[コンテンツ・管理画面設定](./docs/CONTENT_AND_ADMIN_SETUP.md)** - pokenae.Content、GitHub App、管理者allowlist
+- **[Webアプリサービス契約](./docs/WEB_APP_SERVICE_CONTRACT.md)** - Google token proxy、version/capability検証
 
 ## Development & Coding Policy
 
@@ -17,19 +19,14 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+Docker Compose用の環境ファイルと`secrets/`を準備し、開発サーバーを起動します:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+copy .env.local.example .env.docker.debug
+docker compose -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml up --build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:5000](http://localhost:5000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

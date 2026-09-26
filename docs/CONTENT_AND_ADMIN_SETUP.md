@@ -1,0 +1,25 @@
+# コンテンツ・管理画面設定
+
+公開ページは `p-o-ke-nae/pokenae.Content` の `main` にある `content/posts`、`content/tools`、`content/home`、`content/updates` を Server Component から取得し、300秒キャッシュします。GitHub障害時は安全な組み込みfixtureへフォールバックします。
+
+ローカル・E2Eでは `.env.docker.debug` に `CONTENT_SOURCE=fixture` を明示してください。`reference/` は入力専用でGit管理対象外です。
+
+## 管理者
+
+1. Google OAuth2/NextAuthを通常どおり設定する。
+2. `ADMIN_EMAILS` に管理者メールを小文字・カンマ区切りで設定する。認証済みGoogleメールと正規化後に完全一致します。
+3. GitHub Appを `pokenae.Content` にインストールし、Contents: read/write、Pull requests: read/write のみを許可する。
+4. `GITHUB_APP_ID`、`GITHUB_APP_INSTALLATION_ID`、`GITHUB_APP_PRIVATE_KEY` を設定する。本番では秘密鍵をbase64化して `GITHUB_APP_PRIVATE_KEY_BASE64` に設定できます。
+
+管理APIは画面表示とは別に毎回再認可します。保存は `content/<slug>-<timestamp>` ブランチ、単一commit、Pull Requestを作成し、mainへ直接書き込みません。資格情報不足時は失敗として扱います。
+
+## GitHub Actions / VPS / ACA
+
+Repository/Environment Secrets:
+
+- `ADMIN_EMAILS`
+- `GITHUB_APP_ID`
+- `GITHUB_APP_INSTALLATION_ID`
+- `GITHUB_APP_PRIVATE_KEY_BASE64`
+
+公開設定 `CONTENT_REPOSITORY_OWNER`、`CONTENT_REPOSITORY_NAME`、`CONTENT_REPOSITORY_REF` はVariablesまたはCompose環境変数として注入します。秘密鍵はクライアント向け `NEXT_PUBLIC_*` に設定しないでください。

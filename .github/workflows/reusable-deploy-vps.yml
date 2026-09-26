@@ -33,6 +33,14 @@ on:
         required: true
       google_client_secret:
         required: true
+      admin_emails:
+        required: false
+      github_app_id:
+        required: false
+      github_app_installation_id:
+        required: false
+      github_app_private_key_base64:
+        required: false
 
 jobs:
   deploy:
@@ -90,6 +98,10 @@ jobs:
              printf '%s' '${{ secrets.nextauth_secret }}' > secrets/nextauth_secret && \
              printf '%s' '${{ secrets.google_client_id }}' > secrets/google_client_id && \
              printf '%s' '${{ secrets.google_client_secret }}' > secrets/google_client_secret && \
+             printf '%s' '${{ secrets.admin_emails }}' > secrets/admin_emails && \
+             printf '%s' '${{ secrets.github_app_id }}' > secrets/github_app_id && \
+             printf '%s' '${{ secrets.github_app_installation_id }}' > secrets/github_app_installation_id && \
+             printf '%s' '${{ secrets.github_app_private_key_base64 }}' > secrets/github_app_private_key_base64 && \
              chmod 644 secrets/*"
 
       - name: Deploy to VPS
