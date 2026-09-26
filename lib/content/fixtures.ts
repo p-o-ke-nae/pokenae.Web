@@ -1,0 +1,72 @@
+import type { ContentSnapshot } from "./types";
+
+export const contentFixture: ContentSnapshot = {
+  banners: [
+    { id: "welcome", image: "/mock/slide1.svg", alt: "pokenae ポケモン攻略ツール集", href: "/tools", order: 1 },
+    { id: "game-library", image: "/mock/slide2.svg", alt: "ゲームライブラリ Webアプリ", href: "/game-library", order: 2 },
+    { id: "blog", image: "/mock/slide3.svg", alt: "pokenae 技術ブログ", href: "/blog", order: 3 },
+  ],
+  announcements: [
+    { id: "site-renewal", text: "pokenae.com をリニューアルしました", href: "/blog/site-renewal", severity: "highlight" },
+    { id: "github", text: "公開ツールとライブラリは GitHub でも配布しています", href: "https://github.com/p-o-ke-nae", severity: "normal" },
+  ],
+  posts: [
+    {
+      slug: "site-renewal",
+      title: "pokenae.com リニューアルのお知らせ",
+      summary: "ツール、Webアプリ、ブログを探しやすい新しいサイトへ移行しました。",
+      publishedAt: "2026-09-26",
+      status: "published",
+      category: "お知らせ",
+      tags: ["pokenae"],
+      relatedTags: [],
+      priority: 100,
+      thumbnail: "/mock/card2.svg",
+      showInPickup: true,
+      body: "## 新しい pokenae.com\n\nツール配布、Webアプリ、技術記事を一つのサイトから利用できるようになりました。\n\n生の HTML や JavaScript は記事内で実行されません。",
+    },
+    {
+      slug: "collection-dex",
+      title: "第4世代 全国図鑑コレクション",
+      summary: "収集状況を地方や状態で絞り込めるショーケースです。",
+      publishedAt: "2026-09-25",
+      status: "published",
+      category: "showcase",
+      tags: ["ポケモン", "コレクション"],
+      relatedTags: ["ツール"],
+      priority: 90,
+      thumbnail: "/mock/card1.svg",
+      showInPickup: true,
+      embed: { component: "CollectionDex", data: "./collection-dex.json" },
+      body: "## CollectionDex\n\n以下は許可済みの CollectionDex コンポーネントです。\n\n{{CollectionDex}}",
+    },
+  ],
+  tools: [
+    {
+      slug: "blink-observer-tool",
+      name: "BlinkObserverTool",
+      summary: "映像の変化を認識して作業を支援する Windows アプリです。",
+      repository: "p-o-ke-nae/BlinkObserverTool",
+      kind: "windows-app",
+      supportedOs: ["Windows 10 以降 (x64)"],
+      releaseChannel: "stable",
+      image: "/mock/thumb1.svg",
+      showInPickup: true,
+      priority: 100,
+    },
+    {
+      slug: "generic-recognition-workbench",
+      name: "GenericRecognitionWorkbench",
+      summary: "認識処理を組み立てるための開発者向け .NET ライブラリです。",
+      repository: "p-o-ke-nae/GenericRecognitionWorkbench",
+      kind: "library",
+      packageUrl: "https://github.com/p-o-ke-nae/GenericRecognitionWorkbench/packages",
+      image: "/mock/thumb2.svg",
+      showInPickup: true,
+      priority: 80,
+    },
+  ],
+  updates: [
+    { id: "renewal", publishedAt: "2026-09-26", target: "site", summary: "サイト構成とデザインを刷新しました。", href: "/" },
+  ],
+};

@@ -4,6 +4,12 @@ const nextConfig: NextConfig = {
   /* config options here */
   // 【必須】Docker用の自己完結型ビルド
   output: 'standalone',
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'raw.githubusercontent.com' },
+      { protocol: 'https', hostname: 'github.com' },
+    ],
+  },
   
   // 開発環境でのカーネルスタック問題の軽減
   // ファイル監視とメモリ管理の最適化
