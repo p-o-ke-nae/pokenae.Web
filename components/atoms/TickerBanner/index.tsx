@@ -24,7 +24,6 @@ export default function TickerBanner({
 }: TickerBannerProps) {
 	const trackRef = useRef<HTMLDivElement>(null);
 	const [duration, setDuration] = useState<number>(30);
-	const [paused, setPaused] = useState(false);
 
 	// シームレスループのためにアイテムを複製する倍数
 	const DUPLICATION_FACTOR = 2;
@@ -54,15 +53,15 @@ export default function TickerBanner({
 					ref={trackRef}
 					className="ticker__track"
 					style={{ animationDuration: `${duration}s` }}
-					data-paused={paused}
 				>
 					{allItems.map((item, index) => (
 						<span
 							key={`${item.id}-${index}`}
 							className={`ticker__item${item.highlighted ? ' ticker__item--highlighted' : ''}`}
+							aria-hidden={index >= items.length ? true : undefined}
 						>
 							{item.href ? (
-								<a href={item.href} className="ticker__link">
+								<a href={item.href} className="ticker__link" tabIndex={index >= items.length ? -1 : undefined}>
 									{item.text}
 								</a>
 							) : (
@@ -71,9 +70,6 @@ export default function TickerBanner({
 						</span>
 					))}
 				</div>
-				<button type="button" className="ticker__pause" onClick={() => setPaused((value) => !value)}>
-					{paused ? "ニュースを再生" : "ニュースを停止"}
-				</button>
 			</div>
 
 			<style jsx>{`
@@ -83,17 +79,19 @@ export default function TickerBanner({
 					color: #f0f0f0;
 					overflow: hidden;
 					position: relative;
-					border-top: 8px solid var(--color-accent-25);
-					border-bottom: 8px solid var(--color-accent-25);
+					border: solid 7px var(--color-accent-25);
+					border-inline-width: 30px;
+					border-radius: 5px;
+					margin-bottom: 15px;
 				}
-				.ticker__track[data-paused=true] { animation-play-state:paused; }
-				.ticker__pause { position:absolute; right:.5rem; top:50%; transform:translateY(-50%); z-index:2; min-height:36px; border:1px solid #fff; border-radius:.25rem; color:#fff; background:#292538; padding:.25rem .55rem; }
 
 				.ticker__track {
 					display: inline-flex;
 					white-space: nowrap;
-					gap: 5rem;
-					padding: 1rem 0;
+					gap: 50px;
+					padding: 4px 0;
+					min-height: 30px;
+					align-items: center;
 					animation: ticker-scroll linear infinite;
 				}
 
@@ -107,7 +105,7 @@ export default function TickerBanner({
 				}
 
 				.ticker__item {
-					font-size: 1rem;
+					font-size: 20px;
 					font-weight: 700;
 					flex-shrink: 0;
 				}
@@ -133,8 +131,12 @@ export default function TickerBanner({
 					text-decoration-color: currentColor;
 				}
 				@media (prefers-reduced-motion: reduce) {
-					.ticker__track { animation:none; display:flex; flex-wrap:wrap; white-space:normal; padding-right:9rem; gap:.5rem 1.5rem; }
+					.ticker__track { animation:none; display:flex; flex-wrap:wrap; white-space:normal; gap:.5rem 1.5rem; }
 					.ticker__item:nth-child(n + ${items.length + 1}) { display:none; }
+				}
+				@media (max-width: 640px) {
+					.ticker { border-inline-width: 12px; }
+					.ticker__item { font-size: 1rem; }
 				}
 			`}</style>
 		</>

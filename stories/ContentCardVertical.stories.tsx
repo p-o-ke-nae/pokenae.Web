@@ -17,7 +17,7 @@ export const Default: Story = {
   args: {
     id: 'card-1',
     title: '自動認識対応個体値特定ツールでポケモンの個体値を判定する',
-    date: '2024年03月23日',
+    publishedAt: '2024-03-23T09:00:00+09:00',
     imageSrc: '/mock/card1.svg',
     imageAlt: 'pokenaeロゴ',
     href: '#',
@@ -36,7 +36,7 @@ export const WithoutTag: Story = {
   args: {
     id: 'card-2',
     title: 'SVサントラ発売記念！特別コンテンツを公開',
-    date: '2023年12月01日',
+    publishedAt: '2023-12-01',
     imageSrc: '/mock/card2.svg',
     imageAlt: 'SVサントラのサムネイル',
     href: '#',
@@ -63,7 +63,7 @@ export const Grid: Story = {
       <ContentCardVertical
         id="card-1"
         title="自動認識対応個体値特定ツールでポケモンの個体値を判定する"
-        date="2024年03月23日"
+        publishedAt="2024-03-23"
         imageSrc="/mock/card1.svg"
         imageAlt="pokenaeロゴ"
         href="#"
@@ -72,7 +72,7 @@ export const Grid: Story = {
       <ContentCardVertical
         id="card-2"
         title="SVサントラ発売記念！特別コンテンツを公開"
-        date="2023年12月01日"
+        publishedAt="2023-12-01"
         imageSrc="/mock/card2.svg"
         imageAlt="SVサントラのサムネイル"
         href="#"
@@ -81,7 +81,7 @@ export const Grid: Story = {
       <ContentCardVertical
         id="card-3"
         title="擬似学習アルゴリズムによる捕獲確率計算の解説"
-        date="2024年02月10日"
+        publishedAt="2024-02-10"
         imageSrc="/mock/card3.svg"
         imageAlt="擬似学習の解説サムネイル"
         href="#"
@@ -90,7 +90,7 @@ export const Grid: Story = {
       <ContentCardVertical
         id="card-4"
         title="ver3シリーズ発表！新機能まとめ"
-        date="2024年03月01日"
+        publishedAt="2024-03-01"
         imageSrc="/mock/card4.svg"
         imageAlt="ver3シリーズのサムネイル"
         href="#"
@@ -101,7 +101,7 @@ export const Grid: Story = {
   args: {
     id: '',
     title: '',
-    date: '',
+    publishedAt: '2024-01-01',
     imageSrc: '',
     imageAlt: '',
     href: '',

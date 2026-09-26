@@ -2,28 +2,35 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { formatContentDate } from '@/lib/content/presentation';
+
+type ContentCardMetadata =
+	| { publishedAt: string; metaLabel?: never }
+	| { publishedAt?: never; metaLabel: string };
 
 export type ContentCardHorizontalProps = {
 	id: string;
 	title: string;
 	description: string;
-	date: string;
 	imageSrc: string;
 	imageAlt: string;
 	href: string;
-};
+	variant?: 'default' | 'compact';
+} & ContentCardMetadata;
 
 export default function ContentCardHorizontal({
 	title,
 	description,
-	date,
+	publishedAt,
+	metaLabel,
 	imageSrc,
 	imageAlt,
 	href,
+	variant = 'default',
 }: ContentCardHorizontalProps) {
 	return (
 		<>
-			<Link href={href} className="card-h">
+			<Link href={href} className={`card-h card-h--${variant}`}>
 				<div className="card-h__image-wrap">
 					<Image
 						src={imageSrc}
@@ -37,20 +44,18 @@ export default function ContentCardHorizontal({
 				<div className="card-h__body">
 					<h3 className="card-h__title">{title}</h3>
 					<p className="card-h__description">{description}</p>
-					<time className="card-h__date" dateTime={date}>
-						{date}
-					</time>
+					{publishedAt
+						? <time className="card-h__meta" dateTime={publishedAt}>{formatContentDate(publishedAt)}</time>
+						: <span className="card-h__meta">{metaLabel}</span>}
 				</div>
 			</Link>
 
-		<style jsx>{`
+		<style jsx global>{`
 			.card-h {
 				display: flex;
 				flex-direction: row;
 				background: var(--background);
 				border: 2px solid var(--color-base-70-dark);
-				border-top: 5px solid var(--color-accent-25);
-				border-radius: 0.5rem;
 				text-decoration: none;
 				overflow: hidden;
 				transition:
@@ -58,9 +63,19 @@ export default function ContentCardHorizontal({
 					transform 0.2s ease;
 			}
 
-			.card-h:hover {
-				box-shadow: 0 4px 16px rgba(170, 133, 167, 0.2);
+			.card-h:focus-visible {
+				border-color: var(--color-accent-25-strong);
+				box-shadow: 0 6px 18px rgba(121, 85, 118, 0.28);
 				transform: translateY(-2px);
+			}
+			.card-h:focus-visible .card-h__title { color: var(--color-accent-25-strong); }
+			@media (hover: hover) {
+				.card-h:hover {
+					border-color: var(--color-accent-25-strong);
+					box-shadow: 0 6px 18px rgba(121, 85, 118, 0.28);
+					transform: translateY(-2px);
+				}
+				.card-h:hover .card-h__title { color: var(--color-accent-25-strong); }
 			}
 
 			.card-h__image-wrap {
@@ -107,13 +122,18 @@ export default function ContentCardHorizontal({
 				overflow: hidden;
 			}
 
-			.card-h__date {
+			.card-h__meta {
 				font-size: 0.8rem;
 				color: var(--foreground);
 				opacity: 0.5;
 				margin-top: auto;
 				white-space: nowrap;
 			}
+			.card-h--compact .card-h__image-wrap { flex-basis: 38%; min-height: 96px; }
+			.card-h--compact .card-h__body { gap: .25rem; padding: .6rem; }
+			.card-h--compact .card-h__title { font-size: .85rem; -webkit-line-clamp: 2; }
+			.card-h--compact .card-h__description { font-size: .75rem; line-height: 1.4; -webkit-line-clamp: 1; }
+			.card-h--compact .card-h__meta { font-size: .7rem; }
 		`}</style>
 		</>
 	);

@@ -31,6 +31,9 @@ const tool = {
   showInPickup: true,
   priority: 100,
 };
+const homeSchema = JSON.stringify({ type: "array" });
+const toolSchema = JSON.stringify({ type: "object" });
+const updateSchema = JSON.stringify({ type: "object" });
 
 describe("GitHub content snapshot", () => {
   beforeEach(() => vi.restoreAllMocks());
@@ -50,11 +53,21 @@ describe("GitHub content snapshot", () => {
             { path: "content/home/banners.json", type: "blob", sha: "1" },
             { path: "content/home/announcements.json", type: "blob", sha: "2" },
             { path: "content/images/ignored.png", type: "blob", sha: "3" },
+            { path: "schemas/home.schema.json", type: "blob", sha: "4" },
+            { path: "schemas/tool.schema.json", type: "blob", sha: "5" },
+            { path: "schemas/update.schema.json", type: "blob", sha: "6" },
+            { path: "fixtures/tags.json", type: "blob", sha: "7" },
           ],
         });
       }
       expect(url).toContain("/commit-revision/");
-      const text = url.endsWith("banners.json") ? JSON.stringify(banners) : JSON.stringify(announcements);
+      const text = url.endsWith("banners.json")
+        ? JSON.stringify(banners)
+        : url.endsWith("announcements.json")
+          ? JSON.stringify(announcements)
+          : url.endsWith("tags.json")
+            ? JSON.stringify(["pokemon"])
+          : "{}";
       expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer installation-token");
       return new Response(text, { status: 200 });
     });
@@ -62,7 +75,8 @@ describe("GitHub content snapshot", () => {
     const snapshot = await fetchRepositoryFiles(fetcher, "installation-token");
 
     expect(snapshot.revision).toBe("commit-revision");
-    expect(snapshot.files.size).toBe(2);
+    expect(snapshot.files.size).toBe(6);
+    expect(snapshot.paths).toContain("content/images/ignored.png");
     expect(fetcher.mock.calls.filter(([url]) => String(url).includes("api.github.com")).length).toBe(2);
     expect(new Headers(fetcher.mock.calls[0][1]?.headers).get("Authorization")).toBe("Bearer installation-token");
   });
@@ -79,6 +93,12 @@ describe("GitHub content snapshot", () => {
       ["content/home/banners.json", JSON.stringify(banners)],
       ["content/home/announcements.json", JSON.stringify(announcements)],
       ["content/tools/sample-tool.json", JSON.stringify(tool)],
+      ["schemas/home.schema.json", homeSchema],
+      ["schemas/tool.schema.json", toolSchema],
+      ["schemas/update.schema.json", updateSchema],
+      ["fixtures/tags.json", JSON.stringify(["0001"])],
+      ["fixtures/tag-labels.json", JSON.stringify({ "0001": "ポケモン" })],
+      ["content/posts/sample-post/index.md", "---\nslug: sample-post\n---\n\n![画像](./images/sample.webp)\n"],
     ]);
 
     const snapshot = parseContentAdminSnapshot(files, "base-tree-sha");
@@ -86,7 +106,100 @@ describe("GitHub content snapshot", () => {
     expect(snapshot.revision).toBe("base-tree-sha");
     expect(snapshot.banners).toEqual(banners);
     expect(snapshot.announcements).toEqual(announcements);
-    expect(snapshot.tools).toEqual([tool]);
+    expect(snapshot.tools).toEqual([{ ...tool, tags: [] }]);
     expect(snapshot.toolPaths).toEqual(["content/tools/sample-tool.json"]);
+    expect(snapshot.tags).toEqual([{ id: "000001", label: "ポケモン" }]);
+    expect(snapshot.postSources).toEqual([{
+      path: "content/posts/sample-post/index.md",
+      source: "---\nslug: sample-post\n---\n\n![画像](./images/sample.webp)\n",
+    }]);
+    expect(snapshot.schemas).toEqual({ home: homeSchema, tool: toolSchema, update: updateSchema });
+  });
+
+  it("uses the first Markdown image as the public post thumbnail", async () => {
+    const { parseContentSnapshot } = await import("./repository");
+    const files = new Map([
+      ["content/home/banners.json", JSON.stringify([])],
+      ["content/home/announcements.json", JSON.stringify([])],
+      ["fixtures/tags.json", JSON.stringify([])],
+      ["content/posts/sample-post/index.md", `---
+slug: sample-post
+title: サンプル記事
+summary: 概要
+publishedAt: "2026-09-26"
+status: published
+category: blog
+tags: []
+relatedTags: []
+priority: 1
+thumbnail: /mock/should-not-be-used.svg
+showInPickup: false
+---
+
+本文の前置き。
+
+![最初の画像](./images/first.png)
+
+![次の画像](./images/second.png)
+`],
+    ]);
+
+    const snapshot = parseContentSnapshot(files, "base-revision");
+
+    expect(snapshot.posts[0]?.thumbnail).toBe(
+      "https://raw.githubusercontent.com/p-o-ke-nae/pokenae.Content/base-revision/content/posts/sample-post/images/first.png",
+    );
+  });
+
+  it("accepts null optional URLs and normalizes legacyUrl", async () => {
+    const { parseContentSnapshot } = await import("./repository");
+    const files = new Map([
+      ["content/home/banners.json", JSON.stringify([])],
+      ["content/home/announcements.json", JSON.stringify([])],
+      ["fixtures/tags.json", JSON.stringify([])],
+      ["content/posts/sample-post/index.md", `---
+slug: sample-post
+title: サンプル記事
+summary: 概要
+publishedAt: "2026-09-26"
+status: published
+category: blog
+tags: []
+relatedTags: []
+priority: 1
+thumbnail: null
+legacyUrl: null
+showInPickup: false
+---
+
+本文です。
+`],
+    ]);
+
+    const snapshot = parseContentSnapshot(files, "base-revision");
+
+    expect(snapshot.posts[0]).toMatchObject({ slug: "sample-post", legacyUrl: undefined, thumbnail: undefined });
+  });
+
+  it("parses app updates from the canonical content snapshot", async () => {
+    const { parseContentSnapshot } = await import("./repository");
+    const update = {
+      id: "apps-and-tag-ids-20260927",
+      publishedAt: "2026-09-27T06:55:30.147+09:00",
+      target: "app",
+      summary: "Webアプリ情報を正本化しました。",
+      href: "/apps",
+      visible: false,
+    };
+    const files = new Map([
+      ["content/home/banners.json", JSON.stringify([])],
+      ["content/home/announcements.json", JSON.stringify([])],
+      ["content/updates/apps-and-tag-ids-20260927.json", JSON.stringify(update)],
+      ["fixtures/tags.json", JSON.stringify([])],
+    ]);
+
+    const snapshot = parseContentSnapshot(files, "base-revision");
+
+    expect(snapshot.updates).toEqual([{ ...update, skipInfo: true }]);
   });
 });

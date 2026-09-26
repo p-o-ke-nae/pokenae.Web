@@ -2,20 +2,25 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { formatContentDate } from '@/lib/content/presentation';
+
+type ContentCardMetadata =
+	| { publishedAt: string; metaLabel?: never }
+	| { publishedAt?: never; metaLabel: string };
 
 export type ContentCardVerticalProps = {
 	id: string;
 	title: string;
-	date: string;
 	imageSrc: string;
 	imageAlt: string;
 	href: string;
 	tag?: string;
-};
+} & ContentCardMetadata;
 
 export default function ContentCardVertical({
 	title,
-	date,
+	publishedAt,
+	metaLabel,
 	imageSrc,
 	imageAlt,
 	href,
@@ -37,19 +42,18 @@ export default function ContentCardVertical({
 				</div>
 				<div className="card-v__body">
 					<h3 className="card-v__title">{title}</h3>
-					<time className="card-v__date" dateTime={date}>
-						{date}
-					</time>
+					{publishedAt
+						? <time className="card-v__meta" dateTime={publishedAt}>{formatContentDate(publishedAt)}</time>
+						: <span className="card-v__meta">{metaLabel}</span>}
 				</div>
 			</Link>
 
-			<style jsx>{`
+			<style jsx global>{`
 				.card-v {
 					display: flex;
 					flex-direction: column;
 					background: var(--background);
 					border: 1px solid var(--color-base-70);
-					border-radius: 0.5rem;
 					overflow: hidden;
 					text-decoration: none;
 					transition:
@@ -57,9 +61,19 @@ export default function ContentCardVertical({
 						transform 0.2s ease;
 				}
 
-				.card-v:hover {
-					box-shadow: 0 4px 16px rgba(170, 133, 167, 0.2);
+				.card-v:focus-visible {
+					border-color: var(--color-accent-25-strong);
+					box-shadow: 0 6px 18px rgba(121, 85, 118, 0.28);
 					transform: translateY(-2px);
+				}
+				.card-v:focus-visible .card-v__title { color: var(--color-accent-25-strong); }
+				@media (hover: hover) {
+					.card-v:hover {
+						border-color: var(--color-accent-25-strong);
+						box-shadow: 0 6px 18px rgba(121, 85, 118, 0.28);
+						transform: translateY(-2px);
+					}
+					.card-v:hover .card-v__title { color: var(--color-accent-25-strong); }
 				}
 
 				.card-v__image-wrap {
@@ -96,7 +110,7 @@ export default function ContentCardVertical({
 					line-height: 1.5;
 				}
 
-				.card-v__date {
+				.card-v__meta {
 					font-size: 0.75rem;
 					color: var(--foreground);
 					opacity: 0.5;

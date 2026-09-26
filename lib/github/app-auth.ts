@@ -32,7 +32,7 @@ function readCredentials(): GitHubAppCredentials | undefined {
   }
 
   const privateKey = directPrivateKey
-    ?? (encodedKey ? Buffer.from(encodedKey, "base64").toString("utf8") : undefined);
+    ?? (encodedKey ? decodeBase64PrivateKey(encodedKey) : undefined);
   const configured = [appId, installationId, privateKey].filter(Boolean).length;
   if (configured === 0) return undefined;
   if (configured !== 3) throw new Error("GitHub App の資格情報が一部だけ設定されています。");
@@ -41,6 +41,18 @@ function readCredentials(): GitHubAppCredentials | undefined {
     throw new Error("GITHUB_APP_INSTALLATION_ID が不正です。");
   }
   return { appId: appId!, installationId: parsedInstallationId, privateKey: privateKey!.replace(/\\n/g, "\n") };
+}
+
+function decodeBase64PrivateKey(encodedKey: string): string {
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(encodedKey) || encodedKey.length % 4 !== 0) {
+    throw new Error("GITHUB_APP_PRIVATE_KEY_BASE64 はPEM秘密鍵全体をbase64化した値で設定してください。");
+  }
+
+  const privateKey = Buffer.from(encodedKey, "base64").toString("utf8").replace(/\\n/g, "\n");
+  if (!privateKey.includes("-----BEGIN ") || !privateKey.includes(" PRIVATE KEY-----")) {
+    throw new Error("GITHUB_APP_PRIVATE_KEY_BASE64 の復号結果がPEM秘密鍵ではありません。");
+  }
+  return privateKey;
 }
 
 export async function getOptionalInstallationToken(): Promise<string | undefined> {

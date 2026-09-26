@@ -1,39 +1,60 @@
-import Link from "next/link";
-import CustomHeader from "@/components/atoms/CustomHeader";
-import { primaryNavigation, socialLinks } from "@/lib/config/site";
+'use client';
 
-export default function Sidebar() {
+import ContentCardHorizontal from "@/components/molecules/ContentCardHorizontal";
+import CustomHeader from "@/components/atoms/CustomHeader";
+import {
+  selectPickupItems,
+  selectRelatedItems,
+  type PublicContentItem,
+} from "@/lib/content/presentation";
+
+export default function Sidebar({
+  items,
+  pathname,
+}: {
+  items: PublicContentItem[];
+  pathname: string;
+}) {
+  const pickup = selectPickupItems(items, 4);
+  const related = selectRelatedItems(items, pathname, 4);
+
+  if (!pickup.length && !related.length) return null;
+
   return (
-    <aside className="sidebar" aria-label="サイト案内">
-      <section className="sidebar__section">
-        <CustomHeader level={2} variant="subtle">MENU</CustomHeader>
-        <nav aria-label="サイドメニュー">
-          <ul className="sidebar__links">
-            {primaryNavigation.map((item) => (
-              <li key={item.href}><Link href={item.href}>{item.label}</Link></li>
-            ))}
-          </ul>
-        </nav>
-      </section>
-      <section className="sidebar__section">
-        <CustomHeader level={2} variant="subtle">SNS</CustomHeader>
-        <ul className="sidebar__links">
-          {socialLinks.map((item) => (
-            <li key={item.label}>
-              <a href={item.href} target="_blank" rel="noreferrer">{item.label}</a>
-            </li>
-          ))}
-        </ul>
-      </section>
-      <style>{`
-        .sidebar { display:grid; gap:1rem; }
-        .sidebar__section { border:1px solid var(--color-base-70); border-top:5px solid var(--color-accent-25); padding:1rem; background:#fff; box-shadow:var(--shadow-card); }
-        .sidebar__section .custom-header { margin:0 0 .75rem; }
-        .sidebar__links { list-style:none; padding:0; margin:0; display:grid; }
-        .sidebar__links li + li { border-top:1px dotted var(--color-base-70-dark); }
-        .sidebar__links a { display:block; padding:.65rem .25rem; color:var(--color-text-strong); text-decoration:none; font-weight:650; }
-        .sidebar__links a:hover { color:var(--color-accent-25-strong); }
+    <aside className="sidebar" aria-label="おすすめコンテンツ">
+      {pickup.length > 0 && <SidebarSection title="PICKUP" items={pickup} />}
+      {related.length > 0 && <SidebarSection title="関連アイテム" items={related} />}
+      <style jsx>{`
+        .sidebar { display:grid; gap:1.5rem; min-width:0; }
       `}</style>
     </aside>
   );
+}
+
+function SidebarSection({ title, items }: { title: string; items: PublicContentItem[] }) {
+  return <section className="sidebar__section">
+    <CustomHeader level={2} variant="subtle">{title}</CustomHeader>
+    <div className="sidebar__items">
+      {items.map((item) => <SidebarCard key={item.id} item={item} />)}
+    </div>
+    <style jsx>{`
+      .sidebar__section { display:grid; gap:.75rem; min-width:0; }
+      .sidebar__items { display:grid; gap:.75rem; }
+    `}</style>
+  </section>;
+}
+
+function SidebarCard({ item }: { item: PublicContentItem }) {
+  const shared = {
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    imageSrc: item.imageSrc,
+    imageAlt: item.imageAlt,
+    href: item.href,
+    variant: "compact" as const,
+  };
+  return item.publishedAt
+    ? <ContentCardHorizontal {...shared} publishedAt={item.publishedAt} />
+    : <ContentCardHorizontal {...shared} metaLabel={item.metaLabel ?? item.source} />;
 }

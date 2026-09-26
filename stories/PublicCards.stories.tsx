@@ -9,7 +9,7 @@ const meta = {
     id: "sample",
     title: "長いタイトルでもカードの比率と読みやすさを維持するコンテンツ",
     description: "ツール、記事、Webアプリで共通利用する横型カードです。",
-    date: "2026-09-26",
+    publishedAt: "2026-09-26",
     imageSrc: "/mock/thumb1.svg",
     imageAlt: "",
     href: "/tools",

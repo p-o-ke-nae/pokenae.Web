@@ -165,11 +165,3 @@ export async function getValidatedToolRelease(tool: ToolDefinition): Promise<Too
 
   return { available: true, manifest, installerUrl: installer.browser_download_url, checksumUrl: checksum.browser_download_url };
 }
-
-export async function getRepositoryReadme(repository: string) {
-  const response = await fetch(`https://api.github.com/repos/${repository}/readme`, {
-    headers: { Accept: "application/vnd.github.raw+json", "X-GitHub-Api-Version": "2022-11-28" },
-    next: { revalidate: 900 },
-  });
-  return response.ok ? response.text() : "";
-}

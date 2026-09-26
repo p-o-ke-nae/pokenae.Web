@@ -28,7 +28,6 @@ export default function ImageSlideshow({
 	className = '',
 }: ImageSlideshowProps) {
 	const [currentIndex, setCurrentIndex] = useState(0);
-	const [paused, setPaused] = useState(false);
 	const touchStartX = useRef<number | null>(null);
 
 	const goTo = useCallback(
@@ -40,12 +39,12 @@ export default function ImageSlideshow({
 
 	// 自動送り
 	useEffect(() => {
-		if (slides.length <= 1 || paused) return;
+		if (slides.length <= 1) return;
 		const timer = setInterval(() => {
 			setCurrentIndex((prev) => (prev + 1) % slides.length);
 		}, interval);
 		return () => clearInterval(timer);
-	}, [slides.length, interval, paused]);
+	}, [slides.length, interval]);
 
 	// スワイプ開始
 	const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -119,13 +118,6 @@ export default function ImageSlideshow({
 							))}
 						</div>
 					)}
-					{slides.length > 1 && (
-						<div className="slideshow__controls">
-							<button type="button" onClick={() => goTo((currentIndex - 1 + slides.length) % slides.length)} aria-label="前のスライド">‹</button>
-							<button type="button" onClick={() => setPaused((value) => !value)}>{paused ? "再生" : "停止"}</button>
-							<button type="button" onClick={() => goTo((currentIndex + 1) % slides.length)} aria-label="次のスライド">›</button>
-						</div>
-					)}
 				</div>
 
 				{/* サムネイル一覧 */}
@@ -186,8 +178,6 @@ export default function ImageSlideshow({
 					height: 100%;
 				}
 				.slideshow__link { display:block; position:relative; width:100%; height:100%; }
-				.slideshow__controls { position:absolute; right:.75rem; bottom:.65rem; z-index:11; display:flex; gap:.3rem; }
-				.slideshow__controls button { min-width:36px; min-height:36px; border:1px solid rgba(255,255,255,.8); border-radius:.25rem; background:rgba(25,25,30,.78); color:#fff; font-weight:700; }
 
 				.slideshow__dots {
 					position: absolute;

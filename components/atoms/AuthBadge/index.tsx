@@ -1,86 +1,151 @@
 'use client';
 
-/**
- * AuthBadge - 認証状態バッジコンポーネント
- * ログイン状態に応じてユーザー名とログアウトボタン、または未ログイン時はログインボタンを表示
- */
-
+import Image from 'next/image';
+import { useState } from 'react';
 import { signOut, signIn } from 'next-auth/react';
 
 export interface AuthBadgeProps {
   isAuthenticated: boolean;
   userName?: string;
   userEmail?: string;
+  userImage?: string;
+  menuOpen: boolean;
+  onMenuToggle: () => void;
+  onMenuClose: () => void;
   className?: string;
 }
 
-export default function AuthBadge({ isAuthenticated, userName, userEmail, className = '' }: AuthBadgeProps) {
-  const handleSignOut = async () => {
-    await signOut({ callbackUrl: '/' });
-  };
+export default function AuthBadge({
+  isAuthenticated,
+  userName,
+  userEmail,
+  userImage,
+  menuOpen,
+  onMenuToggle,
+  onMenuClose,
+  className = '',
+}: AuthBadgeProps) {
+  const [failedImage, setFailedImage] = useState<string | null>(null);
+  const imageAvailable = Boolean(userImage && failedImage !== userImage);
 
   const handleSignIn = () => {
     signIn('google', { callbackUrl: window.location.href });
   };
 
-  // 未ログイン時：ログインボタンを表示
   if (!isAuthenticated) {
     return (
-      <button
-        onClick={handleSignIn}
-        className={`inline-flex items-center justify-center md:justify-start px-2 py-2 md:px-4 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${className}`}
-        aria-label="Googleでログイン"
-      >
-        <svg 
-          className="w-4 h-4 md:mr-2 shrink-0" 
-          fill="currentColor" 
-          viewBox="0 0 24 24"
-          aria-hidden="true"
+      <>
+        <button
+          type="button"
+          onClick={handleSignIn}
+          className={`auth-badge__login ${className}`}
+          aria-label="Googleでログイン"
         >
-          <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
-        </svg>
-        <span className="hidden md:inline">Googleでログイン</span>
-      </button>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
+          </svg>
+          <span>Googleでログイン</span>
+        </button>
+        <style jsx>{`
+          .auth-badge__login {
+            min-height:44px;
+            display:inline-flex;
+            align-items:center;
+            gap:.5rem;
+            padding:.45rem .75rem;
+            border:0;
+            border-radius:.3rem;
+            color:#fff;
+            background:#2563eb;
+            font:inherit;
+            font-size:.875rem;
+            font-weight:700;
+            white-space:nowrap;
+          }
+          .auth-badge__login:hover { background:#1d4ed8; }
+          svg { width:1rem; height:1rem; fill:currentColor; }
+          @media(max-width:520px) {
+            .auth-badge__login { width:44px; padding:0; justify-content:center; }
+            span { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+          }
+        `}</style>
+      </>
     );
   }
 
-  // ログイン時：ユーザー情報とログアウトボタンを表示
-  return (
-    <div className={`flex items-center gap-2 md:gap-3 ${className}`}>
-      {/* ユーザー情報（スマホでは非表示） */}
-      <div className="hidden md:flex flex-col items-end">
-        <span className="text-sm font-medium text-zinc-900 dark:text-white">
-          {userName || 'ユーザー'}
-        </span>
-        {userEmail && (
-          <span className="text-xs text-zinc-600 dark:text-zinc-400">
-            {userEmail}
-          </span>
-        )}
-      </div>
+  const fallback = (userName || userEmail || 'U').trim().charAt(0).toLocaleUpperCase();
+  const label = userName ? `${userName}のアカウントメニュー` : 'アカウントメニュー';
 
-      {/* ログアウトボタン */}
+  return (
+    <div className={`auth-badge ${className}`}>
       <button
-        onClick={handleSignOut}
-        className="inline-flex items-center justify-center md:justify-start px-2 py-2 md:px-3 md:py-1.5 rounded-md text-sm font-medium text-white bg-zinc-600 hover:bg-zinc-700 dark:bg-zinc-700 dark:hover:bg-zinc-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-zinc-500"
-        aria-label="ログアウト"
+        type="button"
+        className="auth-badge__trigger"
+        onClick={onMenuToggle}
+        aria-label={label}
+        aria-haspopup="true"
+        aria-expanded={menuOpen}
+        aria-controls="account-menu"
       >
-        <svg 
-          className="w-4 h-4 md:mr-1.5 shrink-0" 
-          fill="none" 
-          stroke="currentColor" 
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            strokeWidth={2} 
-            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" 
-          />
-        </svg>
-        <span className="hidden md:inline">ログアウト</span>
+        {userImage && imageAvailable
+          ? <Image src={userImage} alt="" fill sizes="44px" onError={() => setFailedImage(userImage)} />
+          : <span aria-hidden="true">{fallback}</span>}
       </button>
+      {menuOpen && <div id="account-menu" className="auth-badge__menu">
+        <button
+          type="button"
+          onClick={async () => {
+            onMenuClose();
+            await signOut({ callbackUrl: '/' });
+          }}
+        >
+          ログアウト
+        </button>
+      </div>}
+      <style jsx>{`
+        .auth-badge { position:relative; display:flex; }
+        .auth-badge__trigger {
+          position:relative;
+          width:44px;
+          height:44px;
+          overflow:hidden;
+          display:grid;
+          place-items:center;
+          border:2px solid var(--color-accent-25);
+          border-radius:50%;
+          color:#fff;
+          background:var(--color-accent-25-strong);
+          font:inherit;
+          font-weight:800;
+        }
+        .auth-badge__trigger:hover { border-color:var(--color-text-strong); }
+        .auth-badge__trigger :global(img) { object-fit:cover; }
+        .auth-badge__menu {
+          position:absolute;
+          top:calc(100% + .5rem);
+          right:0;
+          z-index:70;
+          min-width:10rem;
+          padding:.35rem;
+          border:1px solid var(--color-base-70-dark);
+          border-radius:.3rem;
+          background:#fff;
+          box-shadow:var(--shadow-card);
+        }
+        .auth-badge__menu button {
+          width:100%;
+          min-height:44px;
+          padding:.55rem .75rem;
+          border:0;
+          border-radius:.2rem;
+          color:var(--color-text-strong);
+          background:#fff;
+          font:inherit;
+          font-weight:700;
+          text-align:left;
+        }
+        .auth-badge__menu button:hover { color:var(--color-accent-25-strong); background:var(--color-base-70-light); }
+      `}</style>
     </div>
   );
 }

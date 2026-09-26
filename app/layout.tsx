@@ -6,7 +6,10 @@ import SessionProvider from "@/components/organisms/SessionProvider";
 import Footer from "@/components/organisms/Footer";
 import TrialImportDialog from "@/components/molecules/TrialImportDialog";
 import { LoadingOverlayProvider } from "@/contexts/LoadingOverlayContext";
-import Sidebar from "@/components/organisms/Sidebar";
+import SiteFrame from "@/components/organisms/SiteFrame";
+import { toPublicContentItems } from "@/lib/content/presentation";
+import { getContentSnapshot } from "@/lib/content/repository";
+import { getAdminAuthorization } from "@/lib/auth/admin";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,11 +34,17 @@ export const metadata: Metadata = {
   description: "ポケモンに関するツール、Webアプリ、技術記事を公開する pokenae の公式サイトです。",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const [{ posts, tagDefinitions, tools, apps, banners, announcements, updates }, adminAuthorization] = await Promise.all([
+    getContentSnapshot(),
+    getAdminAuthorization(),
+  ]);
+  const contentItems = toPublicContentItems({ posts, tagDefinitions, tools, apps, banners, announcements, updates });
+
   return (
     <html lang="ja" suppressHydrationWarning>
       <body
@@ -47,13 +56,8 @@ export default function RootLayout({
             <a className="skip-link" href="#main-content">
               本文へ移動
             </a>
-            <NavigationBar />
-            <div className="site-frame">
-              <div id="main-content" className="site-frame__content">
-                {children}
-              </div>
-              <Sidebar />
-            </div>
+            <NavigationBar isAdmin={adminAuthorization.authorized} />
+            <SiteFrame contentItems={contentItems}>{children}</SiteFrame>
             <Footer />
             <TrialImportDialog />
           </LoadingOverlayProvider>

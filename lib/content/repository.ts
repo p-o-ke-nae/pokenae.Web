@@ -6,14 +6,17 @@ import { contentAdminFixture, contentFixture } from "./fixtures";
 import {
   announcementContentSchema,
   announcementSchema,
+  appSchema,
   bannerContentSchema,
   bannerSchema,
   postFrontmatterSchema,
+  tagDefinitionListSchema,
   toolContentSchema,
   toolSchema,
   updateSchema,
 } from "./schemas";
-import type { CollectionDexRecord, ContentSnapshot, Post } from "./types";
+import type { CollectionDexRecord, ContentSnapshot, Post, TagDefinition } from "./types";
+import type { RepositoryMarkdownContext } from "../tools/readme-urls";
 
 const OWNER = process.env.CONTENT_REPOSITORY_OWNER ?? "p-o-ke-nae";
 const REPOSITORY = process.env.CONTENT_REPOSITORY_NAME ?? "pokenae.Content";
@@ -32,13 +35,21 @@ type GitHubCommit = {
 
 export type ContentAdminSnapshot = {
   revision: string;
+  tags: TagDefinition[];
   banners: Array<ReturnType<typeof bannerContentSchema.parse>>;
   announcements: Array<ReturnType<typeof announcementContentSchema.parse>>;
   tools: Array<ReturnType<typeof toolContentSchema.parse>>;
   toolPaths: string[];
+  paths: string[];
+  postSources: Array<{ path: string; source: string }>;
+  schemas: {
+    home: string;
+    tool: string;
+    update: string;
+  };
 };
 
-function shouldUseFixtures() {
+export function usesContentFixtures() {
   return process.env.CONTENT_SOURCE === "fixture";
 }
 
@@ -53,8 +64,9 @@ function githubHeaders(token?: string) {
 export async function fetchRepositoryFiles(
   fetcher: typeof fetch,
   token?: string,
-): Promise<{ revision: string; files: Map<string, string> }> {
-  const commitResponse = await fetcher(`${API_ROOT}/commits/${encodeURIComponent(REF)}`, {
+  ref = REF,
+): Promise<{ revision: string; files: Map<string, string>; paths: string[] }> {
+  const commitResponse = await fetcher(`${API_ROOT}/commits/${encodeURIComponent(ref)}`, {
     headers: githubHeaders(token),
     cache: "no-store",
   });
@@ -67,9 +79,17 @@ export async function fetchRepositoryFiles(
   if (!treeResponse.ok) throw new Error(`Content tree API ${treeResponse.status}`);
   const tree = await treeResponse.json() as GitTree;
   if (tree.truncated) throw new Error("Content tree が切り詰められたため安全に読み込めません。");
-  const paths = tree.tree
-    .filter((entry) => entry.type === "blob" && entry.path.startsWith("content/") && /\.(json|md)$/i.test(entry.path))
-    .map((entry) => entry.path);
+  const allPaths = tree.tree.filter((entry) => entry.type === "blob").map((entry) => entry.path);
+  const paths = allPaths
+    .filter((path) => (
+      (path.startsWith("content/") && /\.(json|md)$/i.test(path))
+      || path === "schemas/home.schema.json"
+      || path === "schemas/tool.schema.json"
+      || path === "schemas/update.schema.json"
+      || path === "schemas/app.schema.json"
+      || path === "fixtures/tags.json"
+      || path === "fixtures/tag-labels.json"
+    ))
   const entries = await Promise.all(paths.map(async (path) => {
     const response = await fetcher(`${rawRoot(commit.sha)}/${path}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -78,13 +98,13 @@ export async function fetchRepositoryFiles(
     if (!response.ok) throw new Error(`Content raw ${response.status}: ${path}`);
     return [path, await response.text()] as const;
   }));
-  return { revision: commit.sha, files: new Map(entries) };
+  return { revision: commit.sha, files: new Map(entries), paths: allPaths };
 }
 
 const getRemoteFileRecord = unstable_cache(
   async () => {
     const snapshot = await fetchRepositoryFiles(fetch, await getOptionalInstallationToken());
-    return { revision: snapshot.revision, files: Object.fromEntries(snapshot.files) };
+    return { revision: snapshot.revision, files: Object.fromEntries(snapshot.files), paths: snapshot.paths };
   },
   ["pokenae-content-snapshot", OWNER, REPOSITORY, REF],
   { revalidate: 300, tags: ["pokenae-content"] },
@@ -92,7 +112,7 @@ const getRemoteFileRecord = unstable_cache(
 
 async function getRemoteFiles() {
   const snapshot = await getRemoteFileRecord();
-  return { revision: snapshot.revision, files: new Map(Object.entries(snapshot.files)) };
+  return { revision: snapshot.revision, files: new Map(Object.entries(snapshot.files)), paths: snapshot.paths };
 }
 
 function requiredFile(files: ReadonlyMap<string, string>, path: string) {
@@ -112,6 +132,14 @@ function rawRoot(revision: string) {
   return `https://raw.githubusercontent.com/${OWNER}/${REPOSITORY}/${revision}`;
 }
 
+export function getContentMarkdownContext(revision: string, path: string): RepositoryMarkdownContext {
+  return {
+    repository: `${OWNER}/${REPOSITORY}`,
+    commitSha: revision,
+    path,
+  };
+}
+
 function resolveContentUrl(value: string | undefined, directory: string, revision: string) {
   if (!value || !value.startsWith(".")) return value;
   const normalized: string[] = [];
@@ -123,22 +151,64 @@ function resolveContentUrl(value: string | undefined, directory: string, revisio
   return `${rawRoot(revision)}/${normalized.join("/")}`;
 }
 
+function findFirstMarkdownImage(body: string): string | undefined {
+  const match = /!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))/u.exec(body);
+  return match?.[1] ?? match?.[2];
+}
+
+function parseTagDefinitions(files: ReadonlyMap<string, string>): TagDefinition[] {
+  const ids = JSON.parse(requiredFile(files, "fixtures/tags.json")) as unknown;
+  if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string")) {
+    throw new Error("Content snapshot の fixtures/tags.json が不正です。");
+  }
+  const labelsSource = files.get("fixtures/tag-labels.json");
+  const labels = labelsSource ? JSON.parse(labelsSource) as unknown : {};
+  const labelRecord = typeof labels === "object" && labels !== null && !Array.isArray(labels)
+    ? labels as Record<string, unknown>
+    : {};
+  return tagDefinitionListSchema.parse(ids.map((id) => {
+    const normalizedId = /^\d{4}$/.test(id) ? id.padStart(6, "0") : id;
+    return {
+      id: normalizedId,
+      label: typeof labelRecord[id] === "string" && labelRecord[id].trim() ? labelRecord[id] : normalizedId,
+    };
+  }));
+}
+
+function normalizeLegacyTagReferences(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+  const source = value as Record<string, unknown>;
+  const normalize = (tags: unknown) => Array.isArray(tags)
+    ? tags.map((tag) => typeof tag === "string" && /^\d{4}$/.test(tag) ? tag.padStart(6, "0") : tag)
+    : tags;
+  return {
+    ...source,
+    tags: normalize(source.tags),
+    ...(Object.hasOwn(source, "relatedTags") ? { relatedTags: normalize(source.relatedTags) } : {}),
+  };
+}
+
 export function parseContentSnapshot(files: ReadonlyMap<string, string>, revision: string): ContentSnapshot {
   const postPaths = [...files.keys()].filter((path) => /^content\/posts\/[^/]+\/index\.md$/.test(path)).sort();
   const posts = postPaths.map((path): Post => {
     const parsed = matter(requiredFile(files, path));
-    const metadata = postFrontmatterSchema.parse(parsed.data);
+    const metadata = postFrontmatterSchema.parse(normalizeLegacyTagReferences(parsed.data));
     const directory = path.slice(0, -"/index.md".length);
     const base = `${rawRoot(revision)}/${directory}`;
+    const firstImage = resolveContentUrl(findFirstMarkdownImage(parsed.content), directory, revision);
     return {
       ...metadata,
-      thumbnail: resolveContentUrl(metadata.thumbnail, directory, revision),
+      legacyUrl: metadata.legacyUrl ?? undefined,
+      thumbnail: firstImage,
       body: parsed.content.replace(/\]\(\.\/([^)]+)\)/g, `](${base}/$1)`),
     };
   });
   return {
     posts,
-    tools: jsonFiles(files, "content/tools", (value) => toolSchema.parse(value)),
+    tagDefinitions: parseTagDefinitions(files),
+    tools: jsonFiles(files, "content/tools", (value) => toolSchema.parse(normalizeLegacyTagReferences(value))),
+    apps: jsonFiles(files, "content/apps", (value) => appSchema.parse(normalizeLegacyTagReferences(value)))
+      .sort((left, right) => left.order - right.order || left.slug.localeCompare(right.slug)),
     banners: bannerSchema.array().parse(JSON.parse(requiredFile(files, "content/home/banners.json")))
       .map((banner) => ({ ...banner, image: resolveContentUrl(banner.image, "content/home", revision) ?? banner.image })),
     announcements: announcementSchema.array().parse(JSON.parse(requiredFile(files, "content/home/announcements.json"))),
@@ -146,38 +216,61 @@ export function parseContentSnapshot(files: ReadonlyMap<string, string>, revisio
   };
 }
 
-export function parseContentAdminSnapshot(files: ReadonlyMap<string, string>, revision: string): ContentAdminSnapshot {
+export function parseContentAdminSnapshot(files: ReadonlyMap<string, string>, revision: string, paths = [...files.keys()]): ContentAdminSnapshot {
   const toolPaths = [...files.keys()].filter((path) => /^content\/tools\/[^/]+\.json$/.test(path)).sort();
+  const postSources = [...files.entries()]
+    .filter(([path]) => /^content\/posts\/[^/]+\/index\.md$/.test(path))
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([path, source]) => ({ path, source }));
   return {
     revision,
+    tags: parseTagDefinitions(files),
     banners: bannerContentSchema.array().parse(JSON.parse(requiredFile(files, "content/home/banners.json"))),
     announcements: announcementContentSchema.array().parse(JSON.parse(requiredFile(files, "content/home/announcements.json"))),
     tools: toolPaths.map((path) => toolContentSchema.parse(JSON.parse(requiredFile(files, path)))),
     toolPaths,
+    paths,
+    postSources,
+    schemas: {
+      home: requiredFile(files, "schemas/home.schema.json"),
+      tool: requiredFile(files, "schemas/tool.schema.json"),
+      update: requiredFile(files, "schemas/update.schema.json"),
+    },
   };
 }
 
 export async function getContentSnapshot(): Promise<ContentSnapshot> {
-  if (shouldUseFixtures()) return structuredClone(contentFixture);
+  if (usesContentFixtures()) return structuredClone(contentFixture);
   return (await getContentSnapshotWithRevision()).content;
 }
 
 export async function getContentSnapshotWithRevision(): Promise<{ revision: string; content: ContentSnapshot }> {
-  if (shouldUseFixtures()) return { revision: contentAdminFixture.revision, content: structuredClone(contentFixture) };
+  if (usesContentFixtures()) return { revision: contentAdminFixture.revision, content: structuredClone(contentFixture) };
   const snapshot = await getRemoteFiles();
   return { revision: snapshot.revision, content: parseContentSnapshot(snapshot.files, snapshot.revision) };
 }
 
+export async function getFreshContentSnapshotWithRevision(): Promise<{ revision: string; content: ContentSnapshot }> {
+  if (usesContentFixtures()) return { revision: contentAdminFixture.revision, content: structuredClone(contentFixture) };
+  const snapshot = await fetchRepositoryFiles(fetch, await getOptionalInstallationToken());
+  return { revision: snapshot.revision, content: parseContentSnapshot(snapshot.files, snapshot.revision) };
+}
+
 export async function getContentAdminSnapshot(): Promise<ContentAdminSnapshot> {
-  if (shouldUseFixtures()) return structuredClone(contentAdminFixture);
+  if (usesContentFixtures()) return structuredClone(contentAdminFixture);
   const snapshot = await getRemoteFiles();
-  return parseContentAdminSnapshot(snapshot.files, snapshot.revision);
+  return parseContentAdminSnapshot(snapshot.files, snapshot.revision, snapshot.paths);
 }
 
 export async function getFreshContentAdminSnapshot(): Promise<ContentAdminSnapshot> {
-  if (shouldUseFixtures()) return structuredClone(contentAdminFixture);
+  if (usesContentFixtures()) return structuredClone(contentAdminFixture);
   const snapshot = await fetchRepositoryFiles(fetch, await getOptionalInstallationToken());
-  return parseContentAdminSnapshot(snapshot.files, snapshot.revision);
+  return parseContentAdminSnapshot(snapshot.files, snapshot.revision, snapshot.paths);
+}
+
+export async function getContentRevisionFiles(revision: string) {
+  if (usesContentFixtures()) throw new Error("fixture モードでは revision を取得できません。");
+  return fetchRepositoryFiles(fetch, await getOptionalInstallationToken(), revision);
 }
 
 export function isActiveContent(startsAt?: string, endsAt?: string, now = Date.now()) {
@@ -196,7 +289,7 @@ export async function getPublishedPost(slug: string) {
 }
 
 export async function getCollectionDexRecords(post: Post): Promise<CollectionDexRecord[]> {
-  if (!post.embed || post.embed.component !== "CollectionDex" || shouldUseFixtures()) return [];
+  if (!post.embed || post.embed.component !== "CollectionDex" || usesContentFixtures()) return [];
   const snapshot = await getRemoteFiles();
   const { files } = snapshot;
   const raw = JSON.parse(requiredFile(files, `content/posts/${post.slug}/${post.embed.data.replace(/^\.\//, "")}`)) as { records?: unknown[] };

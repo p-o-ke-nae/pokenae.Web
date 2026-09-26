@@ -2,14 +2,20 @@ import type { ContentSnapshot } from "./types";
 import type { ContentAdminSnapshot } from "./repository";
 
 export const contentFixture: ContentSnapshot = {
+  tagDefinitions: [
+    { id: "000001", label: "pokenae" },
+    { id: "000002", label: "ポケモン" },
+    { id: "000003", label: "コレクション" },
+    { id: "000004", label: "ツール" },
+  ],
   banners: [
-    { id: "welcome", image: "/mock/slide1.svg", alt: "pokenae ポケモン攻略ツール集", href: "/tools", order: 1 },
-    { id: "game-library", image: "/mock/slide2.svg", alt: "ゲームライブラリ Webアプリ", href: "/game-library", order: 2 },
-    { id: "blog", image: "/mock/slide3.svg", alt: "pokenae 技術ブログ", href: "/blog", order: 3 },
+    { id: "welcome", image: "/mock/slide1.svg", alt: "pokenae ポケモン攻略ツール集", href: "/tools", order: 1, startsAt: "2026-01-01T00:00:00Z" },
+    { id: "game-library", image: "/mock/slide2.svg", alt: "ゲームライブラリ Webアプリ", href: "/game-library", order: 2, startsAt: "2026-01-01T00:00:00Z" },
+    { id: "blog", image: "/mock/slide3.svg", alt: "pokenae 技術ブログ", href: "/blog", order: 3, startsAt: "2026-01-01T00:00:00Z" },
   ],
   announcements: [
-    { id: "site-renewal", text: "pokenae.com をリニューアルしました", href: "/blog/site-renewal", severity: "highlight" },
-    { id: "github", text: "公開ツールとライブラリは GitHub でも配布しています", href: "https://github.com/p-o-ke-nae", severity: "normal" },
+    { id: "site-renewal", text: "pokenae.com をリニューアルしました", href: "/blog/site-renewal", severity: "emphasis", startsAt: "2026-01-01T00:00:00Z" },
+    { id: "github", text: "公開ツールとライブラリは GitHub でも配布しています", href: "https://github.com/p-o-ke-nae", severity: "normal", startsAt: "2026-01-01T00:00:00Z" },
   ],
   posts: [
     {
@@ -19,7 +25,7 @@ export const contentFixture: ContentSnapshot = {
       publishedAt: "2026-09-26",
       status: "published",
       category: "お知らせ",
-      tags: ["pokenae"],
+      tags: ["000001"],
       relatedTags: [],
       priority: 100,
       thumbnail: "/mock/card2.svg",
@@ -33,8 +39,8 @@ export const contentFixture: ContentSnapshot = {
       publishedAt: "2026-09-25",
       status: "published",
       category: "showcase",
-      tags: ["ポケモン", "コレクション"],
-      relatedTags: ["ツール"],
+      tags: ["000002", "000003"],
+      relatedTags: ["000004"],
       priority: 90,
       thumbnail: "/mock/card1.svg",
       showInPickup: true,
@@ -54,6 +60,7 @@ export const contentFixture: ContentSnapshot = {
       image: "/mock/thumb1.svg",
       showInPickup: true,
       priority: 100,
+      tags: ["000002", "000004"],
     },
     {
       slug: "generic-recognition-workbench",
@@ -65,20 +72,36 @@ export const contentFixture: ContentSnapshot = {
       image: "/mock/thumb2.svg",
       showInPickup: true,
       priority: 80,
+      tags: ["000004"],
+    },
+  ],
+  apps: [
+    {
+      slug: "game-library",
+      name: "ゲームライブラリ",
+      summary: "ゲーム、ハード、セーブデータを管理します。既存URLはそのまま利用できます。",
+      href: "/game-library",
+      image: "/mock/thumb3.svg",
+      imageAlt: "",
+      metaLabel: "Google アカウント対応",
+      status: "published",
+      order: 1,
+      tags: ["000002", "000003"],
     },
   ],
   updates: [
-    { id: "renewal", publishedAt: "2026-09-26", target: "site", summary: "サイト構成とデザインを刷新しました。", href: "/" },
+    { id: "renewal", publishedAt: "2026-09-26T14:30:00+09:00", target: "navigation", summary: "サイト構成とデザインを刷新しました。", href: "/", skipInfo: false },
   ],
 };
 
 export const contentAdminFixture: ContentAdminSnapshot = {
   revision: "0000000000000000000000000000000000000000",
+  tags: contentFixture.tagDefinitions,
   banners: [
-    { id: "welcome", image: "/mock/slide1.svg", alt: "pokenae ポケモン攻略ツール集", href: "/tools", order: 1 },
+    { id: "welcome", image: "/mock/slide1.svg", alt: "pokenae ポケモン攻略ツール集", href: "/tools", order: 1, startsAt: "2026-01-01T00:00:00Z", endsAt: null },
   ],
   announcements: [
-    { id: "site-renewal", text: "pokenae.com をリニューアルしました", href: "/blog/site-renewal", variant: "highlight" },
+    { id: "site-renewal", text: "pokenae.com をリニューアルしました", href: "/blog/site-renewal", variant: "emphasis", startsAt: "2026-01-01T00:00:00Z", endsAt: null },
   ],
   tools: [
     {
@@ -92,7 +115,78 @@ export const contentAdminFixture: ContentAdminSnapshot = {
       supportedOs: ["Windows 10 以降 (x64)"],
       showInPickup: true,
       priority: 100,
+      tags: ["000002", "000004"],
     },
   ],
   toolPaths: ["content/tools/blink-observer-tool.json"],
+  paths: [],
+  postSources: [],
+  schemas: {
+    home: JSON.stringify({
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "image", "alt", "href", "startsAt", "endsAt", "order"],
+        properties: {
+          id: { type: "string", pattern: "^[a-z0-9-]+$" },
+          image: { type: "string" },
+          alt: { type: "string", minLength: 1 },
+          href: { type: "string" },
+          startsAt: { type: "string", format: "date-time" },
+          endsAt: { type: ["string", "null"], format: "date-time" },
+          order: { type: "integer", minimum: 0 },
+        },
+      },
+    }),
+    tool: JSON.stringify({
+      type: "object",
+      additionalProperties: false,
+      required: ["slug", "displayName", "summary", "kind", "repository", "docs", "release", "tags", "showInPickup", "priority"],
+      properties: {
+        slug: { type: "string", pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        displayName: { type: "string", minLength: 1 },
+        summary: { type: "string", minLength: 1 },
+        kind: { enum: ["windows-app", "library"] },
+        repository: { type: "string", pattern: "^p-o-ke-nae/[A-Za-z0-9._-]+$" },
+        docs: {
+          type: "object",
+          additionalProperties: false,
+          required: ["readme", "paths"],
+          properties: {
+            readme: { type: "string" },
+            paths: { type: "array", uniqueItems: true, items: { type: "string" } },
+          },
+        },
+        release: {
+          type: "object",
+          additionalProperties: false,
+          required: ["channel", "manifestRequired"],
+          properties: {
+            channel: { enum: ["stable"] },
+            manifestRequired: { type: "boolean" },
+            package: { type: "string" },
+            unsignedInstaller: { type: "boolean" },
+          },
+        },
+        supportedOs: { type: "array", uniqueItems: true, items: { type: "string" } },
+        tags: { type: "array", uniqueItems: true, items: { type: "string", pattern: "^(?!000000)\\d{6}$" } },
+        showInPickup: { type: "boolean" },
+        priority: { type: "integer", minimum: 0, maximum: 1000 },
+      },
+    }),
+    update: JSON.stringify({
+      type: "object",
+      additionalProperties: false,
+      required: ["id", "publishedAt", "target", "summary", "href", "visible"],
+      properties: {
+        id: { type: "string", pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        publishedAt: { type: "string", format: "date-time" },
+        target: { enum: ["post", "tool", "app", "home", "navigation"] },
+        summary: { type: "string", minLength: 1, maxLength: 200 },
+        href: { type: "string" },
+        visible: { type: "boolean" },
+      },
+    }),
+  },
 };

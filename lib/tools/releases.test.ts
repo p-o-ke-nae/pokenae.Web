@@ -1,16 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { githubReleaseFixture, installerBytes, installerSha256, releaseManifestFixture } from "./releases.fixture";
+import type { ToolDefinition } from "../content/types";
 
 vi.mock("server-only", () => ({}));
 
-const tool = {
+const tool: ToolDefinition = {
   slug: "blink-observer-tool",
   name: "BlinkObserverTool",
   summary: "test",
   repository: "p-o-ke-nae/BlinkObserverTool",
   kind: "windows-app",
-} as const;
+  tags: [],
+};
 
 function responseForRelease(release: ReturnType<typeof githubReleaseFixture>, installerResponse?: () => Response | Promise<Response>) {
   return vi.fn<typeof fetch>(async (input) => {

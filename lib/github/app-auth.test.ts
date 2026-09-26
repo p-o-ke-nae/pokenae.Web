@@ -75,7 +75,9 @@ describe("GitHub App authentication", () => {
     createAppAuth.mockReturnValue(authenticate);
     process.env.GITHUB_APP_ID = "123";
     process.env.GITHUB_APP_INSTALLATION_ID = "456";
-    process.env.GITHUB_APP_PRIVATE_KEY_BASE64 = Buffer.from("private-key").toString("base64");
+    process.env.GITHUB_APP_PRIVATE_KEY_BASE64 = Buffer.from(
+      "-----BEGIN PRIVATE KEY-----\\nprivate-key\\n-----END PRIVATE KEY-----",
+    ).toString("base64");
 
     const { getOptionalInstallationToken } = await loadAppAuth();
 
@@ -83,9 +85,27 @@ describe("GitHub App authentication", () => {
     expect(createAppAuth).toHaveBeenCalledWith({
       appId: "123",
       installationId: 456,
-      privateKey: "private-key",
+      privateKey: "-----BEGIN PRIVATE KEY-----\nprivate-key\n-----END PRIVATE KEY-----",
     });
     expect(authenticate).toHaveBeenCalledWith({ type: "installation" });
+  });
+
+  it.each([
+    "not-base64",
+    Buffer.from("private-key").toString("base64"),
+  ])("rejects an invalid base64 PEM value: %s", async (privateKey) => {
+    process.env.GITHUB_APP_ID = "123";
+    process.env.GITHUB_APP_INSTALLATION_ID = "456";
+    process.env.GITHUB_APP_PRIVATE_KEY_BASE64 = privateKey;
+
+    const { getOptionalInstallationToken } = await loadAppAuth();
+
+    await expect(getOptionalInstallationToken()).rejects.toThrow(
+      privateKey === "not-base64"
+        ? "GITHUB_APP_PRIVATE_KEY_BASE64 はPEM秘密鍵全体をbase64化した値で設定してください。"
+        : "GITHUB_APP_PRIVATE_KEY_BASE64 の復号結果がPEM秘密鍵ではありません。",
+    );
+    expect(createAppAuth).not.toHaveBeenCalled();
   });
 
   it("keeps write operations fail-closed when the disabled sentinel is configured", async () => {

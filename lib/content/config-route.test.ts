@@ -1,21 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("server-only", () => ({}));
+
 const mocks = vi.hoisted(() => ({
   getAdminAuthorization: vi.fn(),
   getFreshContentAdminSnapshot: vi.fn(),
+  usesContentFixtures: vi.fn(),
   createContentPullRequest: vi.fn(),
-  buildToolContentChanges: vi.fn(),
+  getReservedTagDefinitions: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/admin", () => ({ getAdminAuthorization: mocks.getAdminAuthorization }));
-vi.mock("@/lib/content/repository", () => ({ getFreshContentAdminSnapshot: mocks.getFreshContentAdminSnapshot }));
-vi.mock("@/lib/github/content-writer", () => ({ createContentPullRequest: mocks.createContentPullRequest }));
-vi.mock("@/lib/content/schemas", () => ({
-  announcementContentSchema: { array: () => ({ safeParse: () => ({ success: true, data: [] }) }) },
-  bannerContentSchema: { array: () => ({ safeParse: () => ({ success: true, data: [] }) }) },
-  toolContentSchema: { array: () => ({ safeParse: () => ({ success: true, data: [] }) }) },
+vi.mock("@/lib/content/repository", () => ({
+  getFreshContentAdminSnapshot: mocks.getFreshContentAdminSnapshot,
+  usesContentFixtures: mocks.usesContentFixtures,
 }));
-vi.mock("@/lib/content/admin-config", () => ({ buildToolContentChanges: mocks.buildToolContentChanges }));
+vi.mock("@/lib/github/content-writer", () => ({
+  createContentPullRequest: mocks.createContentPullRequest,
+  getReservedTagDefinitions: mocks.getReservedTagDefinitions,
+}));
+vi.mock("@/lib/content/schemas", async () => import("./schemas"));
+vi.mock("@/lib/content/admin-config", async () => import("./admin-config"));
 vi.mock("@/lib/github/content-conflict", () => ({
   isContentConflictError: (error: unknown) => error instanceof Error && error.name === "ContentConflictError",
 }));
@@ -28,14 +33,98 @@ describe("POST /api/content/config", () => {
       status: 200,
       session: { user: { email: "admin@example.com" } },
     });
+    mocks.usesContentFixtures.mockReturnValue(false);
+    mocks.getReservedTagDefinitions.mockResolvedValue([]);
     mocks.getFreshContentAdminSnapshot.mockResolvedValue({
-      revision: "current-tree",
+      revision: "1111111111111111111111111111111111111111",
       banners: [],
       announcements: [],
       tools: [],
+      tags: [{ id: "000001", label: "ポケモン" }],
+      postSources: [],
       toolPaths: ["content/tools/new-tool.json"],
+      paths: ["content/home/images/existing.webp"],
+      schemas: {
+        home: JSON.stringify({
+          oneOf: [{
+            title: "Banners",
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["id", "image", "alt", "href", "startsAt", "endsAt", "order"],
+              properties: {
+                id: { type: "string" },
+                image: { type: "string" },
+                alt: { type: "string" },
+                href: { type: "string" },
+                startsAt: { type: "string", format: "date-time" },
+                endsAt: { type: ["string", "null"], format: "date-time" },
+                order: { type: "integer" },
+              },
+            },
+          }],
+        }),
+        tool: JSON.stringify({
+          type: "object",
+          additionalProperties: false,
+          required: ["slug", "displayName", "summary", "kind", "repository", "docs", "release", "showInPickup", "priority"],
+          properties: {
+            slug: { type: "string" },
+            displayName: { type: "string" },
+            summary: { type: "string" },
+            kind: { enum: ["windows-app", "library"] },
+            repository: { type: "string", pattern: "^p-o-ke-nae/" },
+            docs: { type: "object" },
+            release: { type: "object" },
+            supportedOs: { type: "array" },
+            showInPickup: { type: "boolean" },
+            priority: { type: "integer" },
+          },
+        }),
+        update: JSON.stringify({
+          type: "object",
+          additionalProperties: false,
+          required: ["id", "publishedAt", "target", "summary", "href", "visible"],
+          properties: {
+            id: { type: "string" },
+            publishedAt: { type: "string", format: "date-time" },
+            target: { enum: ["post", "tool", "app", "home", "navigation"] },
+            summary: { type: "string" },
+            href: { type: "string" },
+            visible: { type: "boolean" },
+          },
+        }),
+      },
     });
-    mocks.buildToolContentChanges.mockReturnValue([]);
+  });
+
+  it("rejects unauthenticated requests before reading content", async () => {
+    mocks.getAdminAuthorization.mockResolvedValue({ authorized: false, status: 401 });
+    const { POST } = await import("../../app/api/content/config/route");
+    const response = await POST(new Request("http://localhost/api/content/config", { method: "POST" }));
+
+    expect(response.status).toBe(401);
+    expect(mocks.getFreshContentAdminSnapshot).not.toHaveBeenCalled();
+    expect(mocks.createContentPullRequest).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 without GitHub side effects in fixture mode", async () => {
+    mocks.usesContentFixtures.mockReturnValue(true);
+    const { POST } = await import("../../app/api/content/config/route");
+    const response = await POST(new Request("http://localhost/api/content/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "tools", value: [], baseRevision: "0000000000000000000000000000000000000000" }),
+    }));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "CONTENT_WRITE_DISABLED",
+      error: expect.stringContaining("CONTENT_SOURCE=github"),
+    });
+    expect(mocks.getFreshContentAdminSnapshot).not.toHaveBeenCalled();
+    expect(mocks.createContentPullRequest).not.toHaveBeenCalled();
   });
 
   it("returns 409 before generating deletions when the base revision is stale", async () => {
@@ -43,7 +132,7 @@ describe("POST /api/content/config", () => {
     const response = await POST(new Request("http://localhost/api/content/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "tools", value: [], baseRevision: "stale-tree" }),
+      body: JSON.stringify({ kind: "tools", value: [], baseRevision: "2222222222222222222222222222222222222222" }),
     }));
 
     expect(response.status).toBe(409);
@@ -60,7 +149,7 @@ describe("POST /api/content/config", () => {
     const response = await POST(new Request("http://localhost/api/content/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "tools", value: [], baseRevision: "current-tree" }),
+      body: JSON.stringify({ kind: "tools", value: [], baseRevision: "1111111111111111111111111111111111111111" }),
     }));
 
     expect(response.status).toBe(409);
@@ -68,7 +157,110 @@ describe("POST /api/content/config", () => {
     expect(body).toMatchObject({ code: "CONTENT_CONFLICT" });
     expect(body).not.toHaveProperty("pullRequestUrl");
     expect(mocks.createContentPullRequest).toHaveBeenCalledWith(expect.objectContaining({
-      expectedRevision: "current-tree",
+      expectedRevision: "1111111111111111111111111111111111111111",
+    }));
+  });
+
+  it("returns canonical field errors without creating an invalid tool PR", async () => {
+    const { POST } = await import("../../app/api/content/config/route");
+    const response = await POST(new Request("http://localhost/api/content/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "tools",
+        baseRevision: "1111111111111111111111111111111111111111",
+        value: [{
+          slug: "tool",
+          displayName: "Tool",
+          summary: "tool",
+          repository: "p-o-ke-nae/tool",
+          kind: "library",
+          image: "https://example.com/tool.webp",
+        }],
+      }),
+    }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "CONTENT_VALIDATION_FAILED",
+      issues: expect.arrayContaining([
+        expect.objectContaining({ path: ["tools", 0, "image"] }),
+        expect.objectContaining({ path: ["tools", 0, "docs"] }),
+      ]),
+    });
+    expect(mocks.createContentPullRequest).not.toHaveBeenCalled();
+  });
+
+  it("creates a canonical banner and update file set from multipart input", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-26T12:34:56.000Z"));
+    mocks.createContentPullRequest.mockResolvedValue({
+      html_url: "https://example.test/pull/3",
+      number: 3,
+      base: { sha: "1111111111111111111111111111111111111111" },
+    });
+    const form = new FormData();
+    form.set("kind", "banners");
+    form.set("baseRevision", "1111111111111111111111111111111111111111");
+    form.set("changeNote", "バナーを更新");
+    form.set("value", JSON.stringify([{
+      id: "existing",
+      image: "./images/existing.webp",
+      alt: "既存画像",
+      href: "/",
+      order: 0,
+      startsAt: "2026-09-26T00:00:00.000Z",
+      endsAt: null,
+    }]));
+
+    try {
+      const { POST } = await import("../../app/api/content/config/route");
+      const response = await POST(new Request("http://localhost/api/content/config", { method: "POST", body: form }));
+
+      expect(response.status).toBe(201);
+      await expect(response.json()).resolves.toMatchObject({
+        pullRequestUrl: "https://example.test/pull/3",
+        number: 3,
+      });
+      expect(mocks.createContentPullRequest).toHaveBeenCalledWith(expect.objectContaining({
+        branch: "content/banners-20260926123456",
+        expectedRevision: "1111111111111111111111111111111111111111",
+        files: expect.arrayContaining([
+          expect.objectContaining({ path: "content/home/banners.json" }),
+          expect.objectContaining({ path: "content/updates/banners-20260926123456.json" }),
+        ]),
+      }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("creates tag catalog files with stable IDs and labels", async () => {
+    mocks.createContentPullRequest.mockResolvedValue({
+      html_url: "https://example.test/pull/4",
+      number: 4,
+      base: { sha: "1111111111111111111111111111111111111111" },
+    });
+    const { POST } = await import("../../app/api/content/config/route");
+    const response = await POST(new Request("http://localhost/api/content/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "tags",
+        baseRevision: "1111111111111111111111111111111111111111",
+        value: [
+          { id: "000001", label: "ポケモン" },
+          { id: "", label: "第7世代" },
+        ],
+      }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(mocks.createContentPullRequest).toHaveBeenCalledWith(expect.objectContaining({
+      files: expect.arrayContaining([
+        expect.objectContaining({ path: "fixtures/tags.json", content: expect.stringContaining("000002") }),
+        expect.objectContaining({ path: "fixtures/tag-labels.json", content: expect.stringContaining("第7世代") }),
+      ]),
     }));
   });
 });

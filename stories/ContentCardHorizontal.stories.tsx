@@ -18,7 +18,7 @@ export const Default: Story = {
     id: 'card-1',
     title: '収集補助ツール',
     description: '捕獲作業を自動認識でサポート',
-    date: '2023年08月20日',
+    publishedAt: '2023-08-20T12:00:00Z',
     imageSrc: '/mock/thumb1.svg',
     imageAlt: '収集補助ツールのスクリーンショット',
     href: '#',
@@ -30,7 +30,7 @@ export const LongTitle: Story = {
     id: 'card-2',
     title: '個体値特定ツール ver3 – 自動認識機能付き完全版',
     description: '最新バージョンへのアップデートで認識精度がさらに向上しました',
-    date: '2024年03月01日',
+    publishedAt: '2024-03-01',
     imageSrc: '/mock/thumb2.svg',
     imageAlt: '個体値特定ツールのスクリーンショット',
     href: '#',
@@ -44,7 +44,7 @@ export const List: Story = {
         id="card-1"
         title="収集補助ツール"
         description="捕獲作業を自動認識でサポート"
-        date="2023年08月20日"
+        publishedAt="2023-08-20"
         imageSrc="/mock/thumb1.svg"
         imageAlt="収集補助ツールのスクリーンショット"
         href="#"
@@ -53,7 +53,7 @@ export const List: Story = {
         id="card-2"
         title="個体値特定ツール ver3"
         description="最新バージョンへのアップデートで認識精度が向上"
-        date="2024年03月01日"
+        publishedAt="2024-03-01"
         imageSrc="/mock/thumb2.svg"
         imageAlt="個体値特定ツールのスクリーンショット"
         href="#"
@@ -62,7 +62,7 @@ export const List: Story = {
         id="card-3"
         title="レイドバトル支援ツール"
         description="テラレイドバトルの結果を自動記録・分析"
-        date="2024年01月15日"
+        publishedAt="2024-01-15"
         imageSrc="/mock/thumb3.svg"
         imageAlt="レイドバトル支援ツールのスクリーンショット"
         href="#"
@@ -73,7 +73,7 @@ export const List: Story = {
     id: '',
     title: '',
     description: '',
-    date: '',
+    publishedAt: '2024-01-01',
     imageSrc: '',
     imageAlt: '',
     href: '',

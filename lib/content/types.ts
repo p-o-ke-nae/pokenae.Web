@@ -1,5 +1,10 @@
 export type ContentStatus = "draft" | "published";
 
+export type TagDefinition = {
+  id: string;
+  label: string;
+};
+
 export type Post = {
   slug: string;
   title: string;
@@ -32,8 +37,22 @@ export type ToolDefinition = {
   packageUrl?: string;
   docsPath?: string;
   releaseChannel?: string;
+  tags: string[];
   showInPickup?: boolean;
   priority?: number;
+};
+
+export type AppDefinition = {
+  slug: string;
+  name: string;
+  summary: string;
+  href: string;
+  image?: string;
+  imageAlt: string;
+  metaLabel?: string;
+  status: ContentStatus | "archived";
+  order: number;
+  tags: string[];
 };
 
 export type HomeBanner = {
@@ -50,7 +69,7 @@ export type Announcement = {
   id: string;
   text: string;
   href?: string;
-  severity: "normal" | "highlight" | "urgent";
+  severity: "normal" | "emphasis" | "urgent";
   startsAt?: string;
   endsAt?: string;
 };
@@ -58,7 +77,7 @@ export type Announcement = {
 export type ContentUpdate = {
   id: string;
   publishedAt: string;
-  target: "post" | "tool" | "home" | "site";
+  target: "post" | "tool" | "app" | "home" | "navigation";
   summary: string;
   href?: string;
   skipInfo?: boolean;
@@ -76,7 +95,9 @@ export type CollectionDexRecord = {
 
 export type ContentSnapshot = {
   posts: Post[];
+  tagDefinitions: TagDefinition[];
   tools: ToolDefinition[];
+  apps: AppDefinition[];
   banners: HomeBanner[];
   announcements: Announcement[];
   updates: ContentUpdate[];

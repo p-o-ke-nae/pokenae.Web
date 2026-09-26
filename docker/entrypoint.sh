@@ -10,6 +10,12 @@
 
 set -eu
 
+# Next.js は build を production モードで実行する前提。
+# debug Compose の開発用 NODE_ENV がビルドへ流入すると内部エラーページの prerender が壊れる。
+if [ "$#" -ge 3 ] && [ "$1" = "npm" ] && [ "$2" = "run" ] && [ "$3" = "build" ]; then
+  export NODE_ENV=production
+fi
+
 secrets_dir=${SECRETS_DIR:-/run/secrets}
 
 if [ -d "$secrets_dir" ]; then
@@ -41,6 +47,21 @@ if [ "$(id -u)" -eq 0 ] && [ -n "${ENTRYPOINT_DROP_USER:-}" ]; then
     echo "entrypoint: su-exec is required to drop privileges" >&2
     exit 1
   fi
+
+  drop_user=${ENTRYPOINT_DROP_USER%%:*}
+  drop_group=${ENTRYPOINT_DROP_USER#*:}
+  if [ "$drop_group" = "$ENTRYPOINT_DROP_USER" ]; then
+    drop_group=$drop_user
+  fi
+
+  if [ -d /app/.next ]; then
+    chown -R "$drop_user:$drop_group" /app/.next
+  fi
+  if [ -d /app/node_modules ]; then
+    mkdir -p /app/node_modules/.cache
+    chown -R "$drop_user:$drop_group" /app/node_modules/.cache
+  fi
+
   exec su-exec "$ENTRYPOINT_DROP_USER" "$@"
 fi
 

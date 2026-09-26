@@ -37,4 +37,20 @@ su-exec nextjs:nodejs env \
   SECRETS_DIR="$state_dir/secrets" \
   "$entrypoint" "$state_dir/assert-command.sh" "value with spaces" 'literal "quotes"'
 
+mkdir -p "$state_dir/bin"
+cat > "$state_dir/bin/npm" <<'EOF'
+#!/bin/sh
+set -eu
+[ "$NODE_ENV" = "production" ]
+[ "$1" = "run" ]
+[ "$2" = "build" ]
+EOF
+chmod 755 "$state_dir/bin/npm"
+
+PATH="$state_dir/bin:$PATH" \
+NODE_ENV=development \
+ENTRYPOINT_DROP_USER= \
+SECRETS_DIR="$state_dir/secrets" \
+"$entrypoint" npm run build
+
 echo "entrypoint tests passed"

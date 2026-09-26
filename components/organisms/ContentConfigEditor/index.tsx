@@ -15,7 +15,9 @@ export default function ContentConfigEditor({ kind, initial, baseRevision }: { k
         ? `Pull Request: ${data.pullRequestUrl}`
         : data.code === "CONTENT_CONFLICT"
           ? "公開コンテンツが画面表示後に更新されました。ページを再読込してから編集し直してください。"
-          : data.error ?? "保存に失敗しました。");
+          : data.code === "CONTENT_WRITE_DISABLED"
+            ? data.error ?? "現在のコンテンツソース設定では Pull Request を作成できません。"
+            : data.error ?? "保存に失敗しました。");
     } catch { setMessage("JSON構文を確認してください。"); }
     setSaving(false);
   }
