@@ -11,6 +11,7 @@ prepare_aca_secret_references() {
   local -a parsed_keys=()
   local -A parsed_values=()
   local -A seen_keys=()
+  # Deployment-side representation of GITHUB_APP_DISABLED_SENTINEL in lib/github/app-auth.ts.
   local -A optional_disabled_values=(
     [ADMIN_EMAILS]="__disabled_admin__@invalid.invalid"
     [GITHUB_APP_ID]="0"
