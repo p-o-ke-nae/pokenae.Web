@@ -38,6 +38,16 @@ test("公開導線とモバイルSidebar順序", async ({ page }, testInfo) => {
   await page.goto("/tools");
   await expect(page.getByRole("heading", { name: "ツール開発室" })).toBeVisible();
   expect(await page.locator(".sidebar__section > h2").allTextContents()).toEqual(["PICKUP", "関連アイテム"]);
+  const sidebarBanner = page.locator(".sidebar-banner");
+  await expect(sidebarBanner).toBeVisible();
+  await expect(sidebarBanner.getByRole("link", { name: "個体値特定ツール（ozaroom.com）を開く" })).toHaveAttribute(
+    "href",
+    "https://ozaroom.com/tool/7.html",
+  );
+  await expect(sidebarBanner.getByRole("link", { name: "このバナーの作成者ブログを開く" })).toHaveAttribute(
+    "href",
+    "https://shuahpkmn.hatenablog.jp/entry/rta-iv-calc",
+  );
   await page.goto("/blog");
   await expect(page.getByRole("heading", { name: "ブログ" })).toBeVisible();
   if (testInfo.project.name === "mobile") {
