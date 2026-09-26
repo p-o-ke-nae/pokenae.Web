@@ -94,6 +94,16 @@ docker build --target entrypoint-test -f docker/Dockerfile .
   - 詳細なエラーメッセージが表示
   - ナビゲーションバーに赤色の「DEBUG」バッジが表示
 
+Docker Compose の debug 環境で `gray-matter` など、`package.json` と
+`package-lock.json` に記載済みのモジュールが解決できない場合は、古い匿名
+`node_modules` ボリュームが残っている可能性があります。対象プロジェクトだけの
+ボリュームを再作成してイメージをビルドします。
+
+```bash
+docker compose --env-file .env.docker.debug -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml down -v
+docker compose --env-file .env.docker.debug -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml up --build
+```
+
 #### 設定方法：
 
 ```bash

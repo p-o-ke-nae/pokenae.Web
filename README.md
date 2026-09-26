@@ -28,6 +28,16 @@ docker compose -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.ym
 
 Open [http://localhost:5000](http://localhost:5000) with your browser to see the result.
 
+If Next.js reports `Module not found` for a package that is already listed in
+`package.json` and `package-lock.json`, the debug compose project may be using
+an old anonymous `node_modules` volume. Recreate only that project's volumes
+and rebuild the image:
+
+```bash
+docker compose --env-file .env.docker.debug -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml down -v
+docker compose --env-file .env.docker.debug -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml up --build
+```
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
