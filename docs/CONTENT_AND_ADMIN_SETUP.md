@@ -13,7 +13,7 @@
 
 管理APIは画面表示とは別に毎回再認可します。保存は `content/<slug>-<timestamp>` ブランチ、単一commit、Pull Requestを作成し、mainへ直接書き込みません。資格情報不足時は失敗として扱います。
 
-記事・ホーム・ツール編集画面は取得時のcommit SHAをbase revisionとして保存要求へ含めます。保存直前とcommit作成直前にmainのcommit SHAを再確認し、不一致ならHTTP 409で拒否します。writerは検証済みcommitをparent/base treeとして使用するため、競合時にbranch、commit、Pull Requestは生成されません。画面を再読込して最新内容から編集し直してください。
+記事・ホーム・ツール編集画面は取得時のcommit SHAをbase revisionとして保存要求へ含めます。保存前、commit作成前、Pull Request作成結果でmainのcommit SHAを確認し、不一致ならHTTP 409で拒否します。Pull Request作成と同時に競合を検出した場合は、そのPull Requestを閉じて作業branchを削除します。画面を再読込して最新内容から編集し直してください。
 
 ## GitHub Actions / VPS / ACA
 
