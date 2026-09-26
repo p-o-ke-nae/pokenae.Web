@@ -26,7 +26,7 @@ export function InfoSection({ updates }: { updates: ContentUpdate[] }) {
 export function BlogSection({ posts }: { posts: Post[] }) {
   const visible = posts.slice(0, 6);
   return <HomeSection title="BLOG" moreHref={posts.length > visible.length ? "/blog" : undefined}>
-    <div className="home-card-grid">{visible.map((post) => <ContentCardVertical key={post.slug} id={post.slug} title={post.title} publishedAt={post.publishedAt} imageSrc={post.thumbnail ?? "/mock/card1.svg"} imageAlt="" href={`/blog/${post.slug}`} tag={post.category} />)}</div>
+    <div className="home-card-grid">{visible.map((post) => <ContentCardVertical key={post.slug} id={post.slug} title={post.title} publishedAt={post.publishedAt} imageSrc={post.thumbnail ?? "/pokenaeLogo.png"} imageAlt="" href={`/blog/${post.slug}`} tag={post.category} />)}</div>
   </HomeSection>;
 }
 

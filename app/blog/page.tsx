@@ -13,6 +13,6 @@ export default async function BlogPage({ searchParams }: { searchParams: Promise
   const posts = publishedPosts.filter((post) => matchesContentSearch(post, search));
   return <main className="page-container"><header className="page-header"><CustomHeader>ブログ</CustomHeader><p className="page-lead">開発記録、お知らせ、ショーケースを掲載しています。</p></header>
     <ContentSearchForm key={`${search.query}:${search.tagIds.join(",")}:${search.invalidTag}`} action="/blog" tags={tagDefinitions} search={search} resultCount={posts.length} />
-    {posts.length ? <div className="card-grid">{posts.map((post) => <ContentCardVertical key={post.slug} id={post.slug} title={post.title} publishedAt={post.publishedAt} imageSrc={post.thumbnail ?? "/mock/card1.svg"} imageAlt="" href={`/blog/${post.slug}`} tag={post.category} />)}</div> : <p className="empty-state">条件に一致する記事はありません。</p>}
+    {posts.length ? <div className="card-grid">{posts.map((post) => <ContentCardVertical key={post.slug} id={post.slug} title={post.title} publishedAt={post.publishedAt} imageSrc={post.thumbnail ?? "/pokenaeLogo.png"} imageAlt="" href={`/blog/${post.slug}`} tag={post.category} />)}</div> : <p className="empty-state">条件に一致する記事はありません。</p>}
   </main>;
 }

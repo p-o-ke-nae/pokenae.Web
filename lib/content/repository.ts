@@ -151,6 +151,12 @@ function resolveContentUrl(value: string | undefined, directory: string, revisio
   return `${rawRoot(revision)}/${normalized.join("/")}`;
 }
 
+function resolveContentItemImage<T extends { image?: string }>(item: T, directory: string, revision: string): T {
+  return item.image?.startsWith(".")
+    ? { ...item, image: resolveContentUrl(item.image, directory, revision) }
+    : item;
+}
+
 function findFirstMarkdownImage(body: string): string | undefined {
   const match = /!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))/u.exec(body);
   return match?.[1] ?? match?.[2];
@@ -206,8 +212,10 @@ export function parseContentSnapshot(files: ReadonlyMap<string, string>, revisio
   return {
     posts,
     tagDefinitions: parseTagDefinitions(files),
-    tools: jsonFiles(files, "content/tools", (value) => toolSchema.parse(normalizeLegacyTagReferences(value))),
+    tools: jsonFiles(files, "content/tools", (value) => toolSchema.parse(normalizeLegacyTagReferences(value)))
+      .map((tool) => resolveContentItemImage(tool, "content/tools", revision)),
     apps: jsonFiles(files, "content/apps", (value) => appSchema.parse(normalizeLegacyTagReferences(value)))
+      .map((app) => resolveContentItemImage(app, "content/apps", revision))
       .sort((left, right) => left.order - right.order || left.slug.localeCompare(right.slug)),
     banners: bannerSchema.array().parse(JSON.parse(requiredFile(files, "content/home/banners.json")))
       .map((banner) => ({ ...banner, image: resolveContentUrl(banner.image, "content/home", revision) ?? banner.image })),

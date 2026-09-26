@@ -202,4 +202,43 @@ showInPickup: false
 
     expect(snapshot.updates).toEqual([{ ...update, skipInfo: true }]);
   });
+
+  it("resolves relative tool and app images against the Content commit", async () => {
+    const { parseContentSnapshot } = await import("./repository");
+    const files = new Map([
+      ["content/home/banners.json", JSON.stringify([])],
+      ["content/home/announcements.json", JSON.stringify([])],
+      ["fixtures/tags.json", JSON.stringify([])],
+      ["content/tools/sample-tool.json", JSON.stringify({
+        slug: "sample-tool",
+        displayName: "サンプルツール",
+        summary: "概要",
+        repository: "p-o-ke-nae/sample-tool",
+        kind: "windows-app",
+        image: "./images/pokenaeLogo.png",
+        tags: [],
+      })],
+      ["content/apps/sample-app.json", JSON.stringify({
+        slug: "sample-app",
+        displayName: "サンプルアプリ",
+        summary: "概要",
+        metaLabel: "Webアプリ",
+        image: "./images/pokenaeLogo.png",
+        imageAlt: "",
+        href: "/sample-app",
+        status: "published",
+        order: 1,
+        tags: [],
+      })],
+    ]);
+
+    const snapshot = parseContentSnapshot(files, "base-revision");
+
+    expect(snapshot.tools[0]?.image).toBe(
+      "https://raw.githubusercontent.com/p-o-ke-nae/pokenae.Content/base-revision/content/tools/images/pokenaeLogo.png",
+    );
+    expect(snapshot.apps[0]?.image).toBe(
+      "https://raw.githubusercontent.com/p-o-ke-nae/pokenae.Content/base-revision/content/apps/images/pokenaeLogo.png",
+    );
+  });
 });

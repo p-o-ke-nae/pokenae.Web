@@ -35,7 +35,7 @@ node -e "const fs=require('fs'); process.stdout.write(Buffer.from(fs.readFileSyn
 - 変更対象が対応する設定ファイル、`content/updates/<kind>-*.json`、バナーの場合は `content/home/images/*.webp` のみ
 - 画面で読み込んだ head SHA と保存直前の head SHA が一致する
 
-保存時は、バナーとニュースを同じcommit revisionに固定したhome canonical schema、ツールをtool canonical schema、全種類のupdate JSONをupdate canonical schemaで検証します。schemaを取得・解釈できない場合はfail closedで保存しません。ツールは各 `content/tools/<slug>.json` を個別検証し、canonical schemaとの不整合を項目エラーとして返して、Pull Requestを作成・更新しません。削除されたツールのファイルも同じcommitから削除します。画像欄はURLまたは既存パスを指定するWeb要件として維持しますが、Content側schemaが `image` を許可するまでは明示的なschemaエラーとなり、画像指定を黙って削除しません。update JSONには種類に応じた `target` と `href` を生成し、公開変更は `visible: true`、タグ管理の内部変更は `visible: false` とします。
+保存時は、バナーとニュースを同じcommit revisionに固定したhome canonical schema、ツールをtool canonical schema、全種類のupdate JSONをupdate canonical schemaで検証します。schemaを取得・解釈できない場合はfail closedで保存しません。ツールは各 `content/tools/<slug>.json` を個別検証し、canonical schemaとの不整合を項目エラーとして返して、Pull Requestを作成・更新しません。削除されたツールのファイルも同じcommitから削除します。画像欄はURLまたは既存パスを指定するWeb要件として維持しますが、Content側schemaが `image` を許可するまでは明示的なschemaエラーとなり、画像指定を黙って削除しません。tool/app の `image` に `./images/...` の相対パスを指定した場合は、公開表示時に同じ `content/tools` または `content/apps` 配下のcommit固定raw URLへ解決します。update JSONには種類に応じた `target` と `href` を生成し、公開変更は `visible: true`、タグ管理の内部変更は `visible: false` とします。
 
 タグは `fixtures/tags.json` の安定 ID と `fixtures/tag-labels.json` の表示名を分離して管理します。記事 frontmatter の `tags` / `relatedTags` は従来どおり ID を保持するため、表示名の変更だけでは既存記事を書き換えません。タグを削除すると、同じ Pull Request 内で全記事の `tags` / `relatedTags` から対象 ID を除去します。
 
