@@ -1,8 +1,6 @@
 # 開発環境用オーバーライド（developブランチのリリース前チェック用・コーディングはしない）
 # ローカル: docker compose -p pokenae-dev -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 # CI/CD:    docker compose -p pokenae-dev -f docker-compose.yml -f docker-compose.dev.yml up -d
-version: '3.8'
-
 services:
   app:
     env_file:
@@ -21,11 +19,13 @@ services:
       - "${PORT:-3002}:3000"
     environment:
       NODE_ENV: production
+      DEPLOY_SHA: ${DEPLOY_SHA:-unknown}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3002}
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
       USER_API_BASE_URL: ${USER_API_BASE_URL:-}
       API_SERVICES: ${API_SERVICES:-}
+      API_SERVICE_GAME_LIBRARY_API_BASE_URL: ${API_SERVICE_GAME_LIBRARY_API_BASE_URL:-}
       API_SERVICE_1_BASE_URL: ${API_SERVICE_1_BASE_URL:-}
       API_SERVICE_2_BASE_URL: ${API_SERVICE_2_BASE_URL:-}
       API_SERVICE_3_BASE_URL: ${API_SERVICE_3_BASE_URL:-}

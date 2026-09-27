@@ -1,7 +1,5 @@
 # デバッグ環境用オーバーライド（ホットリロード有効・コーディングしながら動作確認する環境）
 # 使い方: docker compose --env-file .env.docker.debug -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml up --build
-version: '3.8'
-
 services:
   app:
     env_file:

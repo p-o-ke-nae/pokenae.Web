@@ -62,7 +62,7 @@ entrypoint 自体を非 root で起動した場合は追加の権限変更を行
 
 GitHub Actions でのデプロイ時は、GitHub Secrets に登録した値をワークフロー内で VPS の `secrets/` ディレクトリに書き込みます。
 
-#### GitHub リポジトリに登録が必要な Secrets
+#### GitHub に登録が必要な Secrets
 
 **Settings → Secrets and variables → Actions → New repository secret** で以下を登録：
 
@@ -73,10 +73,50 @@ GitHub Actions でのデプロイ時は、GitHub Secrets に登録した値を�
 | `GOOGLE_CLIENT_SECRET` | Google OAuth2 クライアントシークレット                          |
 | `PROD_NEXTAUTH_URL`    | 本番環境のNextAuth URL（例: `https://pokenae.example.com`）     |
 | `PROD_API_URL`         | 本番環境のバックエンド API URL                                  |
-| `ADMIN_ALLOWED_EMAILS` | 管理画面を利用できるメールアドレス（任意、カンマ区切り）        |
+| `ADMIN_EMAILS`         | 管理画面を利用できるメールアドレス（任意、カンマ区切り）        |
 | `DEV_NEXTAUTH_URL`     | 開発環境のNextAuth URL（例: `https://dev.pokenae.example.com`） |
 
-デプロイワークフロー（`.github/workflows/main.yml`）が自動的に VPS 上の `~/pokenae-web/secrets/` にファイルを作成し、Docker Compose secrets として利用します。VPS 上ではデプロイ用ユーザーを所有者として、`secrets/` を `700`、既存ファイルを含む配下の全シークレットファイルを `600` に毎回矯正します。Docker runner は secrets の読み取り時だけ root で動作し、読み取り後は必ず UID/GID 1001 に降格します。デプロイ検証では Node.js プロセスの UID が 1001 であることも確認します。
+加えて、**Settings → Environments → production → Environment secrets** に
+`VPS_RUNTIME_ENV` を登録します。値は `.env` 形式の複数行テキストです。
+最低限、次の runtime 設定を含めます。
+
+```dotenv
+NEXT_PUBLIC_API_BASE_URL=https://api.example.com
+NEXT_PUBLIC_API_URL=https://api.example.com
+CONTENT_REPOSITORY_OWNER=p-o-ke-nae
+CONTENT_REPOSITORY_NAME=pokenae.Content
+CONTENT_REPOSITORY_REF=main
+GAME_LIBRARY_API_VERSION_RANGE=>=1.0.0 <2.0.0
+```
+
+`NEXT_PUBLIC_API_BASE_URL` と `NEXT_PUBLIC_API_URL` は本番 VPS
+デプロイの必須値です。ゲームライブラリ API の接続先は GitHub Repository
+Variable `PROD_GAME_LIBRARY_API_BASE_URL` を正本とし、デプロイ時に
+`API_SERVICE_GAME_LIBRARY_API_BASE_URL` として明示的に上書きします。
+Google OAuth2 / NextAuth、管理者メール、GitHub App の値は
+`VPS_RUNTIME_ENV` に重複登録せず、従来どおり個別の GitHub Secrets から Docker
+Compose secrets として渡します。`.env.docker.production` やその内容を Git に
+コミットしないでください。
+
+デプロイワークフロー（`.github/workflows/main.yml`）は
+`VPS_RUNTIME_ENV` の構文と必須値を検証し、VPS 上の
+`~/pokenae-web/.env.docker.production` へデプロイユーザー所有・`600` で
+原子的に配置します。その後、稼働中コンテナを停止する前に
+`docker compose config` を実行します。設定が不足・不正な場合は現行
+コンテナを停止せずデプロイを終了するため、VPS 上で env ファイルを手動作成する
+必要はありません。
+
+認証用ファイルは従来どおり VPS 上の `~/pokenae-web/secrets/` に作成します。
+VPS 上ではデプロイ用ユーザーを所有者として、`secrets/` を `700`、既存ファイルを
+含む配下の全シークレットファイルを `600` に毎回矯正します。Docker runner は
+secrets の読み取り時だけ root で動作し、読み取り後は必ず UID/GID 1001 に
+降格します。デプロイ検証では Node.js プロセスの UID が 1001 であることも
+確認します。
+
+`VPS_RUNTIME_ENV` を更新した場合は `main` のデプロイを再実行してください。
+`VPS_RUNTIME_ENV is not configured`、`Invalid runtime env syntax`、または
+`Missing or empty required runtime env key` が表示された場合は、production
+Environment の secret 名、各行の `KEY=value` 形式、必須キーを確認します。
 
 entrypoint のコンテナ単体テストは、Docker daemon が利用可能な環境で次のように実行できます。
 
