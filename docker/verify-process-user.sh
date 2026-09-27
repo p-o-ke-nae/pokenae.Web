@@ -11,6 +11,12 @@ case "$expected_uid" in
     ;;
 esac
 
+verifier_uid=$(id -u)
+if [ "$verifier_uid" != "$expected_uid" ]; then
+  echo "verify-process-user: verifier must run as UID $expected_uid; running as UID $verifier_uid" >&2
+  exit 2
+fi
+
 node_processes=0
 invalid_processes=0
 
@@ -31,7 +37,7 @@ for process_dir in /proc/[0-9]*; do
 done
 
 if [ "$node_processes" -eq 0 ]; then
-  echo "verify-process-user: no running Node.js process was found" >&2
+  echo "verify-process-user: no running Node.js process was visible to UID $expected_uid" >&2
   exit 1
 fi
 
