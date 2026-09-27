@@ -7,7 +7,7 @@ declare -ag ACA_SECRET_ENV_ARGS=()
 
 prepare_aca_secret_references() {
   local input="${1-}"
-  local line key value secret_name
+  local line key value secret_name github_app_disabled_count
   local -a parsed_keys=()
   local -A parsed_values=()
   local -A seen_keys=()
@@ -71,6 +71,18 @@ prepare_aca_secret_references() {
       parsed_values["${key}"]=""
     fi
   done
+
+  github_app_disabled_count=0
+  [[ "${parsed_values[GITHUB_APP_ID]}" == "${optional_disabled_values[GITHUB_APP_ID]}" ]] &&
+    github_app_disabled_count=$((github_app_disabled_count + 1))
+  [[ "${parsed_values[GITHUB_APP_INSTALLATION_ID]}" == "${optional_disabled_values[GITHUB_APP_INSTALLATION_ID]}" ]] &&
+    github_app_disabled_count=$((github_app_disabled_count + 1))
+  [[ "${parsed_values[GITHUB_APP_PRIVATE_KEY_BASE64]}" == "${optional_disabled_values[GITHUB_APP_PRIVATE_KEY_BASE64]}" ]] &&
+    github_app_disabled_count=$((github_app_disabled_count + 1))
+  if [[ "${github_app_disabled_count}" -ne 0 && "${github_app_disabled_count}" -ne 3 ]]; then
+    printf '[ERROR] GitHub App secrets must all use disabled sentinel values or all use real credentials.\n' >&2
+    return 1
+  fi
 
   for key in "${parsed_keys[@]}"; do
     value="${parsed_values[${key}]}"

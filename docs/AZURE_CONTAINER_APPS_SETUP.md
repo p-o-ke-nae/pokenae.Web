@@ -230,45 +230,61 @@ Container Apps のデプロイに必要な最小権限を付与する場合:
 > **CLI 自動化**: `setup-azure-aca.sh` の **ステップ 5** に該当（GitHub CLI 使用）
 
 GitHub Actions のワークフローが参照するシークレットと変数を登録します。
+アプリ設定は `development` / `copilot` GitHub Environment ごとに管理し、
+Azure Container Apps 上で直接編集しません。
 
 ### GitHub での手順
 
 1. GitHub リポジトリページ → **「Settings」** → **「Secrets and variables」** → **「Actions」**
 
-#### Secrets（機密情報）
+#### Environment Secrets（機密情報）
 
-**「New repository secret」** で以下を追加:
+**「Environments」** → 対象 Environment → **「Environment secrets」** で以下を追加:
 
-| Secret 名              | 値                                    | 説明                         |
-| ---------------------- | ------------------------------------- | ---------------------------- |
-| `AZURE_CREDENTIALS`    | サービスプリンシパルの JSON 全体      | ステップ 5-1 で取得した JSON |
-| `NEXTAUTH_SECRET`      | NextAuth のシークレット               | （既存のシークレットを流用） |
-| `GOOGLE_CLIENT_ID`     | Google OAuth クライアント ID          | （既存のシークレットを流用） |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth クライアントシークレット | （既存のシークレットを流用） |
-| `AZURE_CLIENT_ID`       | OIDC 用 Azure Client ID               | GitHub Environment の federated credential と対応 |
-| `AZURE_TENANT_ID`       | Azure Tenant ID                        | OIDC 用 |
-| `AZURE_SUBSCRIPTION_ID` | Azure Subscription ID                  | OIDC 用 |
+| Secret 名                   | 値                                    | 説明 |
+| --------------------------- | ------------------------------------- | ---- |
+| `NEXTAUTH_SECRET`           | NextAuth のシークレット               | 環境別の認証キー |
+| `GOOGLE_CLIENT_ID`          | Google OAuth クライアント ID          | Google OAuth2 |
+| `GOOGLE_CLIENT_SECRET`      | Google OAuth クライアントシークレット | Google OAuth2 |
+| `ADMIN_EMAILS`              | 管理者メール（カンマ区切り）          | 任意 |
+| `GH_APP_ID`                 | GitHub App ID                          | 未構成時は `0` |
+| `GH_APP_INSTALLATION_ID`    | GitHub App installation ID            | 未構成時は `0` |
+| `GH_APP_PRIVATE_KEY_BASE64` | PEM 秘密鍵の base64                    | 未構成時は `ZGlzYWJsZWQ=` |
 
-> **注**: `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` は既に VPS デプロイ用に登録済みの場合、追加不要です。
+Azure OIDC の `AZURE_CREDENTIALS`、または `AZURE_CLIENT_ID` /
+`AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` は既存の Repository Secrets を
+共有できます。環境ごとに異なる場合だけ Environment Secrets で上書きします。
 
-#### Variables（公開可能な設定値）
+#### Environment Variables（公開可能なアプリ設定）
 
-**「Variables」** タブ → **「New repository variable」** で以下を追加:
+各 Environment の **「Environment variables」** に同じキー名で環境別の値を追加:
 
-| Variable 名                     | 値の例                                                           | 説明                                                 |
-| ------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------- |
-| `AZURE_RESOURCE_GROUP`          | `ASPGroup`                                                       | リソースグループ名                                   |
-| `PROD_NEXTAUTH_URL_ACA`         | `https://pokenae-web-prod.<リージョン>.azurecontainerapps.io`    | 本番 ACA の FQDN                                     |
-| `DEV_NEXTAUTH_URL_ACA`          | `https://pokenae-web-develop.<リージョン>.azurecontainerapps.io` | 開発 ACA の FQDN                                     |
-| `DEV_GAME_LIBRARY_API_BASE_URL` | `https://game-library-dev.example.com`                           | develop ACA が参照する game-library-api のベース URL |
-| `COPILOT_NEXTAUTH_URL_ACA`      | `https://pokenae-web-copilot.<リージョン>.azurecontainerapps.io` | Copilot 検証用 ACA の FQDN                           |
-| `ACR_NAME`                     | `pokenaewebacr`                                                    | ACR 名                                               |
-| `ACR_LOGIN_SERVER`             | `pokenaewebacr.azurecr.io`                                         | ACR login server                                     |
-| `ACR_PULL_IDENTITY_ID`         | `/subscriptions/.../userAssignedIdentities/pokenae-acr-pull`     | ACA pull 用 UAMI の完全な resource ID                |
+| Variable 名                             | 値の例 | 説明 |
+| --------------------------------------- | ------ | ---- |
+| `NEXTAUTH_URL`                          | `https://pokenae-web-develop.<region>.azurecontainerapps.io` | 対象 ACA の URL |
+| `NEXT_PUBLIC_API_BASE_URL`              | `https://game-library-dev.example.com` | 既定 API URL |
+| `NEXT_PUBLIC_API_URL`                   | 上記と同じ | 互換用 API URL |
+| `NEXT_PUBLIC_GOOGLE_REDIRECT_URI`       | `<NEXTAUTH_URL>/api/auth/callback/google` | Google callback |
+| `API_SERVICES`                          | `game-library-api` | 利用サービス |
+| `API_SERVICE_GAME_LIBRARY_API_BASE_URL` | `https://game-library-dev.example.com` | game-library-api URL |
+| `CONTENT_REPOSITORY_OWNER`              | `p-o-ke-nae` | content owner |
+| `CONTENT_REPOSITORY_NAME`               | `pokenae.Content` | content repository |
+| `CONTENT_REPOSITORY_REF`                | `main` | content branch |
+| `GAME_LIBRARY_API_VERSION_RANGE`        | `>=1.0.0 <2.0.0` | 対応 API version |
+
+#### Repository Variables（共有インフラ）
+
+| Variable 名             | 値の例                                                       | 説明 |
+| ----------------------- | ------------------------------------------------------------ | ---- |
+| `AZURE_RESOURCE_GROUP`  | `ASPGroup`                                                   | リソースグループ名 |
+| `ACR_NAME`              | `pokenaewebacr`                                              | ACR 名 |
+| `ACR_LOGIN_SERVER`      | `pokenaewebacr.azurecr.io`                                   | ACR login server |
+| `ACR_PULL_IDENTITY_ID`  | `/subscriptions/.../userAssignedIdentities/pokenae-acr-pull` | ACA pull 用 UAMI |
 
 > **FQDN の確認方法**: Azure Portal → Container App → **「概要」** → **「アプリケーション URL」** に表示されます。
 >
-> 現在の本番 Web は VPS へデプロイされます。`PROD_GAME_LIBRARY_API_BASE_URL` は `.env.docker.production` ではなく GitHub Actions の Repository Variable から本番コンテナへ注入されます。
+> 現在の本番 Web は VPS へデプロイされます。VPS も ACA と同じキー名を
+> `production` Environment に登録し、Actions が `.env.docker.production` を生成します。
 
 ---
 
@@ -288,7 +304,7 @@ ACA ではカスタムドメインの設定とマネージド TLS 証明書の�
 8. **「追加」** をクリック
 
 > **重要**: カスタムドメインを設定した場合、`NEXTAUTH_URL` を新しいドメインに更新する必要があります。  
-> GitHub Variables の `PROD_NEXTAUTH_URL_ACA` をカスタムドメインに変更してください。
+> GitHub `production` Environment Variable の `NEXTAUTH_URL` をカスタムドメインに変更してください。
 
 ---
 

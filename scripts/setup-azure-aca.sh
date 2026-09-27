@@ -234,16 +234,22 @@ if command -v gh > /dev/null 2>&1; then
       log_success "Variable AZURE_RESOURCE_GROUP を設定" || \
       log_warn "Variable AZURE_RESOURCE_GROUP の設定に失敗（既に存在する可能性あり）"
 
-    if [ -n "${PROD_FQDN}" ] && [ "${PROD_FQDN}" != "（取得失敗）" ]; then
-      gh variable set PROD_NEXTAUTH_URL_ACA --body "https://${PROD_FQDN}" 2>/dev/null && \
-        log_success "Variable PROD_NEXTAUTH_URL_ACA を設定" || \
-        log_warn "Variable PROD_NEXTAUTH_URL_ACA の設定に失敗"
-    fi
-
     if [ -n "${DEV_FQDN}" ] && [ "${DEV_FQDN}" != "（取得失敗）" ]; then
-      gh variable set DEV_NEXTAUTH_URL_ACA --body "https://${DEV_FQDN}" 2>/dev/null && \
-        log_success "Variable DEV_NEXTAUTH_URL_ACA を設定" || \
-        log_warn "Variable DEV_NEXTAUTH_URL_ACA の設定に失敗"
+      gh api --method PUT "repos/{owner}/{repo}/environments/development" > /dev/null
+      gh variable set NEXTAUTH_URL --env development --body "https://${DEV_FQDN}" 2>/dev/null && \
+        log_success "development Environment の NEXTAUTH_URL を設定" || \
+        log_warn "development Environment の NEXTAUTH_URL 設定に失敗"
+      gh variable set NEXT_PUBLIC_GOOGLE_REDIRECT_URI \
+        --env development \
+        --body "https://${DEV_FQDN}/api/auth/callback/google" 2>/dev/null && \
+        log_success "development Environment の Google redirect URI を設定" || \
+        log_warn "development Environment の Google redirect URI 設定に失敗"
+
+      gh secret set GH_APP_ID --env development --body "0" 2>/dev/null &&
+        gh secret set GH_APP_INSTALLATION_ID --env development --body "0" 2>/dev/null &&
+        gh secret set GH_APP_PRIVATE_KEY_BASE64 --env development --body "ZGlzYWJsZWQ=" 2>/dev/null &&
+        log_success "development Environment の GitHub App 無効化センチネルを設定" ||
+        log_warn "development Environment の GitHub App 無効化センチネル設定に失敗"
     fi
 
     # Secrets（機密情報 — SP JSON がある場合のみ）
@@ -253,9 +259,7 @@ if command -v gh > /dev/null 2>&1; then
         log_warn "Secret AZURE_CREDENTIALS の設定に失敗"
     fi
 
-    log_info "GHCR_USERNAME と GHCR_PASSWORD は手動で登録してください。"
-    log_info "  gh secret set GHCR_USERNAME"
-    log_info "  gh secret set GHCR_PASSWORD"
+    log_info "残りの Environment Variables / Secrets は docs/AZURE_CONTAINER_APPS_SETUP.md に従って登録してください。"
   fi
 else
   log_warn "GitHub CLI (gh) が見つかりません。シークレット・変数は手動で登録してください。"

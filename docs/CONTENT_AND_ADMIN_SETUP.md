@@ -62,10 +62,12 @@ node -e "const fs=require('fs'); process.stdout.write(Buffer.from(fs.readFileSyn
 Repository/Environment Secrets:
 
 - `ADMIN_EMAILS`
-- `GITHUB_APP_ID`
-- `GITHUB_APP_INSTALLATION_ID`
-- `GITHUB_APP_PRIVATE_KEY_BASE64`
+- `GH_APP_ID`（コンテナでは `GITHUB_APP_ID`）
+- `GH_APP_INSTALLATION_ID`（コンテナでは `GITHUB_APP_INSTALLATION_ID`）
+- `GH_APP_PRIVATE_KEY_BASE64`（コンテナでは `GITHUB_APP_PRIVATE_KEY_BASE64`）
 
-ACAデプロイでは、スペース区切りの `KEY=VALUE` のうち値が設定されたsecretだけを登録します。未設定の管理用secretは警告して省略されるため公開サイトのデプロイは継続しますが、管理APIは資格情報不足としてfail closedのままです。空または環境変数名として不正なKEYは設定ミスとしてデプロイを停止します。`NEXTAUTH_SECRET`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` は従来どおり、設定されている場合にACAへsecret参照として渡されます。
+GitHubは`GITHUB_`で始まるSecret名を予約しているため、GitHub上では`GH_APP_*`を使用し、workflowがコンテナ用の`GITHUB_APP_*`へ変換します。未構成環境では`GH_APP_ID=0`、`GH_APP_INSTALLATION_ID=0`、`GH_APP_PRIVATE_KEY_BASE64=ZGlzYWJsZWQ=`を登録します。3値が揃った場合だけ無効化センチネルとして扱われ、公開サイトのデプロイは継続しますが、管理APIは資格情報不足としてfail closedのままです。
+
+ACAデプロイでは、Environment SecretsをAzure secretsへ設定し、常に同じsecretrefでコンテナへ渡します。必須secretの空値、またはGitHub Appの実値とセンチネルの混在は設定ミスとして拒否します。`NEXTAUTH_SECRET`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`も同じEnvironment Secretsから渡します。
 
 公開設定 `CONTENT_REPOSITORY_OWNER`、`CONTENT_REPOSITORY_NAME`、`CONTENT_REPOSITORY_REF` はVariablesまたはCompose環境変数として注入します。秘密鍵はクライアント向け `NEXT_PUBLIC_*` に設定しないでください。

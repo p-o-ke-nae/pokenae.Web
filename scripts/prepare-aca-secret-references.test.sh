@@ -59,6 +59,18 @@ grep -Fqx "admin-emails=__disabled_admin__@invalid.invalid" "${output_file}" ||
 grep -Fqx "ADMIN_EMAILS=secretref:admin-emails" "${output_file}" ||
   fail "disabled ADMIN_EMAILS secret reference was not prepared"
 
+if run_parser 'NEXTAUTH_SECRET=nextauth
+GOOGLE_CLIENT_ID=google-id
+GOOGLE_CLIENT_SECRET=google-secret
+GITHUB_APP_ID=0
+GITHUB_APP_INSTALLATION_ID=456
+GITHUB_APP_PRIVATE_KEY_BASE64=ZGlzYWJsZWQ='; then
+  fail "mixed GitHub App disabled and real values were accepted"
+fi
+grep -Fqx \
+  "[ERROR] GitHub App secrets must all use disabled sentinel values or all use real credentials." \
+  "${log_file}" || fail "mixed GitHub App credential error was not emitted"
+
 if run_parser 'NEXTAUTH_SECRET=
 GOOGLE_CLIENT_ID=google-id
 GOOGLE_CLIENT_SECRET=google-secret'; then
