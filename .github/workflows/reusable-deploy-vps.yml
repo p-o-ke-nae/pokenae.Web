@@ -19,13 +19,17 @@ on:
       project_name:
         required: true
         type: string
-      container_name:
-        required: true
-        type: string
       image_tag:
         required: true
         type: string
       port:
+        required: true
+        type: string
+      api_services:
+        required: false
+        type: string
+        default: game-library-api
+      game_library_api_base_url:
         required: true
         type: string
     secrets:
@@ -70,6 +74,27 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Validate deployment configuration
+        env:
+          GAME_LIBRARY_API_BASE_URL: ${{ inputs.game_library_api_base_url }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$GAME_LIBRARY_API_BASE_URL" ]; then
+            echo "::error::PROD_GAME_LIBRARY_API_BASE_URL is not configured"
+            exit 1
+          fi
+
+          node -e "
+            const url = new URL(process.env.GAME_LIBRARY_API_BASE_URL);
+            if (url.protocol !== 'https:') {
+              throw new Error('PROD_GAME_LIBRARY_API_BASE_URL must use HTTPS');
+            }
+            if (url.username || url.password || url.search || url.hash) {
+              throw new Error('PROD_GAME_LIBRARY_API_BASE_URL must be a base URL without credentials, query, or fragment');
+            }
+          "
 
       - name: Create .ssh directory and add known hosts
         env:
@@ -265,7 +290,10 @@ jobs:
           RUNTIME_ENV_FILE: ${{ inputs.runtime_env_file }}
           RUNTIME_ENV_STAGING: .${{ inputs.runtime_env_file }}.upload-${{ github.run_id }}-${{ github.run_attempt }}
           PROJECT_NAME: ${{ inputs.project_name }}
-          CONTAINER_NAME: ${{ inputs.container_name }}
+          PORT: ${{ inputs.port }}
+          DEPLOY_SHA: ${{ github.sha }}
+          API_SERVICES: ${{ inputs.api_services }}
+          GAME_LIBRARY_API_BASE_URL: ${{ inputs.game_library_api_base_url }}
           NEXTAUTH_URL: ${{ secrets.nextauth_url }}
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_ACTOR: ${{ github.actor }}
@@ -277,13 +305,16 @@ jobs:
           chmod 600 private_key
 
           printf -v remote_command \
-            'IMAGE=%q OVERRIDE_COMPOSE_FILE=%q RUNTIME_ENV_FILE=%q RUNTIME_ENV_STAGING=%q PROJECT_NAME=%q CONTAINER_NAME=%q NEXTAUTH_URL=%q GITHUB_TOKEN=%q GITHUB_ACTOR=%q bash -s' \
+            'IMAGE=%q OVERRIDE_COMPOSE_FILE=%q RUNTIME_ENV_FILE=%q RUNTIME_ENV_STAGING=%q PROJECT_NAME=%q PORT=%q DEPLOY_SHA=%q API_SERVICES=%q API_SERVICE_GAME_LIBRARY_API_BASE_URL=%q NEXTAUTH_URL=%q GITHUB_TOKEN=%q GITHUB_ACTOR=%q bash -s' \
             "$IMAGE" \
             "$OVERRIDE_COMPOSE_FILE" \
             "$RUNTIME_ENV_FILE" \
             "$RUNTIME_ENV_STAGING" \
             "$PROJECT_NAME" \
-            "$CONTAINER_NAME" \
+            "$PORT" \
+            "$DEPLOY_SHA" \
+            "$API_SERVICES" \
+            "$GAME_LIBRARY_API_BASE_URL" \
             "$NEXTAUTH_URL" \
             "$GITHUB_TOKEN" \
             "$GITHUB_ACTOR"
@@ -292,6 +323,13 @@ jobs:
           set -euo pipefail
 
           cd ~/pokenae-web
+
+          get_container_id() {
+            docker ps -aq \
+              --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
+              --filter "label=com.docker.compose.service=app" |
+              head -n 1
+          }
 
           if [ -z "${NEXTAUTH_URL:-}" ]; then
             echo "[ERROR] nextauth_url is empty."
@@ -362,41 +400,76 @@ jobs:
           echo "[INFO] Pulling image..."
           docker pull "${IMAGE}"
 
-          echo "[INFO] Stopping existing compose project..."
-          IMAGE="${IMAGE}" docker compose \
+          echo "[INFO] Starting container with docker compose..."
+          PREVIOUS_CONTAINER_ID="$(get_container_id)"
+          PREVIOUS_IMAGE_ID="$(docker inspect --format='{{.Image}}' "${PREVIOUS_CONTAINER_ID}" 2>/dev/null || true)"
+          if ! IMAGE="${IMAGE}" \
+            NEXTAUTH_URL="${NEXTAUTH_URL}" \
+            DEPLOY_SHA="${DEPLOY_SHA}" \
+            docker compose \
             --env-file "${RUNTIME_ENV_FILE}" \
             -p "${PROJECT_NAME}" \
             -f docker-compose.yml \
             -f "${OVERRIDE_COMPOSE_FILE}" \
-            down --remove-orphans 2>/dev/null || true
-
-          echo "[INFO] Removing stale container if exists..."
-          for i in $(seq 1 10); do
-            if docker ps -a --format '{{.Names}}' | grep -qx "${CONTAINER_NAME}"; then
-              docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
-              sleep 2
-              continue
+            up -d --no-build --force-recreate --remove-orphans; then
+            echo "[ERROR] Failed to start the new container"
+            if [ -n "${PREVIOUS_IMAGE_ID}" ]; then
+              echo "[INFO] Restoring previous image..."
+              IMAGE="${PREVIOUS_IMAGE_ID}" \
+                NEXTAUTH_URL="${NEXTAUTH_URL}" \
+                DEPLOY_SHA="${DEPLOY_SHA}" \
+                docker compose \
+                --env-file "${RUNTIME_ENV_FILE}" \
+                -p "${PROJECT_NAME}" \
+                -f docker-compose.yml \
+                -f "${OVERRIDE_COMPOSE_FILE}" \
+                up -d --no-build --force-recreate
+              for i in $(seq 1 12); do
+                if curl -sf "http://127.0.0.1:${PORT}/api/health" > /dev/null; then
+                  echo "[INFO] Previous image restored"
+                  break
+                fi
+                sleep 5
+              done
             fi
-            break
-          done
-
-          if docker ps -a --format '{{.Names}}' | grep -qx "${CONTAINER_NAME}"; then
-            echo "[ERROR] Stale container still exists: ${CONTAINER_NAME}"
             exit 1
           fi
 
-          echo "[INFO] Starting container with docker compose..."
-          IMAGE="${IMAGE}" \
-          NEXTAUTH_URL="${NEXTAUTH_URL}" \
-          docker compose \
-            --env-file "${RUNTIME_ENV_FILE}" \
-            -p "${PROJECT_NAME}" \
-            -f docker-compose.yml \
-            -f "${OVERRIDE_COMPOSE_FILE}" \
-            up -d --no-build --force-recreate
+          echo "[INFO] Waiting for the new container to become healthy..."
+          for i in $(seq 1 24); do
+            CONTAINER_ID="$(get_container_id)"
+            CONTAINER_STATUS="$(docker inspect --format='{{.State.Status}}' "${CONTAINER_ID}" 2>/dev/null || echo not_found)"
+            HEALTH_STATUS="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${CONTAINER_ID}" 2>/dev/null || echo none)"
+            if [ "${CONTAINER_STATUS}" = "running" ] &&
+               [ "${HEALTH_STATUS}" = "healthy" ] &&
+               curl -sf "http://127.0.0.1:${PORT}/api/health" > /dev/null; then
+              echo "[SUCCESS] New container is healthy"
+              docker image prune -f
+              exit 0
+            fi
+            echo "[INFO] Waiting for healthy startup... (${i}/24) status=${CONTAINER_STATUS}, health=${HEALTH_STATUS}"
+            sleep 5
+          done
 
-          echo "[INFO] Cleaning up old images..."
-          docker image prune -f
+          echo "[ERROR] New container failed its health check"
+          docker ps -a \
+            --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
+            --filter "label=com.docker.compose.service=app" || true
+          docker logs "$(get_container_id)" --tail 100 2>/dev/null || true
+
+          if [ -n "${PREVIOUS_IMAGE_ID}" ]; then
+            echo "[INFO] Restoring previous image..."
+            IMAGE="${PREVIOUS_IMAGE_ID}" \
+              NEXTAUTH_URL="${NEXTAUTH_URL}" \
+              DEPLOY_SHA="${DEPLOY_SHA}" \
+              docker compose \
+              --env-file "${RUNTIME_ENV_FILE}" \
+              -p "${PROJECT_NAME}" \
+              -f docker-compose.yml \
+              -f "${OVERRIDE_COMPOSE_FILE}" \
+              up -d --no-build --force-recreate
+          fi
+          exit 1
           EOF
 
       - name: Verify deployment
@@ -404,6 +477,7 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
           HOST: ${{ secrets.host }}
           USERNAME: ${{ secrets.username }}
+          SITE_URL: ${{ secrets.nextauth_url }}
         run: |
           set -euo pipefail
           trap 'rm -f private_key' EXIT
@@ -412,21 +486,31 @@ jobs:
           chmod 600 private_key
 
           ssh "$USERNAME@$HOST" -i private_key -p 22 \
-            "CONTAINER_NAME=${{ inputs.container_name }} \
+            "PROJECT_NAME=${{ inputs.project_name }} \
              PORT=${{ inputs.port }} \
              bash -s" <<'EOF'
           set -euo pipefail
 
           echo "[INFO] Verifying deployment..."
 
+          get_container_id() {
+            docker ps -aq \
+              --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
+              --filter "label=com.docker.compose.service=app" |
+              head -n 1
+          }
+
+          VERIFIED=false
           for i in $(seq 1 24); do
-            CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo "not_found")
-            HEALTH_STATUS=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${CONTAINER_NAME}" 2>/dev/null || echo "none")
+            CONTAINER_ID="$(get_container_id)"
+            CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' "${CONTAINER_ID}" 2>/dev/null || echo "not_found")
+            HEALTH_STATUS=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${CONTAINER_ID}" 2>/dev/null || echo "none")
 
             if [ "$CONTAINER_STATUS" = "running" ] && [ "$HEALTH_STATUS" != "unhealthy" ]; then
-              if curl -sf "http://localhost:${PORT}/" > /dev/null 2>&1; then
+              if curl -sf "http://127.0.0.1:${PORT}/api/health" > /dev/null 2>&1; then
                 echo "[SUCCESS] Application is responding on port ${PORT}"
-                exit 0
+                VERIFIED=true
+                break
               fi
             fi
 
@@ -434,10 +518,14 @@ jobs:
             sleep 5
           done
 
-          echo "[ERROR] Deployment verification timed out"
-          docker ps -a --filter "name=${CONTAINER_NAME}" || true
-          docker logs "${CONTAINER_NAME}" --tail 100 2>/dev/null || true
-          exit 1
+          if [ "${VERIFIED}" != "true" ]; then
+            echo "[ERROR] Deployment verification timed out"
+            docker ps -a \
+              --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
+              --filter "label=com.docker.compose.service=app" || true
+            docker logs "$(get_container_id)" --tail 100 2>/dev/null || true
+            exit 1
+          fi
           EOF
 
       - name: Verify application privilege drop
@@ -445,6 +533,7 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
           HOST: ${{ secrets.host }}
           USERNAME: ${{ secrets.username }}
+          PROJECT_NAME: ${{ inputs.project_name }}
         run: |
           set -euo pipefail
           trap 'rm -f private_key' EXIT
@@ -452,12 +541,23 @@ jobs:
           printf '%s' "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
 
-          ssh "$USERNAME@$HOST" -i private_key -p 22 \
-            "CONTAINER_NAME=${{ inputs.container_name }} bash -s" <<'EOF'
+          printf -v remote_command 'PROJECT_NAME=%q bash -s' "$PROJECT_NAME"
+          ssh "$USERNAME@$HOST" -i private_key -p 22 "$remote_command" <<'EOF'
           set -euo pipefail
 
+          container_id="$(
+            docker ps -q \
+              --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
+              --filter "label=com.docker.compose.service=app" |
+              head -n 1
+          )"
+          if [ -z "$container_id" ]; then
+            echo "[ERROR] Application container was not found"
+            exit 1
+          fi
+
           node_uid="$(
-            docker exec "${CONTAINER_NAME}" sh -c '
+            docker exec "${container_id}" sh -c '
               for status in /proc/[0-9]*/status; do
                 [ "$(awk "/^Name:/ { print \$2 }" "$status")" = "node" ] || continue
                 awk "/^Uid:/ { print \$2; exit }" "$status"

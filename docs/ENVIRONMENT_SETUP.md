@@ -72,6 +72,8 @@ GitHub Actions でのデプロイ時は、GitHub Secrets に登録した値を�
 | `GOOGLE_CLIENT_ID`     | Google OAuth2 クライアントID                                    |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth2 クライアントシークレット                          |
 | `PROD_NEXTAUTH_URL`    | 本番環境のNextAuth URL（例: `https://pokenae.example.com`）     |
+| `PROD_API_URL`         | 本番環境のバックエンド API URL                                  |
+| `ADMIN_EMAILS`         | 管理画面を利用できるメールアドレス（任意、カンマ区切り）        |
 | `DEV_NEXTAUTH_URL`     | 開発環境のNextAuth URL（例: `https://dev.pokenae.example.com`） |
 
 加えて、**Settings → Environments → production → Environment secrets** に
@@ -81,19 +83,20 @@ GitHub Actions でのデプロイ時は、GitHub Secrets に登録した値を�
 ```dotenv
 NEXT_PUBLIC_API_BASE_URL=https://api.example.com
 NEXT_PUBLIC_API_URL=https://api.example.com
-API_SERVICES=game-library-api
-API_SERVICE_GAME_LIBRARY_API_BASE_URL=https://game-library.example.com
 CONTENT_REPOSITORY_OWNER=p-o-ke-nae
 CONTENT_REPOSITORY_NAME=pokenae.Content
 CONTENT_REPOSITORY_REF=main
 GAME_LIBRARY_API_VERSION_RANGE=>=1.0.0 <2.0.0
 ```
 
-`API_SERVICES` と `API_SERVICE_GAME_LIBRARY_API_BASE_URL` は本番 VPS
-デプロイの必須値です。Google OAuth2 / NextAuth、管理者メール、GitHub App の
-値は `VPS_RUNTIME_ENV` に重複登録せず、従来どおり個別の GitHub Secrets から
-Docker Compose secrets として渡します。`.env.docker.production` やその内容を
-Git にコミットしないでください。
+`NEXT_PUBLIC_API_BASE_URL` と `NEXT_PUBLIC_API_URL` は本番 VPS
+デプロイの必須値です。ゲームライブラリ API の接続先は GitHub Repository
+Variable `PROD_GAME_LIBRARY_API_BASE_URL` を正本とし、デプロイ時に
+`API_SERVICE_GAME_LIBRARY_API_BASE_URL` として明示的に上書きします。
+Google OAuth2 / NextAuth、管理者メール、GitHub App の値は
+`VPS_RUNTIME_ENV` に重複登録せず、従来どおり個別の GitHub Secrets から Docker
+Compose secrets として渡します。`.env.docker.production` やその内容を Git に
+コミットしないでください。
 
 デプロイワークフロー（`.github/workflows/main.yml`）は
 `VPS_RUNTIME_ENV` の構文と必須値を検証し、VPS 上の
