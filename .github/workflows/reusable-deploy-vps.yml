@@ -12,10 +12,6 @@ on:
       runtime_env_file:
         required: true
         type: string
-      required_runtime_env_keys:
-        required: false
-        type: string
-        default: ""
       project_name:
         required: true
         type: string
@@ -25,13 +21,6 @@ on:
       port:
         required: true
         type: string
-      api_services:
-        required: false
-        type: string
-        default: game-library-api
-      game_library_api_base_url:
-        required: true
-        type: string
     secrets:
       host:
         required: true
@@ -39,24 +28,19 @@ on:
         required: true
       ssh_private_key:
         required: true
-      vps_runtime_env:
-        required: false
-        description: Supplied by the selected GitHub Environment as VPS_RUNTIME_ENV
-      nextauth_url:
+      NEXTAUTH_SECRET:
         required: true
-      nextauth_secret:
+      GOOGLE_CLIENT_ID:
         required: true
-      google_client_id:
+      GOOGLE_CLIENT_SECRET:
         required: true
-      google_client_secret:
-        required: true
-      admin_emails:
+      ADMIN_EMAILS:
         required: false
-      github_app_id:
+      GH_APP_ID:
         required: false
-      github_app_installation_id:
+      GH_APP_INSTALLATION_ID:
         required: false
-      github_app_private_key_base64:
+      GH_APP_PRIVATE_KEY_BASE64:
         required: false
 
 jobs:
@@ -77,24 +61,19 @@ jobs:
 
       - name: Validate deployment configuration
         env:
-          GAME_LIBRARY_API_BASE_URL: ${{ inputs.game_library_api_base_url }}
+          NEXTAUTH_URL: ${{ vars.NEXTAUTH_URL }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || vars.NEXT_PUBLIC_API_BASE_URL }}
+          API_SERVICES: ${{ vars.API_SERVICES }}
+          API_SERVICE_GAME_LIBRARY_API_BASE_URL: ${{ vars.API_SERVICE_GAME_LIBRARY_API_BASE_URL }}
+          CONTENT_REPOSITORY_OWNER: ${{ vars.CONTENT_REPOSITORY_OWNER }}
+          CONTENT_REPOSITORY_NAME: ${{ vars.CONTENT_REPOSITORY_NAME }}
+          CONTENT_REPOSITORY_REF: ${{ vars.CONTENT_REPOSITORY_REF }}
+          GAME_LIBRARY_API_VERSION_RANGE: ${{ vars.GAME_LIBRARY_API_VERSION_RANGE }}
         run: |
           set -euo pipefail
-
-          if [ -z "$GAME_LIBRARY_API_BASE_URL" ]; then
-            echo "::error::PROD_GAME_LIBRARY_API_BASE_URL is not configured"
-            exit 1
-          fi
-
-          node -e "
-            const url = new URL(process.env.GAME_LIBRARY_API_BASE_URL);
-            if (url.protocol !== 'https:') {
-              throw new Error('PROD_GAME_LIBRARY_API_BASE_URL must use HTTPS');
-            }
-            if (url.username || url.password || url.search || url.hash) {
-              throw new Error('PROD_GAME_LIBRARY_API_BASE_URL must be a base URL without credentials, query, or fragment');
-            }
-          "
+          trap 'rm -f .validated-runtime-env' EXIT
+          node scripts/write-vps-runtime-env.mjs .validated-runtime-env
 
       - name: Create .ssh directory and add known hosts
         env:
@@ -127,10 +106,16 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
           HOST: ${{ secrets.host }}
           USERNAME: ${{ secrets.username }}
-          RUNTIME_ENV_CONTENT: ${{ secrets.vps_runtime_env }}
           RUNTIME_ENV_FILE: ${{ inputs.runtime_env_file }}
-          REQUIRED_RUNTIME_ENV_KEYS: ${{ inputs.required_runtime_env_keys }}
-          DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment_environment }}
+          NEXTAUTH_URL: ${{ vars.NEXTAUTH_URL }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || vars.NEXT_PUBLIC_API_BASE_URL }}
+          API_SERVICES: ${{ vars.API_SERVICES }}
+          API_SERVICE_GAME_LIBRARY_API_BASE_URL: ${{ vars.API_SERVICE_GAME_LIBRARY_API_BASE_URL }}
+          CONTENT_REPOSITORY_OWNER: ${{ vars.CONTENT_REPOSITORY_OWNER }}
+          CONTENT_REPOSITORY_NAME: ${{ vars.CONTENT_REPOSITORY_NAME }}
+          CONTENT_REPOSITORY_REF: ${{ vars.CONTENT_REPOSITORY_REF }}
+          GAME_LIBRARY_API_VERSION_RANGE: ${{ vars.GAME_LIBRARY_API_VERSION_RANGE }}
         run: |
           set -euo pipefail
           umask 077
@@ -146,62 +131,7 @@ jobs:
               ;;
           esac
 
-          if [ -z "${RUNTIME_ENV_CONTENT:-}" ]; then
-            echo "[ERROR] VPS_RUNTIME_ENV is not configured in the ${DEPLOYMENT_ENVIRONMENT} GitHub Environment."
-            exit 1
-          fi
-
-          printf '%s\n' "$RUNTIME_ENV_CONTENT" | sed 's/\r$//' > "$runtime_env_path"
-          chmod 600 "$runtime_env_path"
-
-          awk '
-            /^[[:space:]]*($|#)/ { next }
-            !/^[A-Za-z_][A-Za-z0-9_]*=/ {
-              printf "[ERROR] Invalid runtime env syntax at line %d.\n", NR > "/dev/stderr"
-              invalid = 1
-              next
-            }
-            {
-              key = $0
-              sub(/=.*/, "", key)
-              if (seen[key]++) {
-                printf "[ERROR] Duplicate runtime env key: %s\n", key > "/dev/stderr"
-                invalid = 1
-              }
-            }
-            END { exit invalid }
-          ' "$runtime_env_path"
-
-          for key in $REQUIRED_RUNTIME_ENV_KEYS; do
-            case "$key" in
-              ""|[!A-Za-z_]*|*[!A-Za-z0-9_]*)
-                echo "[ERROR] Invalid required runtime env key: $key"
-                exit 1
-                ;;
-            esac
-
-            if ! awk -v required_key="$key" '
-              index($0, required_key "=") == 1 {
-                value = substr($0, length(required_key) + 2)
-                sub(/^[[:space:]]+/, "", value)
-                sub(/[[:space:]]+$/, "", value)
-
-                if (value ~ /^".*"$/ || value ~ /^\047.*\047$/) {
-                  value = substr(value, 2, length(value) - 2)
-                  sub(/^[[:space:]]+/, "", value)
-                  sub(/[[:space:]]+$/, "", value)
-                }
-
-                if (length(value) > 0 && value !~ /^#/) {
-                  found = 1
-                }
-              }
-              END { exit !found }
-            ' "$runtime_env_path"; then
-              echo "[ERROR] Missing or empty required runtime env key: $key"
-              exit 1
-            fi
-          done
+          node scripts/write-vps-runtime-env.mjs "$runtime_env_path"
 
           printf '%s' "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
@@ -228,13 +158,13 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
           HOST: ${{ secrets.host }}
           USERNAME: ${{ secrets.username }}
-          NEXTAUTH_SECRET: ${{ secrets.nextauth_secret }}
-          GOOGLE_CLIENT_ID: ${{ secrets.google_client_id }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.google_client_secret }}
-          ADMIN_EMAILS: ${{ secrets.admin_emails }}
-          GITHUB_APP_ID: ${{ secrets.github_app_id }}
-          GITHUB_APP_INSTALLATION_ID: ${{ secrets.github_app_installation_id }}
-          GITHUB_APP_PRIVATE_KEY_BASE64: ${{ secrets.github_app_private_key_base64 }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
+          GITHUB_APP_ID: ${{ secrets.GH_APP_ID }}
+          GITHUB_APP_INSTALLATION_ID: ${{ secrets.GH_APP_INSTALLATION_ID }}
+          GITHUB_APP_PRIVATE_KEY_BASE64: ${{ secrets.GH_APP_PRIVATE_KEY_BASE64 }}
         run: |
           set -euo pipefail
           umask 077
@@ -292,9 +222,7 @@ jobs:
           PROJECT_NAME: ${{ inputs.project_name }}
           PORT: ${{ inputs.port }}
           DEPLOY_SHA: ${{ github.sha }}
-          API_SERVICES: ${{ inputs.api_services }}
-          GAME_LIBRARY_API_BASE_URL: ${{ inputs.game_library_api_base_url }}
-          NEXTAUTH_URL: ${{ secrets.nextauth_url }}
+          NEXTAUTH_URL: ${{ vars.NEXTAUTH_URL }}
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_ACTOR: ${{ github.actor }}
         run: |
@@ -305,7 +233,7 @@ jobs:
           chmod 600 private_key
 
           printf -v remote_command \
-            'IMAGE=%q OVERRIDE_COMPOSE_FILE=%q RUNTIME_ENV_FILE=%q RUNTIME_ENV_STAGING=%q PROJECT_NAME=%q PORT=%q DEPLOY_SHA=%q API_SERVICES=%q API_SERVICE_GAME_LIBRARY_API_BASE_URL=%q NEXTAUTH_URL=%q GITHUB_TOKEN=%q GITHUB_ACTOR=%q bash -s' \
+            'IMAGE=%q OVERRIDE_COMPOSE_FILE=%q RUNTIME_ENV_FILE=%q RUNTIME_ENV_STAGING=%q PROJECT_NAME=%q PORT=%q DEPLOY_SHA=%q NEXTAUTH_URL=%q GITHUB_TOKEN=%q GITHUB_ACTOR=%q bash -s' \
             "$IMAGE" \
             "$OVERRIDE_COMPOSE_FILE" \
             "$RUNTIME_ENV_FILE" \
@@ -313,8 +241,6 @@ jobs:
             "$PROJECT_NAME" \
             "$PORT" \
             "$DEPLOY_SHA" \
-            "$API_SERVICES" \
-            "$GAME_LIBRARY_API_BASE_URL" \
             "$NEXTAUTH_URL" \
             "$GITHUB_TOKEN" \
             "$GITHUB_ACTOR"
@@ -477,7 +403,7 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
           HOST: ${{ secrets.host }}
           USERNAME: ${{ secrets.username }}
-          SITE_URL: ${{ secrets.nextauth_url }}
+          SITE_URL: ${{ vars.NEXTAUTH_URL }}
         run: |
           set -euo pipefail
           trap 'rm -f private_key' EXIT

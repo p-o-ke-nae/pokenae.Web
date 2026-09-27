@@ -3,7 +3,7 @@ name: Reusable Deploy to Azure Container Apps
 # 汎用 ACA デプロイワークフロー
 # - ACR からの pull は user-assigned managed identity を使用
 # - GitHub Actions から ACR への push は OIDC/AcrPush を使用
-# - 環境変数は呼び出し側が env_vars / secret_env_vars で指定
+# - アプリ環境変数は選択された GitHub Environment の Variables / Secrets を使用
 # ===========================================================================
 
 on:
@@ -33,11 +33,6 @@ on:
         required: true
         type: string
         description: GitHub Environment used by the Azure OIDC federated credential
-      env_vars:
-        required: false
-        type: string
-        default: ""
-        description: 公開可能な環境変数（スペース区切り KEY=VALUE 形式）
       health_check_path:
         required: false
         type: string
@@ -49,24 +44,32 @@ on:
         default: 120
         description: デプロイ検証のタイムアウト（秒）
     secrets:
-      azure_credentials:
+      AZURE_CREDENTIALS:
         required: false
         description: Azure Service Principal の JSON 認証情報
-      azure_client_id:
+      AZURE_CLIENT_ID:
         required: false
         description: OIDC 用 Azure Client ID
-      azure_tenant_id:
+      AZURE_TENANT_ID:
         required: false
         description: OIDC 用 Azure Tenant ID
-      azure_subscription_id:
+      AZURE_SUBSCRIPTION_ID:
         required: false
         description: OIDC 用 Azure Subscription ID
-      secret_env_vars:
+      NEXTAUTH_SECRET:
+        required: true
+      GOOGLE_CLIENT_ID:
+        required: true
+      GOOGLE_CLIENT_SECRET:
+        required: true
+      ADMIN_EMAILS:
         required: false
-        description: >
-          機密性のある環境変数（1 行 1 KEY=VALUE 形式）。
-          必須値は空を許可せず、未設定の optional 値は無効値で上書きして
-          常に同じ secretref で参照する。
+      GH_APP_ID:
+        required: false
+      GH_APP_INSTALLATION_ID:
+        required: false
+      GH_APP_PRIVATE_KEY_BASE64:
+        required: false
 
 jobs:
   deploy:
@@ -101,10 +104,10 @@ jobs:
         id: azure-auth
         shell: bash
         env:
-          AZURE_CREDENTIALS: ${{ secrets.azure_credentials }}
-          AZURE_CLIENT_ID: ${{ secrets.azure_client_id }}
-          AZURE_TENANT_ID: ${{ secrets.azure_tenant_id }}
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.azure_subscription_id }}
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
           set -euo pipefail
 
@@ -124,15 +127,15 @@ jobs:
         if: steps.azure-auth.outputs.mode == 'service-principal'
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.azure_credentials }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Login to Azure (OIDC)
         if: steps.azure-auth.outputs.mode == 'oidc'
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.azure_client_id }}
-          tenant-id: ${{ secrets.azure_tenant_id }}
-          subscription-id: ${{ secrets.azure_subscription_id }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Check out deployment scripts
         uses: actions/checkout@v4
@@ -140,13 +143,30 @@ jobs:
       - name: Deploy to Azure Container Apps
         uses: azure/cli@v2
         env:
-          SECRET_ENV_VARS: ${{ secrets.secret_env_vars }}
-          PUBLIC_ENV_VARS: ${{ inputs.env_vars }}
+          SECRET_ENV_VARS: |
+            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+            ADMIN_EMAILS=${{ secrets.ADMIN_EMAILS }}
+            GITHUB_APP_ID=${{ secrets.GH_APP_ID }}
+            GITHUB_APP_INSTALLATION_ID=${{ secrets.GH_APP_INSTALLATION_ID }}
+            GITHUB_APP_PRIVATE_KEY_BASE64=${{ secrets.GH_APP_PRIVATE_KEY_BASE64 }}
+          NEXTAUTH_URL: ${{ vars.NEXTAUTH_URL }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || vars.NEXT_PUBLIC_API_BASE_URL }}
+          API_SERVICES: ${{ vars.API_SERVICES }}
+          API_SERVICE_GAME_LIBRARY_API_BASE_URL: ${{ vars.API_SERVICE_GAME_LIBRARY_API_BASE_URL }}
+          CONTENT_REPOSITORY_OWNER: ${{ vars.CONTENT_REPOSITORY_OWNER }}
+          CONTENT_REPOSITORY_NAME: ${{ vars.CONTENT_REPOSITORY_NAME }}
+          CONTENT_REPOSITORY_REF: ${{ vars.CONTENT_REPOSITORY_REF }}
+          GAME_LIBRARY_API_VERSION_RANGE: ${{ vars.GAME_LIBRARY_API_VERSION_RANGE }}
         with:
           inlineScript: |
             set -euo pipefail
             source scripts/prepare-aca-secret-references.sh
+            source scripts/prepare-aca-public-environment.sh
             prepare_aca_secret_references "${SECRET_ENV_VARS:-}"
+            prepare_aca_public_environment
 
             echo "[INFO] Setting managed identity registry access for ${{ inputs.registry_server }}..."
             az containerapp registry set \
@@ -161,11 +181,7 @@ jobs:
               --resource-group "${{ inputs.resource_group }}" \
               --secrets "${ACA_SECRET_ARGS[@]}"
 
-            ENV_ARGS=()
-            if [ -n "${PUBLIC_ENV_VARS:-}" ]; then
-              read -r -a PUBLIC_ENV_ARGS <<< "${PUBLIC_ENV_VARS}"
-              ENV_ARGS+=("${PUBLIC_ENV_ARGS[@]}")
-            fi
+            ENV_ARGS=("${ACA_PUBLIC_ENV_ARGS[@]}")
             ENV_ARGS+=("${ACA_SECRET_ENV_ARGS[@]}")
 
             UPDATE_ARGS=(

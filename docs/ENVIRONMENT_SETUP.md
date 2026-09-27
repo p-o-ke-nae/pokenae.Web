@@ -60,46 +60,53 @@ entrypoint 自体を非 root で起動した場合は追加の権限変更を行
 
 ### CI/CD（GitHub Actions）でのシークレット管理
 
-GitHub Actions でのデプロイ時は、GitHub Secrets に登録した値をワークフロー内で VPS の `secrets/` ディレクトリに書き込みます。
+デプロイ設定は GitHub Environment を正本にします。VPS は `production`、ACA は
+`development` / `copilot` を使用します。公開可能な設定は各 Environment の
+Variables、認証情報は Secrets に同じキー名で登録します。
 
-#### GitHub に登録が必要な Secrets
+#### Environment Variables
 
-**Settings → Secrets and variables → Actions → New repository secret** で以下を登録：
+| Variable 名                                | 説明 |
+| ------------------------------------------ | ---- |
+| `NEXTAUTH_URL`                             | その環境の公開 URL |
+| `NEXT_PUBLIC_API_BASE_URL`                 | 既定 API の公開 URL |
+| `NEXT_PUBLIC_API_URL`                      | 互換用の既定 API URL |
+| `NEXT_PUBLIC_GOOGLE_REDIRECT_URI`          | Google OAuth2 callback URL |
+| `API_SERVICES`                             | 利用する API サービス ID |
+| `API_SERVICE_GAME_LIBRARY_API_BASE_URL`    | game-library-api の URL |
+| `CONTENT_REPOSITORY_OWNER`                 | 公開コンテンツのリポジトリ owner |
+| `CONTENT_REPOSITORY_NAME`                  | 公開コンテンツのリポジトリ名 |
+| `CONTENT_REPOSITORY_REF`                   | 公開コンテンツの参照 branch |
+| `GAME_LIBRARY_API_VERSION_RANGE`           | 対応 API バージョン範囲 |
 
-| Secret 名              | 説明                                                            |
-| ---------------------- | --------------------------------------------------------------- |
-| `NEXTAUTH_SECRET`      | NextAuth.jsのJWT暗号化キー                                      |
-| `GOOGLE_CLIENT_ID`     | Google OAuth2 クライアントID                                    |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth2 クライアントシークレット                          |
-| `PROD_NEXTAUTH_URL`    | 本番環境のNextAuth URL（例: `https://pokenae.example.com`）     |
-| `PROD_API_URL`         | 本番環境のバックエンド API URL                                  |
-| `ADMIN_EMAILS`         | 管理画面を利用できるメールアドレス（任意、カンマ区切り）        |
-| `DEV_NEXTAUTH_URL`     | 開発環境のNextAuth URL（例: `https://dev.pokenae.example.com`） |
+#### Environment Secrets
 
-加えて、**Settings → Environments → production → Environment secrets** に
-`VPS_RUNTIME_ENV` を登録します。値は `.env` 形式の複数行テキストです。
-最低限、次の runtime 設定を含めます。
+| Secret 名                  | コンテナ内の環境変数              | 説明 |
+| -------------------------- | --------------------------------- | ---- |
+| `NEXTAUTH_SECRET`          | `NEXTAUTH_SECRET`                 | NextAuth.js の暗号化キー |
+| `GOOGLE_CLIENT_ID`         | `GOOGLE_CLIENT_ID`                | Google OAuth2 client ID |
+| `GOOGLE_CLIENT_SECRET`     | `GOOGLE_CLIENT_SECRET`            | Google OAuth2 client secret |
+| `ADMIN_EMAILS`             | `ADMIN_EMAILS`                    | 管理者 allowlist |
+| `GH_APP_ID`                | `GITHUB_APP_ID`                   | GitHub App ID |
+| `GH_APP_INSTALLATION_ID`   | `GITHUB_APP_INSTALLATION_ID`      | GitHub App installation ID |
+| `GH_APP_PRIVATE_KEY_BASE64`| `GITHUB_APP_PRIVATE_KEY_BASE64`   | GitHub App PEM の base64 |
 
-```dotenv
-NEXT_PUBLIC_API_BASE_URL=https://api.example.com
-NEXT_PUBLIC_API_URL=https://api.example.com
-CONTENT_REPOSITORY_OWNER=p-o-ke-nae
-CONTENT_REPOSITORY_NAME=pokenae.Content
-CONTENT_REPOSITORY_REF=main
-GAME_LIBRARY_API_VERSION_RANGE=>=1.0.0 <2.0.0
-```
+GitHub は `GITHUB_` で始まる Secret 名を予約しているため、GitHub App の登録名には
+`GH_APP_*` を使い、workflow がアプリ用の `GITHUB_APP_*` へマッピングします。
+GitHub App 未構成時は順に `0`、`0`、`ZGlzYWJsZWQ=` を登録します。この 3 値は
+アプリが対応済みの無効化センチネルであり、公開表示は継続し、管理 API は
+「資格情報未設定」として fail closed になります。実値とセンチネルを混在させないでください。
 
-`NEXT_PUBLIC_API_BASE_URL` と `NEXT_PUBLIC_API_URL` は本番 VPS
-デプロイの必須値です。ゲームライブラリ API の接続先は GitHub Repository
-Variable `PROD_GAME_LIBRARY_API_BASE_URL` を正本とし、デプロイ時に
-`API_SERVICE_GAME_LIBRARY_API_BASE_URL` として明示的に上書きします。
-Google OAuth2 / NextAuth、管理者メール、GitHub App の値は
-`VPS_RUNTIME_ENV` に重複登録せず、従来どおり個別の GitHub Secrets から Docker
-Compose secrets として渡します。`.env.docker.production` やその内容を Git に
-コミットしないでください。
+VPS の SSH 接続情報は引き続き `HOST`、`USERNAME`、`SSH_PRIVATE_KEY` として
+GitHub Secrets に保持します。Azure の resource group、ACR、managed identity
+など環境間で共有する値は Repository Variables に保持します。
+既存の Repository Secrets は、同名の Environment Secret を登録するまで
+reusable workflow への明示的なフォールバックとして利用できます。GitHub は
+Secret の値を読み戻せないため、移行時は保持している正本から各 Environment へ
+再登録し、動作確認後に不要な Repository Secret を削除してください。
 
 デプロイワークフロー（`.github/workflows/main.yml`）は
-`VPS_RUNTIME_ENV` の構文と必須値を検証し、VPS 上の
+個別の production Environment Variables を検証して env ファイルを生成し、VPS 上の
 `~/pokenae-web/.env.docker.production` へデプロイユーザー所有・`600` で
 原子的に配置します。その後、稼働中コンテナを停止する前に
 `docker compose config` を実行します。設定が不足・不正な場合は現行
@@ -113,10 +120,14 @@ secrets の読み取り時だけ root で動作し、読み取り後は必ず UI
 降格します。デプロイ検証では Node.js プロセスの UID が 1001 であることも
 確認します。
 
-`VPS_RUNTIME_ENV` を更新した場合は `main` のデプロイを再実行してください。
-`VPS_RUNTIME_ENV is not configured`、`Invalid runtime env syntax`、または
-`Missing or empty required runtime env key` が表示された場合は、production
-Environment の secret 名、各行の `KEY=value` 形式、必須キーを確認します。
+Environment Variable / Secret を更新した場合は対象 branch のデプロイを再実行してください。
+`is not configured in the selected GitHub Environment` が表示された場合は、対象
+Environment と Variable 名を確認します。VPS 上の `.env.docker.production` は
+Actions の生成物であり、手動編集や Git へのコミットは行いません。
+
+旧 `VPS_RUNTIME_ENV` Secret は、新 workflow が main に反映されて最初の production
+デプロイが成功した後に削除します。反映前に削除すると、旧 workflow のデプロイが
+失敗するため、移行作業中は残しておいてください。
 
 entrypoint のコンテナ単体テストは、Docker daemon が利用可能な環境で次のように実行できます。
 

@@ -48,6 +48,13 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Test deployment configuration scripts
+        shell: bash
+        run: |
+          bash scripts/prepare-aca-secret-references.test.sh
+          bash scripts/prepare-aca-public-environment.test.sh
+          node --test scripts/write-vps-runtime-env.test.mjs
+
       - name: Build Storybook
         run: npm run build-storybook -- --quiet
 
@@ -70,13 +77,11 @@ jobs:
       azure_environment: production
       registry_server: ${{ vars.ACR_LOGIN_SERVER }}
     secrets:
-      api_url: ${{ secrets.PROD_API_URL }}
-      google_redirect_uri: ${{ secrets.PROD_GOOGLE_REDIRECT_URI }}
-      google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
-      azure_credentials: ${{ secrets.AZURE_CREDENTIALS }}
-      azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
-      azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
-      azure_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
   build-develop:
     if: github.event_name == 'push' && github.ref_name == 'develop'
@@ -92,13 +97,11 @@ jobs:
       azure_environment: development
       registry_server: ${{ vars.ACR_LOGIN_SERVER }}
     secrets:
-      api_url: ${{ secrets.DEV_API_URL }}
-      google_redirect_uri: ${{ secrets.DEV_GOOGLE_REDIRECT_URI }}
-      google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
-      azure_credentials: ${{ secrets.AZURE_CREDENTIALS }}
-      azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
-      azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
-      azure_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
   deploy-main-vps:
     if: github.event_name == 'push' && github.ref_name == 'main'
@@ -107,34 +110,28 @@ jobs:
       contents: read
       packages: read
     uses: ./.github/workflows/reusable-deploy-vps.yml
-    # VPS_RUNTIME_ENV is read from the production Environment by the called job.
     with:
       deployment_environment: production
       compose_file: docker-compose.prod.yml
       runtime_env_file: .env.docker.production
-      required_runtime_env_keys: NEXT_PUBLIC_API_BASE_URL NEXT_PUBLIC_API_URL
       project_name: pokenae-prod
       image_tag: main
       port: "3001"
-      api_services: game-library-api
-      game_library_api_base_url: ${{ vars.PROD_GAME_LIBRARY_API_BASE_URL }}
     secrets:
       host: ${{ secrets.HOST }}
       username: ${{ secrets.USERNAME }}
       ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
-      nextauth_url: ${{ secrets.PROD_NEXTAUTH_URL }}
-      nextauth_secret: ${{ secrets.NEXTAUTH_SECRET }}
-      google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
-      google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-      admin_emails: ${{ secrets.ADMIN_EMAILS }}
-      github_app_id: ${{ secrets.GITHUB_APP_ID }}
-      github_app_installation_id: ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
-      github_app_private_key_base64: ${{ secrets.GITHUB_APP_PRIVATE_KEY_BASE64 }}
+      NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
+      GH_APP_ID: ${{ secrets.GH_APP_ID }}
+      GH_APP_INSTALLATION_ID: ${{ secrets.GH_APP_INSTALLATION_ID }}
+      GH_APP_PRIVATE_KEY_BASE64: ${{ secrets.GH_APP_PRIVATE_KEY_BASE64 }}
 
   # =================================================================
   # Azure Container Apps デプロイ（develop ブランチ → ACA 開発環境）
-  # reusable-deploy-azure-container-apps.yml はアプリ種類に依存しない
-  # 汎用ワークフロー。環境変数は env_vars / secret_env_vars で指定。
+  # アプリ設定は reusable workflow が development Environment から取得する。
   # =================================================================
 
   # =================================================================
@@ -156,13 +153,11 @@ jobs:
       azure_environment: copilot
       registry_server: ${{ vars.ACR_LOGIN_SERVER }}
     secrets:
-      api_url: ${{ secrets.DEV_API_URL }}
-      google_redirect_uri: ${{ secrets.DEV_GOOGLE_REDIRECT_URI }}
-      google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
-      azure_credentials: ${{ secrets.AZURE_CREDENTIALS }}
-      azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
-      azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
-      azure_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
   deploy-copilot-aca:
     if: github.event_name == 'push' && startsWith(github.ref_name, 'copilot/')
@@ -178,20 +173,18 @@ jobs:
       registry_server: ${{ vars.ACR_LOGIN_SERVER }}
       registry_identity: ${{ vars.ACR_PULL_IDENTITY_ID }}
       azure_environment: copilot
-      env_vars: "NODE_ENV=production PORT=3000 NEXTAUTH_URL=${{ vars.COPILOT_NEXTAUTH_URL_ACA }} CONTENT_REPOSITORY_OWNER=p-o-ke-nae CONTENT_REPOSITORY_NAME=pokenae.Content CONTENT_REPOSITORY_REF=main"
     secrets:
-      azure_credentials: ${{ secrets.AZURE_CREDENTIALS }}
-      azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
-      azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
-      azure_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      secret_env_vars: |
-        NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
-        GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-        GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-        ADMIN_EMAILS=${{ secrets.ADMIN_EMAILS }}
-        GITHUB_APP_ID=${{ secrets.GITHUB_APP_ID }}
-        GITHUB_APP_INSTALLATION_ID=${{ secrets.GITHUB_APP_INSTALLATION_ID }}
-        GITHUB_APP_PRIVATE_KEY_BASE64=${{ secrets.GITHUB_APP_PRIVATE_KEY_BASE64 }}
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
+      GH_APP_ID: ${{ secrets.GH_APP_ID }}
+      GH_APP_INSTALLATION_ID: ${{ secrets.GH_APP_INSTALLATION_ID }}
+      GH_APP_PRIVATE_KEY_BASE64: ${{ secrets.GH_APP_PRIVATE_KEY_BASE64 }}
 
   deploy-develop-aca:
     if: github.event_name == 'push' && github.ref_name == 'develop'
@@ -207,25 +200,15 @@ jobs:
       registry_server: ${{ vars.ACR_LOGIN_SERVER }}
       registry_identity: ${{ vars.ACR_PULL_IDENTITY_ID }}
       azure_environment: development
-      env_vars: >-
-        NODE_ENV=production
-        PORT=3000
-        NEXTAUTH_URL=${{ vars.DEV_NEXTAUTH_URL_ACA }}
-        API_SERVICES=game-library-api
-        API_SERVICE_GAME_LIBRARY_API_BASE_URL=${{ vars['DEV_GAME_LIBRARY_API_BASE_URL'] }}
-        CONTENT_REPOSITORY_OWNER=p-o-ke-nae
-        CONTENT_REPOSITORY_NAME=pokenae.Content
-        CONTENT_REPOSITORY_REF=main
     secrets:
-      azure_credentials: ${{ secrets.AZURE_CREDENTIALS }}
-      azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
-      azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
-      azure_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      secret_env_vars: |
-        NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
-        GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-        GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-        ADMIN_EMAILS=${{ secrets.ADMIN_EMAILS }}
-        GITHUB_APP_ID=${{ secrets.GITHUB_APP_ID }}
-        GITHUB_APP_INSTALLATION_ID=${{ secrets.GITHUB_APP_INSTALLATION_ID }}
-        GITHUB_APP_PRIVATE_KEY_BASE64=${{ secrets.GITHUB_APP_PRIVATE_KEY_BASE64 }}
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
+      GH_APP_ID: ${{ secrets.GH_APP_ID }}
+      GH_APP_INSTALLATION_ID: ${{ secrets.GH_APP_INSTALLATION_ID }}
+      GH_APP_PRIVATE_KEY_BASE64: ${{ secrets.GH_APP_PRIVATE_KEY_BASE64 }}
