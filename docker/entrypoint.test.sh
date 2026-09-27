@@ -64,9 +64,14 @@ su-exec nextjs:nodejs node -e \
 test_process_pid=$!
 sleep 1
 
-"$process_user_verifier" 1001
+su-exec nextjs:nodejs "$process_user_verifier" 1001
 
-if "$process_user_verifier" 0 >/dev/null 2>&1; then
+if "$process_user_verifier" 1001 >/dev/null 2>&1; then
+  echo "process user verifier accepted execution as an unexpected UID" >&2
+  exit 1
+fi
+
+if su-exec nextjs:nodejs "$process_user_verifier" 0 >/dev/null 2>&1; then
   echo "process user verifier accepted an unexpected UID" >&2
   exit 1
 fi
@@ -75,8 +80,17 @@ kill "$test_process_pid"
 wait "$test_process_pid" 2>/dev/null || true
 test_process_pid=
 
-if "$process_user_verifier" 1001 >/dev/null 2>&1; then
+if su-exec nextjs:nodejs "$process_user_verifier" 1001 >/dev/null 2>&1; then
   echo "process user verifier accepted a missing Node.js process" >&2
+  exit 1
+fi
+
+node -e 'setInterval(() => {}, 1000)' &
+test_process_pid=$!
+sleep 1
+
+if su-exec nextjs:nodejs "$process_user_verifier" 1001 >/dev/null 2>&1; then
+  echo "process user verifier accepted a Node.js process that did not drop privileges" >&2
   exit 1
 fi
 

@@ -482,7 +482,7 @@ jobs:
             exit 1
           fi
 
-          if ! docker exec "${container_id}" \
+          if ! docker exec --user 1001:1001 "${container_id}" \
             /usr/local/bin/verify-process-user.sh 1001; then
             echo "[ERROR] Application privilege drop verification failed"
             docker top "${container_id}" -eo pid,user,args || true
