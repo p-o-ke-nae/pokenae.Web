@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { getAdminAuthorization } from "@/lib/auth/admin";
 import { prepareBannerWrite, validateBannerImageReferences } from "../../../../../../lib/content/banner-admin";
 import { validateCanonicalItems, validateCanonicalJson, type ValidationIssue } from "../../../../../../lib/content/canonical-validation";
-import { prepareAnnouncementWrite, prepareToolWrite } from "../../../../../../lib/content/admin-config";
+import { prepareAnnouncementWrite, prepareAppWrite, prepareToolWrite } from "../../../../../../lib/content/admin-config";
 import {
   announcementContentSchema,
+  appListSchema,
   gitCommitShaSchema,
   tagDefinitionListSchema,
   toolListSchema,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/content/schemas";
 import { usesContentFixtures } from "@/lib/content/repository";
 import { isContentConflictError } from "@/lib/github/content-conflict";
+import { contentAdminGitHubError, logContentAdminGitHubError } from "../../../../../../lib/github/admin-error";
 import {
   ContentPullRequestError,
   getEditableContentPullRequest,
@@ -30,7 +32,7 @@ function parseNumber(value: string) {
 
 function parseKind(request: Request): ConfigKind | null {
   const kind = new URL(request.url).searchParams.get("kind");
-  return kind === "banners" || kind === "announcements" || kind === "tools" || kind === "tags" ? kind : null;
+  return kind === "banners" || kind === "announcements" || kind === "tools" || kind === "apps" || kind === "tags" ? kind : null;
 }
 
 function prefixed(prefix: string, issues: ValidationIssue[]) {
@@ -62,8 +64,9 @@ function errorResponse(error: unknown) {
   if (error instanceof ContentPullRequestError) {
     return NextResponse.json({ code: error.code, error: error.message }, { status: error.status });
   }
-  console.error("Content pull request operation failed", error);
-  return NextResponse.json({ error: "GitHub の Pull Request を処理できませんでした。" }, { status: 502 });
+  logContentAdminGitHubError("Content pull request operation failed", error);
+  const response = contentAdminGitHubError(error);
+  return NextResponse.json({ code: response.code, error: response.error }, { status: response.status });
 }
 
 async function authorize() {
@@ -109,6 +112,12 @@ export async function GET(request: Request, context: Context) {
       if (!parsed.success) issues.push(...zodIssues("tools", parsed.error.issues));
       if (Array.isArray(snapshot.value)) {
         issues.push(...prefixed("tools", validateCanonicalItems(snapshot.schemas.tool, snapshot.value)));
+      }
+    } else if (kind === "apps") {
+      const parsed = appListSchema.safeParse(snapshot.value);
+      if (!parsed.success) issues.push(...zodIssues("apps", parsed.error.issues));
+      if (parsed.success) {
+        issues.push(...prefixed("apps", validateCanonicalItems(snapshot.schemas.app, parsed.data)));
       }
     } else {
       const parsed = tagDefinitionListSchema.safeParse(snapshot.value);
@@ -198,7 +207,14 @@ export async function PUT(request: Request, context: Context) {
             toolSchema: snapshot.schemas.tool,
             ...common,
           })
-          : prepareTagWrite({
+          : queryKind === "apps"
+            ? prepareAppWrite({
+                rawValue: data.value,
+                currentPaths: snapshot.appPaths,
+                appSchema: snapshot.schemas.app,
+                ...common,
+              })
+            : prepareTagWrite({
               rawValue: data.value,
               currentTags: Array.isArray(snapshot.value) ? snapshot.value as Array<{ id: string; label: string }> : [],
               reservedTags,

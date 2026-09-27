@@ -9,10 +9,10 @@ const adminLinks = [
     action: "記事管理を開く",
   },
   {
-    href: "/admin/posts/home",
-    title: "ホーム・ツール設定",
-    description: "バナー、ニュース、ツールの公開設定を編集します。",
-    action: "ホーム・ツール設定を開く",
+    href: "/admin/content",
+    title: "公開コンテンツ設定",
+    description: "バナー、ニュース、ツール、Webアプリ、タグを項目別に編集します。",
+    action: "公開コンテンツ設定を開く",
   },
 ];
 

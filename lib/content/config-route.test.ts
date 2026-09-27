@@ -40,9 +40,11 @@ describe("POST /api/content/config", () => {
       banners: [],
       announcements: [],
       tools: [],
+      apps: [],
       tags: [{ id: "000001", label: "ポケモン" }],
       postSources: [],
       toolPaths: ["content/tools/new-tool.json"],
+      appPaths: ["content/apps/old-app.json"],
       paths: ["content/home/images/existing.webp"],
       schemas: {
         home: JSON.stringify({
@@ -80,6 +82,23 @@ describe("POST /api/content/config", () => {
             supportedOs: { type: "array" },
             showInPickup: { type: "boolean" },
             priority: { type: "integer" },
+          },
+        }),
+        app: JSON.stringify({
+          type: "object",
+          additionalProperties: false,
+          required: ["slug", "displayName", "summary", "href", "image", "imageAlt", "metaLabel", "status", "order", "tags"],
+          properties: {
+            slug: { type: "string" },
+            displayName: { type: "string" },
+            summary: { type: "string" },
+            href: { type: "string", pattern: "^/" },
+            image: { type: ["string", "null"] },
+            imageAlt: { type: "string" },
+            metaLabel: { type: "string" },
+            status: { enum: ["draft", "published", "archived"] },
+            order: { type: "integer" },
+            tags: { type: "array" },
           },
         }),
         update: JSON.stringify({
@@ -123,8 +142,25 @@ describe("POST /api/content/config", () => {
       code: "CONTENT_WRITE_DISABLED",
       error: expect.stringContaining("CONTENT_SOURCE=github"),
     });
+
     expect(mocks.getFreshContentAdminSnapshot).not.toHaveBeenCalled();
     expect(mocks.createContentPullRequest).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown kind before reading the content repository", async () => {
+    const { POST } = await import("../../app/api/content/config/route");
+    const response = await POST(new Request("http://localhost/api/content/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "unknown",
+        value: [],
+        baseRevision: "0000000000000000000000000000000000000000",
+      }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect(mocks.getFreshContentAdminSnapshot).not.toHaveBeenCalled();
   });
 
   it("returns 409 before generating deletions when the base revision is stale", async () => {
@@ -260,6 +296,44 @@ describe("POST /api/content/config", () => {
       files: expect.arrayContaining([
         expect.objectContaining({ path: "fixtures/tags.json", content: expect.stringContaining("000002") }),
         expect.objectContaining({ path: "fixtures/tag-labels.json", content: expect.stringContaining("第7世代") }),
+      ]),
+    }));
+  });
+
+  it("creates a Web app pull request with app and update files", async () => {
+    mocks.createContentPullRequest.mockResolvedValue({
+      html_url: "https://example.test/pull/5",
+      number: 5,
+      base: { sha: "1111111111111111111111111111111111111111" },
+    });
+    const { POST } = await import("../../app/api/content/config/route");
+    const response = await POST(new Request("http://localhost/api/content/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "apps",
+        baseRevision: "1111111111111111111111111111111111111111",
+        value: [{
+          slug: "new-app",
+          displayName: "New App",
+          summary: "New app",
+          href: "/new-app",
+          imageAlt: "",
+          metaLabel: "Webアプリ",
+          status: "draft",
+          order: 0,
+          tags: [],
+        }],
+      }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(mocks.createContentPullRequest).toHaveBeenCalledWith(expect.objectContaining({
+      branch: expect.stringMatching(/^content\/apps-\d{14}$/),
+      files: expect.arrayContaining([
+        expect.objectContaining({ path: "content/apps/new-app.json" }),
+        { path: "content/apps/old-app.json", content: null },
+        expect.objectContaining({ path: expect.stringMatching(/^content\/updates\/apps-\d{14}\.json$/) }),
       ]),
     }));
   });

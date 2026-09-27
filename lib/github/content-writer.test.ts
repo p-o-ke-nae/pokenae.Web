@@ -426,11 +426,81 @@ describe("createContentPullRequest", () => {
       }
       return new Response("unexpected", { status: 500 });
     });
+
     const { listEditableContentPullRequests } = await import("./content-writer");
 
     await expect(listEditableContentPullRequests("tags")).resolves.toEqual([
       expect.objectContaining({ number: 8, kind: "tags" }),
     ]);
+  });
+
+  it("lists app PRs only when changed paths stay inside content/apps", async () => {
+    const appPullRequest = {
+      number: 9,
+      title: "apps",
+      html_url: "https://example.test/9",
+      state: "open",
+      draft: false,
+      changed_files: 2,
+      base: { ref: "main", sha: "base", repo: { full_name: "p-o-ke-nae/pokenae.Content" } },
+      head: { ref: "content/apps-20260926103847", sha: "apps-head", repo: { full_name: "p-o-ke-nae/pokenae.Content" } },
+    };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/pulls?")) return Response.json([appPullRequest]);
+      if (url.endsWith("/pulls/9")) return Response.json(appPullRequest);
+      if (url.includes("/pulls/9/files")) {
+        return Response.json([
+          { filename: "content/apps/game-library.json" },
+          { filename: "content/updates/apps-20260926103847.json" },
+        ]);
+      }
+      return new Response("unexpected", { status: 500 });
+    });
+
+    const { listEditableContentPullRequests } = await import("./content-writer");
+
+    await expect(listEditableContentPullRequests("apps")).resolves.toEqual([
+      expect.objectContaining({ number: 9, kind: "apps" }),
+    ]);
+  });
+
+  it("rejects app PRs that rename a file from outside the allowed paths", async () => {
+    const appPullRequest = {
+      number: 10,
+      title: "apps",
+      html_url: "https://example.test/10",
+      state: "open",
+      draft: false,
+      changed_files: 2,
+      base: { ref: "main", sha: "base", repo: { full_name: "p-o-ke-nae/pokenae.Content" } },
+      head: { ref: "content/apps-20260926103848", sha: "apps-head", repo: { full_name: "p-o-ke-nae/pokenae.Content" } },
+    };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/pulls?")) return Response.json([appPullRequest]);
+      if (url.endsWith("/pulls/10")) return Response.json(appPullRequest);
+      if (url.includes("/pulls/10/files")) {
+        return Response.json([
+          { filename: "content/apps/game-library.json", previous_filename: "content/posts/sample/index.md" },
+          { filename: "content/updates/apps-20260926103848.json" },
+        ]);
+      }
+      return new Response("unexpected", { status: 500 });
+    });
+    const { listEditableContentPullRequests } = await import("./content-writer");
+
+    await expect(listEditableContentPullRequests("apps")).resolves.toEqual([]);
+  });
+
+  it("reports a missing pull request as a content error", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}, { status: 404 }));
+    const { getEditableContentPullRequest } = await import("./content-writer");
+
+    await expect(getEditableContentPullRequest(404, "apps")).rejects.toMatchObject({
+      name: "ContentPullRequestError",
+      status: 404,
+    });
   });
 
   it("rejects a pull request when the explicitly requested kind differs from its branch", async () => {

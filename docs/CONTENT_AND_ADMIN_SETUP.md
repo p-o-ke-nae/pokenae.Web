@@ -25,17 +25,27 @@ node -e "const fs=require('fs'); process.stdout.write(Buffer.from(fs.readFileSyn
 
 既存記事の「非公開化」は、記事の `status` を `draft` に変更するPull Requestを作成します。記事本文、slug、画像は削除せず、mainにマージされるまで公開状態は変わりません。物理削除は行わないため、誤操作時もGit履歴または逆のstatus変更で復元できます。fixtureモードでは他のコンテンツ書き込みと同様にPull Requestを作成できません。
 
-### ホーム・ツール設定 Pull Request の修正
+### 公開コンテンツ設定 Pull Request の修正
 
-`/admin/posts/home` ではバナー、ニュース、ツール、タグを項目別フォームで編集できます。各項目の追加、編集、削除に対応し、ツールではWeb側schemaの任意項目も指定できます。新規作成に加え、管理画面が作成した open な `content/<kind>-YYYYMMDDhhmmss` Pull Request を種類ごとに選び、同じ head branch に修正commitを追加できます。対象は次をすべて満たすPRだけです。
+`/admin/content` は公開コンテンツ設定のハブです。編集対象はページごとに分かれています。
+
+- `/admin/content/banners`: バナー
+- `/admin/content/announcements`: ニュース
+- `/admin/content/tools`: ツール
+- `/admin/content/apps`: Webアプリ
+- `/admin/content/tags`: タグ
+
+旧URL `/admin/posts/home` は `/admin/content` へリダイレクトします。各ページでは項目の追加、編集、削除に対応し、ツールではWeb側schemaの任意項目も指定できます。Webアプリでは表示名、slug、概要、アプリ内href、画像、代替テキスト、メタラベル、公開状態、表示順、タグを編集します。画像を指定しない場合もContent側canonical schemaに従って `image: null` を保存します。
+
+新規作成に加え、管理画面が作成した open な `content/<kind>-YYYYMMDDhhmmss` Pull Request を種類ごとに選び、同じ head branch に修正commitを追加できます。Webアプリは `content/apps-YYYYMMDDhhmmss` branchで、各項目を `content/apps/<slug>.json`、更新情報を `content/updates/apps-YYYYMMDDhhmmss.json` へ保存します。対象は次をすべて満たすPRだけです。
 
 - head/base がともに設定済みの `pokenae.Content` リポジトリである（forkは不可）
 - base branch が `CONTENT_REPOSITORY_REF`
 - branchと変更対象が選択した種類に一致する
-- 変更対象が対応する設定ファイル、`content/updates/<kind>-*.json`、バナーの場合は `content/home/images/*.webp` のみ
+- 変更対象が対応する設定ファイル、`content/updates/<kind>-*.json`、バナーの場合は `content/home/images/*.webp` のみ。Webアプリの場合は `content/apps/*.json` と対応するupdateファイルのみ
 - 画面で読み込んだ head SHA と保存直前の head SHA が一致する
 
-保存時は、バナーとニュースを同じcommit revisionに固定したhome canonical schema、ツールをtool canonical schema、全種類のupdate JSONをupdate canonical schemaで検証します。schemaを取得・解釈できない場合はfail closedで保存しません。ツールは各 `content/tools/<slug>.json` を個別検証し、canonical schemaとの不整合を項目エラーとして返して、Pull Requestを作成・更新しません。削除されたツールのファイルも同じcommitから削除します。画像欄はURLまたは既存パスを指定するWeb要件として維持しますが、Content側schemaが `image` を許可するまでは明示的なschemaエラーとなり、画像指定を黙って削除しません。tool/app の `image` に `./images/...` の相対パスを指定した場合は、公開表示時に同じ `content/tools` または `content/apps` 配下のcommit固定raw URLへ解決します。update JSONには種類に応じた `target` と `href` を生成し、公開変更は `visible: true`、タグ管理の内部変更は `visible: false` とします。
+保存時は、バナーとニュースを同じcommit revisionに固定したhome canonical schema、ツールをtool canonical schema、Webアプリをapp canonical schema、全種類のupdate JSONをupdate canonical schemaで検証します。schemaを取得・解釈できない場合はfail closedで保存しません。ツールとWebアプリは各JSONを個別検証し、canonical schemaとの不整合を項目エラーとして返して、Pull Requestを作成・更新しません。削除された項目のファイルも同じcommitから削除します。tool/app の `image` に `./images/...` の相対パスを指定した場合は、公開表示時に同じ `content/tools` または `content/apps` 配下のcommit固定raw URLへ解決します。update JSONには種類に応じた `target` と `href` を生成し、公開変更は `visible: true`、タグ管理の内部変更は `visible: false` とします。
 
 タグは `fixtures/tags.json` の安定 ID と `fixtures/tag-labels.json` の表示名を分離して管理します。記事 frontmatter の `tags` / `relatedTags` は従来どおり ID を保持するため、表示名の変更だけでは既存記事を書き換えません。タグを削除すると、同じ Pull Request 内で全記事の `tags` / `relatedTags` から対象 ID を除去します。
 
@@ -67,6 +77,10 @@ Repository/Environment Secrets:
 - `GH_APP_PRIVATE_KEY_BASE64`（コンテナでは `GITHUB_APP_PRIVATE_KEY_BASE64`）
 
 GitHubは`GITHUB_`で始まるSecret名を予約しているため、GitHub上では`GH_APP_*`を使用し、workflowがコンテナ用の`GITHUB_APP_*`へ変換します。未構成環境では`GH_APP_ID=0`、`GH_APP_INSTALLATION_ID=0`、`GH_APP_PRIVATE_KEY_BASE64=ZGlzYWJsZWQ=`を登録します。3値が揃った場合だけ無効化センチネルとして扱われ、公開サイトのデプロイは継続しますが、管理APIは資格情報不足としてfail closedのままです。
+
+秘密鍵がログ、画面共有、チャットなどへ露出した場合は再利用せず、GitHub App設定でその鍵を削除して新しい秘密鍵を発行します。新しいPEMをbase64化し、対象GitHub Environmentの `GH_APP_PRIVATE_KEY_BASE64` を上書きして再デプロイしてください。必要に応じて `GH_APP_ID` と `GH_APP_INSTALLATION_ID` も同じEnvironmentで更新します。値をログやコマンド出力へ表示せず、デプロイ後に認証済み管理画面からPR一覧取得とテスト用PR作成で確認します。
+
+管理APIはGitHub障害を安全なコードへ分類します。`GITHUB_APP_NOT_CONFIGURED` / `GITHUB_APP_INVALID` は資格情報、`GITHUB_APP_FORBIDDEN` はContents・Pull requests権限、`GITHUB_APP_NOT_INSTALLED` はContentリポジトリへのインストール、`GITHUB_RATE_LIMITED` / `GITHUB_UNAVAILABLE` は再試行時期やGitHub状態を確認してください。GitHubレスポンス本文や秘密情報は画面へ返しません。
 
 ACAデプロイでは、Environment SecretsをAzure secretsへ設定し、常に同じsecretrefでコンテナへ渡します。必須secretの空値、またはGitHub Appの実値とセンチネルの混在は設定ミスとして拒否します。`NEXTAUTH_SECRET`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`も同じEnvironment Secretsから渡します。
 

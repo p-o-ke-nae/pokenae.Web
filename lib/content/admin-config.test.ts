@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildToolContentChanges, prepareAnnouncementWrite, prepareToolWrite } from "./admin-config";
+import { buildToolContentChanges, prepareAnnouncementWrite, prepareAppWrite, prepareToolWrite } from "./admin-config";
 
 const updateSchema = JSON.stringify({
   type: "object",
@@ -30,6 +30,23 @@ const toolSchema = JSON.stringify({
     tags: { type: "array", items: { type: "string", pattern: "^(?!000000)\\d{6}$" } },
     showInPickup: { type: "boolean" },
     priority: { type: "integer" },
+  },
+});
+const appSchema = JSON.stringify({
+  type: "object",
+  additionalProperties: false,
+  required: ["slug", "displayName", "summary", "href", "image", "imageAlt", "metaLabel", "status", "order", "tags"],
+  properties: {
+    slug: { type: "string" },
+    displayName: { type: "string" },
+    summary: { type: "string" },
+    href: { type: "string", pattern: "^/" },
+    image: { type: ["string", "null"] },
+    imageAlt: { type: "string" },
+    metaLabel: { type: "string" },
+    status: { enum: ["draft", "published", "archived"] },
+    order: { type: "integer", minimum: 0 },
+    tags: { type: "array" },
   },
 });
 
@@ -185,6 +202,39 @@ describe("buildToolContentChanges", () => {
       ["tools", 0, "release"],
       ["tools", 0, "showInPickup"],
       ["tools", 0, "priority"],
+    ]));
+  });
+
+  it("prepares app updates and deletes removed app files", () => {
+    const result = prepareAppWrite({
+      rawValue: [{
+        slug: "keep",
+        displayName: "Keep",
+        summary: "kept app",
+        href: "/keep",
+        imageAlt: "",
+        metaLabel: "Webアプリ",
+        status: "published",
+        order: 0,
+        tags: ["000001"],
+      }],
+      currentPaths: ["content/apps/keep.json", "content/apps/remove.json"],
+      appSchema,
+      updateSchema,
+      updatePath: "content/updates/apps-20260926100000.json",
+      updateId: "apps-20260926100000",
+      summary: "Webアプリを修正",
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.files).toEqual(expect.arrayContaining([
+      { path: "content/apps/remove.json", content: null },
+      expect.objectContaining({ path: "content/apps/keep.json", content: expect.stringContaining('"image": null') }),
+      expect.objectContaining({
+        path: "content/updates/apps-20260926100000.json",
+        content: expect.stringContaining('"target": "app"'),
+      }),
     ]));
   });
 });

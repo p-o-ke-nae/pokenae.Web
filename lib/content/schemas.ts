@@ -3,6 +3,8 @@ import { z } from "zod";
 const optionalUrl = z.string().url().or(z.string().startsWith("/")).or(z.string().startsWith(".")).optional();
 const nullableOptionalUrl = z.string().url().or(z.string().startsWith("/")).or(z.string().startsWith(".")).nullable()
   .transform((value) => value ?? undefined).optional();
+const nullableContentUrl = z.string().url().or(z.string().startsWith("/")).or(z.string().startsWith(".")).nullable()
+  .optional().transform((value) => value ?? null);
 const contentDate = z.string().datetime({ offset: true }).or(z.string().date());
 const contentDateTime = z.string().datetime({ offset: true });
 export const gitCommitShaSchema = z.string().regex(/^[0-9a-fA-F]{40}$/).transform((revision) => revision.toLowerCase());
@@ -95,23 +97,33 @@ export const toolSchema = toolContentSchema.transform((value) => ({
 
 export const appContentSchema = z.object({
   slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-  displayName: z.string().min(1),
-  summary: z.string().min(1),
-  href: z.string().startsWith("/"),
-  image: nullableOptionalUrl,
+  displayName: z.string().min(1).max(120),
+  summary: z.string().min(1).max(240),
+  href: z.string().regex(/^\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/),
+  image: nullableContentUrl,
   imageAlt: z.string(),
-  metaLabel: z.string().min(1),
+  metaLabel: z.string().min(1).max(120),
   status: z.enum(["draft", "published", "archived"]),
-  order: z.number().int().min(0),
+  order: z.number().int().min(0).max(1000),
   tags: z.array(tagIdSchema).default([]),
 }).strict();
+
+export const appListSchema = z.array(appContentSchema).superRefine((apps, context) => {
+  const slugs = new Set<string>();
+  apps.forEach((app, index) => {
+    if (slugs.has(app.slug)) {
+      context.addIssue({ code: "custom", path: [index, "slug"], message: "slug は重複できません。" });
+    }
+    slugs.add(app.slug);
+  });
+});
 
 export const appSchema = appContentSchema.transform((value) => ({
   slug: value.slug,
   name: value.displayName,
   summary: value.summary,
   href: value.href,
-  image: value.image,
+  image: value.image ?? undefined,
   imageAlt: value.imageAlt,
   metaLabel: value.metaLabel,
   status: value.status,

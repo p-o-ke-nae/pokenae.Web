@@ -3,6 +3,7 @@ import matter from "gray-matter";
 import { getOptionalInstallationToken, getRequiredInstallationToken } from "./app-auth";
 import { materializeGitTreeEntries, type ContentFileChange } from "./tree-changes";
 import { ContentConflictError } from "./content-conflict";
+import { GitHubApiError } from "./admin-error";
 import { getContentRevisionFiles, getFreshContentSnapshotWithRevision } from "../content/repository";
 import type { TagDefinition } from "../content/types";
 
@@ -27,7 +28,12 @@ type GitHubPullRequest = {
   head: { ref: string; sha: string; repo: { full_name: string } | null };
 };
 
-export type ConfigKind = "banners" | "announcements" | "tools" | "tags";
+type GitHubChangedFile = {
+  filename: string;
+  previous_filename?: string;
+};
+
+export type ConfigKind = "banners" | "announcements" | "tools" | "apps" | "tags";
 
 export type EditableContentPullRequest = {
   number: number;
@@ -46,8 +52,9 @@ export type EditableContentPullRequestSnapshot = EditableContentPullRequest & {
   update: unknown;
   paths: string[];
   toolPaths: string[];
+  appPaths: string[];
   postSources: Array<{ path: string; source: string }>;
-  schemas: { home: string; tool: string; update: string };
+  schemas: { home: string; tool: string; app: string; update: string };
 };
 
 export type EditablePostPullRequest = {
@@ -118,7 +125,7 @@ async function api<T>(path: string, init: RequestInit, token: string): Promise<T
     headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json", ...init.headers },
     cache: "no-store",
   });
-  if (!response.ok) throw new Error(`GitHub API ${response.status}: ${await response.text()}`);
+  if (!response.ok) throw new GitHubApiError(response.status, path);
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
@@ -132,7 +139,7 @@ function expectedUpdatePath(branch: string) {
 }
 
 function branchKind(branch: string): ConfigKind | null {
-  const match = /^content\/(banners|announcements|tools|tags)-\d{14}$/.exec(branch);
+  const match = /^content\/(banners|announcements|tools|apps|tags)-\d{14}$/.exec(branch);
   return (match?.[1] as ConfigKind | undefined) ?? null;
 }
 
@@ -148,7 +155,8 @@ function isAllowedConfigPath(kind: ConfigKind, path: string, updatePath: string)
       || path === "fixtures/tag-labels.json"
       || /^content\/posts\/[^/]+\/index\.md$/.test(path);
   }
-  return /^content\/tools\/[a-z0-9]+(?:-[a-z0-9]+)*\.json$/.test(path);
+  if (kind === "tools") return /^content\/tools\/[a-z0-9]+(?:-[a-z0-9]+)*\.json$/.test(path);
+  return /^content\/apps\/[a-z0-9]+(?:-[a-z0-9]+)*\.json$/.test(path);
 }
 
 function requiredConfigPaths(kind: ConfigKind) {
@@ -191,19 +199,31 @@ async function loadEditableContentPullRequest(number: number, kind: ConfigKind, 
   if (!Number.isSafeInteger(number) || number <= 0) {
     throw new ContentPullRequestError("Pull Request 番号が不正です。");
   }
-  const pullRequest = await api<GitHubPullRequest>(`/pulls/${number}`, {}, token);
+  let pullRequest: GitHubPullRequest;
+  try {
+    pullRequest = await api<GitHubPullRequest>(`/pulls/${number}`, {}, token);
+  } catch (error) {
+    if (error instanceof GitHubApiError && error.status === 404) {
+      throw new ContentPullRequestError("Pull Request が見つかりません。", 404);
+    }
+    throw error;
+  }
   const editable = assertEditableContentPullRequest(pullRequest, kind);
   if (pullRequest.changed_files > 100) {
     throw new ContentPullRequestError("変更ファイル数が上限を超えています。", 403);
   }
-  const changedFiles = await api<Array<{ filename: string }>>(`/pulls/${number}/files?per_page=100`, {}, token);
+  const changedFiles = await api<GitHubChangedFile[]>(`/pulls/${number}/files?per_page=100`, {}, token);
   const paths = changedFiles.map((file) => file.filename);
+  const affectedPaths = changedFiles.flatMap((file) => file.previous_filename
+    ? [file.filename, file.previous_filename]
+    : [file.filename]);
   const requiredPaths = requiredConfigPaths(kind);
   if (
     !paths.includes(editable.updatePath)
     || requiredPaths.some((path) => !paths.includes(path))
-    || (kind === "tools" && !paths.some((path) => /^content\/tools\/[^/]+\.json$/.test(path)))
-    || paths.some((path) => !isAllowedConfigPath(kind, path, editable.updatePath))
+    || ((kind === "tools" || kind === "apps")
+      && !paths.some((path) => new RegExp(`^content/${kind}/[^/]+\\.json$`).test(path)))
+    || affectedPaths.some((path) => !isAllowedConfigPath(kind, path, editable.updatePath))
   ) {
     throw new ContentPullRequestError("許可されていないファイルを含む Pull Request は更新できません。", 403);
   }
@@ -265,9 +285,9 @@ export async function getEditableContentPullRequest(
   const token = await getRequiredInstallationToken();
   const pullRequest = await loadEditableContentPullRequest(number, kind, token);
   const snapshot = await getContentRevisionFiles(pullRequest.headRevision);
-  const valueSources = kind === "tools"
+  const valueSources = kind === "tools" || kind === "apps"
     ? [...snapshot.files.entries()]
-      .filter(([path]) => /^content\/tools\/[^/]+\.json$/.test(path))
+      .filter(([path]) => new RegExp(`^content/${kind}/[^/]+\\.json$`).test(path))
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([, source]) => source)
     : kind === "tags"
@@ -278,14 +298,15 @@ export async function getEditableContentPullRequest(
   const updateSource = snapshot.files.get(pullRequest.updatePath);
   const homeSchema = snapshot.files.get("schemas/home.schema.json");
   const toolSchema = snapshot.files.get("schemas/tool.schema.json");
+  const appSchema = snapshot.files.get("schemas/app.schema.json");
   const updateSchema = snapshot.files.get("schemas/update.schema.json");
-  if (valueSources.some((source) => source === undefined) || !updateSource || !homeSchema || !toolSchema || !updateSchema) {
+  if (valueSources.some((source) => source === undefined) || !updateSource || !homeSchema || !toolSchema || !appSchema || !updateSchema) {
     throw new ContentPullRequestError("Pull Request の編集に必要なファイルを取得できません。", 422);
   }
   let value: unknown;
   let update: unknown;
   try {
-    value = kind === "tools"
+    value = kind === "tools" || kind === "apps"
       ? valueSources.map((source) => JSON.parse(source as string) as unknown)
       : kind === "tags"
         ? (() => {
@@ -314,11 +335,12 @@ export async function getEditableContentPullRequest(
     update,
     paths: snapshot.paths,
     toolPaths: snapshot.paths.filter((path) => /^content\/tools\/[^/]+\.json$/.test(path)).sort(),
+    appPaths: snapshot.paths.filter((path) => /^content\/apps\/[^/]+\.json$/.test(path)).sort(),
     postSources: [...snapshot.files.entries()]
       .filter(([path]) => /^content\/posts\/[^/]+\/index\.md$/.test(path))
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([path, source]) => ({ path, source })),
-    schemas: { home: homeSchema, tool: toolSchema, update: updateSchema },
+    schemas: { home: homeSchema, tool: toolSchema, app: appSchema, update: updateSchema },
   };
 }
 
@@ -474,13 +496,24 @@ async function loadEditablePostPullRequest(number: number, token: string) {
   if (!Number.isSafeInteger(number) || number <= 0) {
     throw new ContentPullRequestError("Pull Request 番号が不正です。");
   }
-  const pullRequest = await api<GitHubPullRequest>(`/pulls/${number}`, {}, token);
+  let pullRequest: GitHubPullRequest;
+  try {
+    pullRequest = await api<GitHubPullRequest>(`/pulls/${number}`, {}, token);
+  } catch (error) {
+    if (error instanceof GitHubApiError && error.status === 404) {
+      throw new ContentPullRequestError("Pull Request が見つかりません。", 404);
+    }
+    throw error;
+  }
   const editable = assertEditablePostPullRequest(pullRequest);
   if (pullRequest.changed_files > 100) {
     throw new ContentPullRequestError("変更ファイル数が上限を超えています。", 403);
   }
-  const changedFiles = await api<Array<{ filename: string }>>(`/pulls/${number}/files?per_page=100`, {}, token);
+  const changedFiles = await api<GitHubChangedFile[]>(`/pulls/${number}/files?per_page=100`, {}, token);
   const paths = changedFiles.map((file) => file.filename);
+  const affectedPaths = changedFiles.flatMap((file) => file.previous_filename
+    ? [file.filename, file.previous_filename]
+    : [file.filename]);
   const articlePath = `content/posts/${editable.slug}/index.md`;
   const imagePrefix = `content/posts/${editable.slug}/images/`;
   const allowed = (path: string) => path === articlePath
@@ -488,7 +521,7 @@ async function loadEditablePostPullRequest(number: number, token: string) {
     || path === "fixtures/tags.json"
     || path === "fixtures/tag-labels.json"
     || (path.startsWith(imagePrefix) && /^[a-zA-Z0-9_-]+\.webp$/.test(path.slice(imagePrefix.length)));
-  if (!paths.includes(articlePath) || paths.some((path) => !allowed(path))) {
+  if (!paths.includes(articlePath) || affectedPaths.some((path) => !allowed(path))) {
     throw new ContentPullRequestError("許可されていないファイルを含む記事 Pull Request は更新できません。", 403);
   }
   return editable;
