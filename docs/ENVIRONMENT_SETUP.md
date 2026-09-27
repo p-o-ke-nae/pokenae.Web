@@ -72,6 +72,8 @@ GitHub Actions でのデプロイ時は、GitHub Secrets に登録した値を�
 | `GOOGLE_CLIENT_ID`     | Google OAuth2 クライアントID                                    |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth2 クライアントシークレット                          |
 | `PROD_NEXTAUTH_URL`    | 本番環境のNextAuth URL（例: `https://pokenae.example.com`）     |
+| `PROD_API_URL`         | 本番環境のバックエンド API URL                                  |
+| `ADMIN_ALLOWED_EMAILS` | 管理画面を利用できるメールアドレス（任意、カンマ区切り）        |
 | `DEV_NEXTAUTH_URL`     | 開発環境のNextAuth URL（例: `https://dev.pokenae.example.com`） |
 
 デプロイワークフロー（`.github/workflows/main.yml`）が自動的に VPS 上の `~/pokenae-web/secrets/` にファイルを作成し、Docker Compose secrets として利用します。VPS 上ではデプロイ用ユーザーを所有者として、`secrets/` を `700`、既存ファイルを含む配下の全シークレットファイルを `600` に毎回矯正します。Docker runner は secrets の読み取り時だけ root で動作し、読み取り後は必ず UID/GID 1001 に降格します。デプロイ検証では Node.js プロセスの UID が 1001 であることも確認します。

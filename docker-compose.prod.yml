@@ -18,7 +18,7 @@ services:
     user: "0:0"
     container_name: pokenae-web-prod
     ports:
-      - "${PORT:-3001}:3000"
+      - "127.0.0.1:${PORT:-3001}:3000"
     environment:
       NODE_ENV: production
       NEXTAUTH_URL: ${NEXTAUTH_URL}
@@ -53,10 +53,9 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
-    # ヘルスチェック失敗時はコンテナを終了させ、restart: always で自動再起動させる。
-    # /api/auth/session は認証不要で応答するため、アプリの生死確認に適している。
+    # IPv6 の ::1 ではなく、Next.js が待ち受ける IPv4 ループバックを明示する。
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/auth/session || exit 1"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --output-document=/dev/null http://127.0.0.1:3000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

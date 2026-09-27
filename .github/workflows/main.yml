@@ -110,9 +110,10 @@ jobs:
     with:
       compose_file: docker-compose.prod.yml
       project_name: pokenae-prod
-      container_name: pokenae-web-prod
       image_tag: main
       port: "3001"
+      api_services: game-library-api
+      game_library_api_base_url: ${{ vars.PROD_GAME_LIBRARY_API_BASE_URL }}
     secrets:
       host: ${{ secrets.HOST }}
       username: ${{ secrets.USERNAME }}

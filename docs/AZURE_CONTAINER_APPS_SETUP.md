@@ -267,6 +267,8 @@ GitHub Actions のワークフローが参照するシークレットと変数�
 | `ACR_PULL_IDENTITY_ID`         | `/subscriptions/.../userAssignedIdentities/pokenae-acr-pull`     | ACA pull 用 UAMI の完全な resource ID                |
 
 > **FQDN の確認方法**: Azure Portal → Container App → **「概要」** → **「アプリケーション URL」** に表示されます。
+>
+> 現在の本番 Web は VPS へデプロイされます。`PROD_GAME_LIBRARY_API_BASE_URL` は `.env.docker.production` ではなく GitHub Actions の Repository Variable から本番コンテナへ注入されます。
 
 ---
 
