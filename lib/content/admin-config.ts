@@ -1,12 +1,14 @@
 import type { z } from "zod";
 import {
   announcementContentSchema,
+  appListSchema,
   toolListSchema,
   updateContentSchema,
 } from "./schemas";
 import { validateCanonicalItems, validateCanonicalJson, type ValidationIssue } from "./canonical-validation";
 
 export type ToolContent = z.infer<typeof toolListSchema>[number];
+export type AppContent = z.infer<typeof appListSchema>[number];
 export type ContentTreeChange = { path: string; content: string | null };
 export type ConfigWriteResult<T> =
   | { success: true; value: T; files: ContentTreeChange[] }
@@ -16,8 +18,8 @@ type UpdateInput = {
   id: string;
   publishedAt?: string;
   summary: string;
-  target: "tool" | "home";
-  href: "/tools" | "/";
+  target: "tool" | "app" | "home";
+  href: "/tools" | "/apps" | "/";
 };
 
 function zodIssues(prefix: string, issues: Array<{ path: PropertyKey[]; message: string }>): ValidationIssue[] {
@@ -51,6 +53,18 @@ export function buildToolContentChanges(currentPaths: readonly string[], tools: 
   const updates = tools.map((tool) => ({
     path: `content/tools/${tool.slug}.json`,
     content: `${JSON.stringify(tool, null, 2)}\n`,
+  }));
+  const deletions = currentPaths
+    .filter((path) => !nextPaths.has(path))
+    .map((path) => ({ path, content: null }));
+  return [...updates, ...deletions];
+}
+
+export function buildAppContentChanges(currentPaths: readonly string[], apps: readonly AppContent[]): ContentTreeChange[] {
+  const nextPaths = new Set(apps.map((app) => `content/apps/${app.slug}.json`));
+  const updates = apps.map((app) => ({
+    path: `content/apps/${app.slug}.json`,
+    content: `${JSON.stringify({ ...app, image: app.image ?? null }, null, 2)}\n`,
   }));
   const deletions = currentPaths
     .filter((path) => !nextPaths.has(path))
@@ -118,6 +132,40 @@ export function prepareToolWrite(input: {
     value: parsed.data,
     files: [
       ...buildToolContentChanges(input.currentPaths, parsed.data),
+      { path: input.updatePath, content: `${JSON.stringify(update.update, null, 2)}\n` },
+    ],
+  };
+}
+
+export function prepareAppWrite(input: {
+  rawValue: unknown;
+  currentPaths: readonly string[];
+  appSchema: string;
+  updateSchema: string;
+  updatePath: string;
+  updateId: string;
+  summary: string;
+  publishedAt?: string;
+}): ConfigWriteResult<AppContent[]> {
+  const parsed = appListSchema.safeParse(input.rawValue);
+  if (!parsed.success) return { success: false, issues: zodIssues("apps", parsed.error.issues) };
+  const appDocuments = parsed.data.map((app) => ({ ...app, image: app.image ?? null }));
+  const appIssues = validateCanonicalItems(input.appSchema, appDocuments)
+    .map((issue) => ({ ...issue, path: ["apps", ...issue.path] }));
+  if (appIssues.length) return { success: false, issues: appIssues };
+  const update = prepareUpdate({
+    id: input.updateId,
+    publishedAt: input.publishedAt,
+    summary: input.summary,
+    target: "app",
+    href: "/apps",
+  }, input.updateSchema);
+  if (!update.success) return update;
+  return {
+    success: true,
+    value: parsed.data,
+    files: [
+      ...buildAppContentChanges(input.currentPaths, parsed.data),
       { path: input.updatePath, content: `${JSON.stringify(update.update, null, 2)}\n` },
     ],
   };

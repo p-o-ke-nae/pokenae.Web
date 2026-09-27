@@ -9,6 +9,7 @@ import { isContentConflictError } from "@/lib/github/content-conflict";
 import { validateCanonicalJson } from "../../../../lib/content/canonical-validation";
 import { assignNewTagsToPost, serializeTagFiles } from "../../../../lib/content/tags-admin";
 import { PostImageReferenceError, serializePostSource } from "../../../../lib/content/post-source";
+import { getPostUpdatePublishedAt, preparePostForWrite } from "../../../../lib/content/post-publication";
 
 const allowedImages = new Map([["image/png", ".png"], ["image/jpeg", ".jpg"], ["image/webp", ".webp"]]);
 
@@ -109,11 +110,16 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    const now = new Date();
+    const existingPost = currentSnapshot.postSources.some(
+      ({ path }) => path === `content/posts/${parsed.data.post.slug}/index.md`,
+    );
+    const postToWrite = preparePostForWrite(parsed.data.post, existingPost, now);
     const parsedTagDefinitions = tagDefinitionListSchema.safeParse(assigned.definitions);
     if (!parsedTagDefinitions.success) {
       return NextResponse.json({ error: "タグ一覧が不正です。", issues: parsedTagDefinitions.error.issues }, { status: 400 });
     }
-    const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+    const timestamp = now.toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
     const branch = `content/${parsed.data.post.slug}-${timestamp}`;
     const currentTagIds = new Set(currentSnapshot.tags.map((tag) => tag.id));
     const submittedTagIds = new Set(parsedTagDefinitions.data.map((tag) => tag.id));
@@ -131,15 +137,15 @@ export async function POST(request: Request) {
     }
     const skipInfo = parseBoolean(form.get("skipInfo"));
     const files: { path: string; content: Buffer | string }[] = [
-      { path: `content/posts/${parsed.data.post.slug}/index.md`, content: serializePostSource(parsed.data.post, parsed.data.body) },
+      { path: `content/posts/${postToWrite.slug}/index.md`, content: serializePostSource(postToWrite, parsed.data.body) },
     ];
     if (!skipInfo) {
       const update = updateContentSchema.safeParse({
-        id: `${parsed.data.post.slug}-${timestamp}`,
-        publishedAt: new Date().toISOString(),
+        id: `${postToWrite.slug}-${timestamp}`,
+        publishedAt: getPostUpdatePublishedAt(postToWrite.publishedAt, now),
         target: "post",
-        summary: parsed.data.post.changeNote || `${parsed.data.post.title}を更新`,
-        href: `/blog/${parsed.data.post.slug}`,
+        summary: postToWrite.changeNote || `${postToWrite.title}を更新`,
+        href: `/blog/${postToWrite.slug}`,
         visible: true,
       });
       if (!update.success) {
@@ -149,7 +155,7 @@ export async function POST(request: Request) {
       if (updateIssues.length) {
         return NextResponse.json({ error: "更新情報がcanonical schemaに適合しません。", issues: updateIssues }, { status: 400 });
       }
-      files.push({ path: `content/updates/${parsed.data.post.slug}-${timestamp}.json`, content: JSON.stringify(update.data, null, 2) + "\n" });
+      files.push({ path: `content/updates/${postToWrite.slug}-${timestamp}.json`, content: JSON.stringify(update.data, null, 2) + "\n" });
     }
     if (JSON.stringify(parsedTagDefinitions.data) !== JSON.stringify(currentSnapshot.tags)) {
       files.push(...serializeTagFiles(parsedTagDefinitions.data));
@@ -167,7 +173,7 @@ export async function POST(request: Request) {
     }
     const pr = await createContentPullRequest({
       branch,
-      title: `content: ${parsed.data.post.title}`,
+      title: `content: ${postToWrite.title}`,
       body: skipInfo
         ? `管理画面から作成\n\nContent-Update: skip\nContent-Update-Reason: INFOに表示しない設定\n\n投稿者: ${auth.session.user?.email ?? "unknown"}`
         : `管理画面から作成\n\n投稿者: ${auth.session.user?.email ?? "unknown"}`,

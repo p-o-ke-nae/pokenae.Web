@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getAdminAuthorization: vi.fn(),
@@ -90,6 +90,8 @@ describe("POST /api/content/posts", () => {
     });
   });
 
+  afterEach(() => vi.useRealTimers());
+
   function validForm(baseRevision?: string) {
     const form = new FormData();
     if (baseRevision !== undefined) form.set("baseRevision", baseRevision);
@@ -156,6 +158,53 @@ describe("POST /api/content/posts", () => {
     expect(mocks.createContentPullRequest).toHaveBeenCalledWith(expect.objectContaining({
       expectedRevision: normalizedRevision,
     }));
+  });
+
+  it("writes a scheduled publication with matching canonical dates", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-27T02:00:00Z"));
+    mocks.createContentPullRequest.mockResolvedValue({ html_url: "https://example.test/pr/2", number: 2 });
+    const form = validForm(normalizedRevision);
+    const metadata = JSON.parse(String(form.get("post"))) as Record<string, unknown>;
+    form.set("post", JSON.stringify({
+      ...metadata,
+      publishedAt: "2026-09-28",
+      updatedAt: "2026-09-27T00:00:00Z",
+      status: "published",
+    }));
+    const { POST } = await import("../../app/api/content/posts/route");
+
+    const response = await POST(new Request("http://localhost/api/content/posts", { method: "POST", body: form }));
+
+    expect(response.status).toBe(201);
+    const files = mocks.createContentPullRequest.mock.calls[0][0].files as Array<{ path: string; content: string }>;
+    const article = files.find(({ path }) => path.endsWith("/index.md"))?.content;
+    const update = files.find(({ path }) => path.startsWith("content/updates/"))?.content;
+    expect(article).toContain('publishedAt: "2026-09-28T00:00:00+09:00"');
+    expect(article).toContain('updatedAt: "2026-09-28T00:00:00+09:00"');
+    expect(JSON.parse(update ?? "{}")).toMatchObject({
+      publishedAt: "2026-09-28T00:00:00+09:00",
+    });
+  });
+
+  it("sets an update date when editing an already published article", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-27T02:00:00Z"));
+    mocks.getFreshContentAdminSnapshot.mockResolvedValue({
+      ...(await mocks.getFreshContentAdminSnapshot()),
+      postSources: [{ path: "content/posts/test-post/index.md", source: "" }],
+    });
+    mocks.createContentPullRequest.mockResolvedValue({ html_url: "https://example.test/pr/2", number: 2 });
+    const form = validForm(normalizedRevision);
+    const { POST } = await import("../../app/api/content/posts/route");
+
+    const response = await POST(new Request("http://localhost/api/content/posts", { method: "POST", body: form }));
+
+    expect(response.status).toBe(201);
+    const files = mocks.createContentPullRequest.mock.calls[0][0].files as Array<{ path: string; content: string }>;
+    const article = files.find(({ path }) => path.endsWith("/index.md"))?.content;
+    expect(article).toContain('publishedAt: "2025-01-01T00:00:00+09:00"');
+    expect(article).toContain('updatedAt: "2026-09-27T02:00:00.000Z"');
   });
 
   it("adds a new tag catalog entry to the same article pull request", async () => {

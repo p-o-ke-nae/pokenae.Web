@@ -6,6 +6,7 @@ import { contentAdminFixture, contentFixture } from "./fixtures";
 import {
   announcementContentSchema,
   announcementSchema,
+  appContentSchema,
   appSchema,
   bannerContentSchema,
   bannerSchema,
@@ -17,6 +18,7 @@ import {
 } from "./schemas";
 import type { CollectionDexRecord, ContentSnapshot, Post, TagDefinition } from "./types";
 import type { RepositoryMarkdownContext } from "../tools/readme-urls";
+import { isPublishedPost } from "./post-publication";
 
 const OWNER = process.env.CONTENT_REPOSITORY_OWNER ?? "p-o-ke-nae";
 const REPOSITORY = process.env.CONTENT_REPOSITORY_NAME ?? "pokenae.Content";
@@ -39,12 +41,15 @@ export type ContentAdminSnapshot = {
   banners: Array<ReturnType<typeof bannerContentSchema.parse>>;
   announcements: Array<ReturnType<typeof announcementContentSchema.parse>>;
   tools: Array<ReturnType<typeof toolContentSchema.parse>>;
+  apps: Array<ReturnType<typeof appContentSchema.parse>>;
   toolPaths: string[];
+  appPaths: string[];
   paths: string[];
   postSources: Array<{ path: string; source: string }>;
   schemas: {
     home: string;
     tool: string;
+    app: string;
     update: string;
   };
 };
@@ -226,6 +231,7 @@ export function parseContentSnapshot(files: ReadonlyMap<string, string>, revisio
 
 export function parseContentAdminSnapshot(files: ReadonlyMap<string, string>, revision: string, paths = [...files.keys()]): ContentAdminSnapshot {
   const toolPaths = [...files.keys()].filter((path) => /^content\/tools\/[^/]+\.json$/.test(path)).sort();
+  const appPaths = [...files.keys()].filter((path) => /^content\/apps\/[^/]+\.json$/.test(path)).sort();
   const postSources = [...files.entries()]
     .filter(([path]) => /^content\/posts\/[^/]+\/index\.md$/.test(path))
     .sort(([left], [right]) => left.localeCompare(right))
@@ -236,12 +242,15 @@ export function parseContentAdminSnapshot(files: ReadonlyMap<string, string>, re
     banners: bannerContentSchema.array().parse(JSON.parse(requiredFile(files, "content/home/banners.json"))),
     announcements: announcementContentSchema.array().parse(JSON.parse(requiredFile(files, "content/home/announcements.json"))),
     tools: toolPaths.map((path) => toolContentSchema.parse(JSON.parse(requiredFile(files, path)))),
+    apps: appPaths.map((path) => appContentSchema.parse(JSON.parse(requiredFile(files, path)))),
     toolPaths,
+    appPaths,
     paths,
     postSources,
     schemas: {
       home: requiredFile(files, "schemas/home.schema.json"),
       tool: requiredFile(files, "schemas/tool.schema.json"),
+      app: requiredFile(files, "schemas/app.schema.json"),
       update: requiredFile(files, "schemas/update.schema.json"),
     },
   };
@@ -288,7 +297,7 @@ export function isActiveContent(startsAt?: string, endsAt?: string, now = Date.n
 export async function getPublishedPosts() {
   const { posts } = await getContentSnapshot();
   return posts
-    .filter((post) => post.status === "published")
+    .filter((post) => isPublishedPost(post))
     .sort((a, b) => b.priority - a.priority || b.publishedAt.localeCompare(a.publishedAt));
 }
 

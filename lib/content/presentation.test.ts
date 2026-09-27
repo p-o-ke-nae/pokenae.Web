@@ -61,7 +61,19 @@ describe("content presentation", () => {
       { id: "hidden-app", publishedAt: "2026-09-29T12:00:00Z", target: "app" as const, summary: "非表示アプリ", skipInfo: true },
     ];
 
-    expect(selectInfoUpdates(updates).map((item) => item.id)).toEqual(["app", "tool", "blog"]);
+    expect(selectInfoUpdates(updates, Date.parse("2026-09-30T00:00:00Z")).map((item) => item.id)).toEqual(["app", "tool", "blog"]);
+  });
+
+  it("keeps scheduled post updates hidden until their publication time", () => {
+    const updates = [{
+      id: "scheduled-post",
+      publishedAt: "2026-09-28T00:00:00+09:00",
+      target: "post" as const,
+      summary: "予約記事",
+    }];
+
+    expect(selectInfoUpdates(updates, Date.parse("2026-09-27T14:59:59Z"))).toEqual([]);
+    expect(selectInfoUpdates(updates, Date.parse("2026-09-27T15:00:00Z"))).toEqual(updates);
   });
 
   it("orders pickup items by priority and applies the requested limit", () => {
@@ -71,6 +83,23 @@ describe("content presentation", () => {
       "tool:blink-observer-tool",
     ]);
     expect(selectPickupItems(items)).toHaveLength(4);
+  });
+
+  it("excludes scheduled posts from public content until publication", () => {
+    const scheduledPost = {
+      ...contentFixture.posts[0],
+      slug: "scheduled",
+      publishedAt: "2026-09-28T00:00:00+09:00",
+      status: "published" as const,
+    };
+    const snapshot = { ...contentFixture, posts: [scheduledPost] };
+
+    expect(toPublicContentItems(snapshot, Date.parse("2026-09-27T14:59:59Z"))).toEqual(
+      expect.not.arrayContaining([expect.objectContaining({ id: "post:scheduled" })]),
+    );
+    expect(toPublicContentItems(snapshot, Date.parse("2026-09-27T15:00:00Z"))).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "post:scheduled" })]),
+    );
   });
 
   it("prioritizes matching tags, excludes the current item, and fills with recent items", () => {

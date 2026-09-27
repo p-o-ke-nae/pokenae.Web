@@ -78,6 +78,23 @@ const toolSchema = JSON.stringify({
     priority: { type: "integer" },
   },
 });
+const appSchema = JSON.stringify({
+  type: "object",
+  additionalProperties: false,
+  required: ["slug", "displayName", "summary", "href", "image", "imageAlt", "metaLabel", "status", "order", "tags"],
+  properties: {
+    slug: { type: "string" },
+    displayName: { type: "string" },
+    summary: { type: "string" },
+    href: { type: "string", pattern: "^/" },
+    image: { type: ["string", "null"] },
+    imageAlt: { type: "string" },
+    metaLabel: { type: "string" },
+    status: { enum: ["draft", "published", "archived"] },
+    order: { type: "integer" },
+    tags: { type: "array" },
+  },
+});
 const announcementHomeSchema = JSON.stringify({
   oneOf: [{
     title: "Announcements",
@@ -399,6 +416,7 @@ describe("banner pull request route", () => {
       toolPaths: ["content/tools/tool.json"],
       schemas: { home: homeSchema, tool: toolSchema, update: updateSchema },
     });
+
     const { PUT } = await import("../../app/api/content/config/pull-requests/[number]/route");
     const response = await PUT(new Request("http://localhost?kind=tools", {
       method: "PUT",
@@ -425,6 +443,75 @@ describe("banner pull request route", () => {
       ]),
     });
     expect(mocks.updateEditableContentPullRequest).not.toHaveBeenCalled();
+  });
+
+  it("loads and updates a Web app pull request", async () => {
+    const value = [{
+      slug: "game-library",
+      displayName: "ゲームライブラリ",
+      summary: "ゲームを管理します。",
+      href: "/game-library",
+      imageAlt: "",
+      metaLabel: "Webアプリ",
+      status: "published",
+      order: 0,
+      tags: [],
+    }];
+    mocks.getEditableContentPullRequest.mockResolvedValue({
+      number: 6,
+      title: "apps",
+      url: "https://example.test/6",
+      branch: "content/apps-20260926103844",
+      kind: "apps",
+      headRevision: "2222222222222222222222222222222222222222",
+      baseRevision: "1111111111111111111111111111111111111111",
+      updatePath: "content/updates/apps-20260926103844.json",
+      value,
+      update: {
+        id: "apps-20260926103844",
+        publishedAt: "2026-09-26T10:38:44.000Z",
+        target: "app",
+        summary: "Webアプリを更新",
+        href: "/apps",
+        visible: true,
+      },
+      paths: ["content/apps/game-library.json", "content/apps/remove.json"],
+      toolPaths: [],
+      appPaths: ["content/apps/game-library.json", "content/apps/remove.json"],
+      postSources: [],
+      schemas: { home: homeSchema, tool: toolSchema, app: appSchema, update: updateSchema },
+    });
+    mocks.updateEditableContentPullRequest.mockResolvedValue({
+      number: 6,
+      url: "https://example.test/6",
+      headRevision: "3333333333333333333333333333333333333333",
+    });
+    const { GET, PUT } = await import("../../app/api/content/config/pull-requests/[number]/route");
+    const getResponse = await GET(new Request("http://localhost?kind=apps"), {
+      params: Promise.resolve({ number: "6" }),
+    });
+    expect(getResponse.status).toBe(200);
+    await expect(getResponse.json()).resolves.toMatchObject({ kind: "apps", value, issues: [] });
+
+    const putResponse = await PUT(new Request("http://localhost?kind=apps", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "apps",
+        expectedRevision: "2222222222222222222222222222222222222222",
+        value,
+      }),
+    }), { params: Promise.resolve({ number: "6" }) });
+
+    expect(putResponse.status).toBe(200);
+    expect(mocks.updateEditableContentPullRequest).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "apps",
+      files: expect.arrayContaining([
+        expect.objectContaining({ path: "content/apps/game-library.json" }),
+        { path: "content/apps/remove.json", content: null },
+        expect.objectContaining({ path: "content/updates/apps-20260926103844.json" }),
+      ]),
+    }));
   });
 
   it("rejects a body kind that does not match the requested kind", async () => {

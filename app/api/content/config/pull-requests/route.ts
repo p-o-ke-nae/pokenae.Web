@@ -5,10 +5,11 @@ import {
   listEditableContentPullRequests,
   type ConfigKind,
 } from "@/lib/github/content-writer";
+import { contentAdminGitHubError, logContentAdminGitHubError } from "../../../../../lib/github/admin-error";
 
 function parseKind(request: Request): ConfigKind | null {
   const kind = new URL(request.url).searchParams.get("kind");
-  return kind === "banners" || kind === "announcements" || kind === "tools" || kind === "tags" ? kind : null;
+  return kind === "banners" || kind === "announcements" || kind === "tools" || kind === "apps" || kind === "tags" ? kind : null;
 }
 
 export async function GET(request: Request) {
@@ -25,7 +26,8 @@ export async function GET(request: Request) {
   try {
     return NextResponse.json({ pullRequests: await listEditableContentPullRequests(kind) });
   } catch (error) {
-    console.error("Content pull request listing failed", error);
-    return NextResponse.json({ error: "Pull Request 一覧を取得できませんでした。" }, { status: 502 });
+    logContentAdminGitHubError("Content pull request listing failed", error);
+    const response = contentAdminGitHubError(error);
+    return NextResponse.json({ code: response.code, error: response.error }, { status: response.status });
   }
 }

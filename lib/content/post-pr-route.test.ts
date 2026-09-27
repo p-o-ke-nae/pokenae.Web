@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getAdminAuthorization: vi.fn(),
@@ -76,6 +76,8 @@ describe("PUT /api/content/posts/pull-requests/[number]", () => {
     mocks.updateEditablePostPullRequest.mockResolvedValue({ headRevision: "new-head" });
   });
 
+  afterEach(() => vi.useRealTimers());
+
   function request(body: string, thumbnail?: string) {
     return new Request("http://localhost/api/content/posts/pull-requests/42", {
       method: "PUT",
@@ -141,6 +143,34 @@ describe("PUT /api/content/posts/pull-requests/[number]", () => {
     expect(article).not.toContain("legacyUrl:");
     expect(article).not.toContain("raw.githubusercontent.com");
     expect(article).toMatch(/updatedAt: "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z"/);
+  });
+
+  it("matches updatedAt to the future publication and schedules INFO", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-27T02:00:00Z"));
+    const { PUT } = await import("../../app/api/content/posts/pull-requests/[number]/route");
+    const scheduledRequest = request("本文");
+    const payload = await scheduledRequest.json() as { post: Record<string, unknown> };
+    payload.post.publishedAt = "2026-09-28";
+    payload.post.updatedAt = "2026-09-27T00:00:00Z";
+
+    const response = await PUT(new Request(scheduledRequest.url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }), {
+      params: Promise.resolve({ number: "42" }),
+    });
+
+    expect(response.status, JSON.stringify(await response.clone().json())).toBe(200);
+    const files = mocks.updateEditablePostPullRequest.mock.calls[0][0].files as Array<{ path: string; content: string | null }>;
+    const article = files.find(({ path }) => path.endsWith("/index.md"))?.content;
+    const update = files.find(({ path }) => path.startsWith("content/updates/"))?.content;
+    expect(article).toContain('publishedAt: "2026-09-28T00:00:00+09:00"');
+    expect(article).toContain('updatedAt: "2026-09-28T00:00:00+09:00"');
+    expect(JSON.parse(update ?? "{}")).toMatchObject({
+      publishedAt: "2026-09-28T00:00:00+09:00",
+    });
   });
 
   it("rejects external images without updating the pull request", async () => {

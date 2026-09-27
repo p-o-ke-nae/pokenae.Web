@@ -95,6 +95,29 @@ img { max-width: 100%; }
 .admin-card:hover { border-color: var(--color-accent-25-strong); }
 .admin-card strong { color: var(--color-accent-25-strong); font-size: 1.15rem; }
 .admin-card__action { align-self: end; color: var(--color-link); font-weight: 700; }
+.admin-content-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  padding: .75rem;
+  border: 1px solid var(--color-base-70);
+  border-radius: .35rem;
+  background: var(--color-base-70-light);
+}
+.admin-content-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: .35rem .75rem;
+  border-radius: .25rem;
+  color: var(--color-link);
+  font-weight: 700;
+  text-decoration: none;
+}
+.admin-content-nav a[aria-current="page"] {
+  background: var(--color-accent-25-strong);
+  color: var(--color-text-inverse);
+}
 .stack { display: grid; gap: 1rem; }
 .empty-state, .notice {
   padding: 1rem 1.25rem;

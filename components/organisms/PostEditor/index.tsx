@@ -7,8 +7,9 @@ import { createMarkdownImageLink, createPastedImageFile, insertMarkdownAtSelecti
 import SafeMarkdown from "@/components/organisms/SafeMarkdown";
 import TagPicker from "@/components/molecules/TagPicker";
 import type { RepositoryMarkdownContext } from "@/lib/tools/readme-urls";
+import { normalizePostPublishedAt, toJapanDateInputValue } from "@/lib/content/post-publication";
 
-const blank: Post = { slug: "", title: "", summary: "", publishedAt: new Date().toISOString().slice(0, 10), status: "draft", category: "blog", tags: [], relatedTags: [], priority: 0, showInPickup: false, body: "" };
+const blank: Post = { slug: "", title: "", summary: "", publishedAt: normalizePostPublishedAt(toJapanDateInputValue()), status: "draft", category: "blog", tags: [], relatedTags: [], priority: 0, showInPickup: false, body: "" };
 const DRAFT_VERSION = 3;
 const DRAFT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -188,7 +189,7 @@ export default function PostEditor({ initial = blank, baseRevision, pullRequestN
     <label>slug<input required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={post.slug} onChange={(event) => setPost({ ...post, slug: event.target.value })} /></label>
     <label>タイトル<input required value={post.title} onChange={(event) => handleTitleChange(event.target.value)} /></label>
     <label>概要<textarea required value={post.summary} onChange={(event) => setPost({ ...post, summary: event.target.value })} /></label>
-    <div className="post-editor__row"><label>公開日<input type="date" required value={post.publishedAt.slice(0, 10)} onChange={(event) => setPost({ ...post, publishedAt: event.target.value })} /></label><label>状態<select value={post.status} onChange={(event) => setPost({ ...post, status: event.target.value as Post["status"] })}><option value="draft">下書き</option><option value="published">公開</option></select></label></div>
+    <div className="post-editor__row"><label>公開日<input type="date" required value={post.publishedAt.slice(0, 10)} onChange={(event) => setPost({ ...post, publishedAt: event.target.value ? normalizePostPublishedAt(event.target.value) : "" })} /></label><label>状態<select value={post.status} onChange={(event) => setPost({ ...post, status: event.target.value as Post["status"] })}><option value="draft">下書き</option><option value="published">公開</option></select></label></div>
     <label>表示優先度<input type="number" min="0" step="1" value={post.priority} onChange={(event) => setPost({ ...post, priority: Number(event.target.value || 0) })} /></label>
     <p className="post-editor__hint">大きい値ほど先に表示されます。既定値は 0 です。通常運用では 0 のままで問題ありません。</p>
     <label>カテゴリ<input required value={post.category} onChange={(event) => setPost({ ...post, category: event.target.value })} /></label>

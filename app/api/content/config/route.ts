@@ -3,13 +3,22 @@ import { getAdminAuthorization } from "@/lib/auth/admin";
 import { announcementContentSchema, gitCommitShaSchema, updateContentSchema } from "@/lib/content/schemas";
 import { createContentPullRequest, getReservedTagDefinitions } from "@/lib/github/content-writer";
 import { getFreshContentAdminSnapshot, usesContentFixtures } from "@/lib/content/repository";
-import { prepareToolWrite } from "@/lib/content/admin-config";
+import { prepareAppWrite, prepareToolWrite } from "@/lib/content/admin-config";
 import { isContentConflictError } from "@/lib/github/content-conflict";
+import { contentAdminGitHubError, logContentAdminGitHubError } from "../../../../lib/github/admin-error";
 import { prepareBannerWrite } from "../../../../lib/content/banner-admin";
 import { validateCanonicalJson } from "../../../../lib/content/canonical-validation";
 import { prepareTagWrite } from "../../../../lib/content/tags-admin";
 
-type ConfigKind = "banners" | "announcements" | "tools" | "tags";
+type ConfigKind = "banners" | "announcements" | "tools" | "apps" | "tags";
+
+function isConfigKind(value: unknown): value is ConfigKind {
+  return value === "banners"
+    || value === "announcements"
+    || value === "tools"
+    || value === "apps"
+    || value === "tags";
+}
 
 export async function POST(request: Request) {
   const auth = await getAdminAuthorization();
@@ -39,7 +48,9 @@ export async function POST(request: Request) {
       data = await request.json() as typeof data;
     }
     const revision = gitCommitShaSchema.safeParse(data.baseRevision);
-    if (!data.kind || !revision.success) return NextResponse.json({ error: "編集対象またはbase revisionが不正です。" }, { status: 400 });
+    if (!isConfigKind(data.kind) || !revision.success) {
+      return NextResponse.json({ error: "編集対象またはbase revisionが不正です。" }, { status: 400 });
+    }
     const currentSnapshot = await getFreshContentAdminSnapshot();
     if (currentSnapshot.revision !== revision.data) {
       return NextResponse.json({
@@ -61,6 +72,24 @@ export async function POST(request: Request) {
         updatePath,
         updateId,
         summary: data.changeNote || "ツールを更新",
+      });
+      if (!prepared.success) {
+        return NextResponse.json({
+          code: "CONTENT_VALIDATION_FAILED",
+          error: "入力内容がpokenae.Contentのcanonical schemaに適合しません。",
+          issues: prepared.issues,
+        }, { status: 400 });
+      }
+      contentFiles = prepared.files;
+    } else if (data.kind === "apps") {
+      const prepared = prepareAppWrite({
+        rawValue: data.value,
+        currentPaths: currentSnapshot.appPaths,
+        appSchema: currentSnapshot.schemas.app,
+        updateSchema: currentSnapshot.schemas.update,
+        updatePath,
+        updateId,
+        summary: data.changeNote || "Webアプリを更新",
       });
       if (!prepared.success) {
         return NextResponse.json({
@@ -141,7 +170,8 @@ export async function POST(request: Request) {
     if (isContentConflictError(error)) {
       return NextResponse.json({ code: "CONTENT_CONFLICT", error: error.message }, { status: 409 });
     }
-    console.error("Content config write failed", error);
-    return NextResponse.json({ error: "GitHub への保存に失敗しました。時間をおいて再試行してください。" }, { status: 502 });
+    logContentAdminGitHubError("Content config write failed", error);
+    const response = contentAdminGitHubError(error);
+    return NextResponse.json({ code: response.code, error: response.error }, { status: response.status });
   }
 }

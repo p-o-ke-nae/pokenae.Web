@@ -1,4 +1,5 @@
 import type { ContentSnapshot, ContentUpdate } from "./types";
+import { isPublishedPost } from "./post-publication";
 
 export type PublicContentItem = {
   id: string;
@@ -71,17 +72,17 @@ export function groupContentUpdatesByDate(updates: ContentUpdate[]): ContentUpda
   }));
 }
 
-export function selectInfoUpdates(updates: ContentUpdate[]): ContentUpdate[] {
+export function selectInfoUpdates(updates: ContentUpdate[], now = Date.now()): ContentUpdate[] {
   return updates
-    .filter((item) => !item.skipInfo && (
+    .filter((item) => Date.parse(item.publishedAt) <= now && !item.skipInfo && (
       item.target === "post" || item.target === "tool" || item.target === "app"
     ))
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
 }
 
-export function toPublicContentItems(snapshot: ContentSnapshot): PublicContentItem[] {
+export function toPublicContentItems(snapshot: ContentSnapshot, now = Date.now()): PublicContentItem[] {
   const posts: PublicContentItem[] = snapshot.posts
-    .filter((post) => post.status === "published")
+    .filter((post) => isPublishedPost(post, now))
     .map((post) => ({
       id: `post:${post.slug}`,
       source: "post",

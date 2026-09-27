@@ -3,9 +3,15 @@
 set -eu
 
 entrypoint=${ENTRYPOINT_PATH:-/usr/local/bin/entrypoint.sh}
+process_user_verifier=${PROCESS_USER_VERIFIER_PATH:-/usr/local/bin/verify-process-user.sh}
 state_dir=/.entrypoint-test-state
+test_process_pid=
 
 cleanup() {
+  if [ -n "$test_process_pid" ]; then
+    kill "$test_process_pid" 2>/dev/null || true
+    wait "$test_process_pid" 2>/dev/null || true
+  fi
   rm -rf "$state_dir"
 }
 trap cleanup EXIT
@@ -52,5 +58,26 @@ NODE_ENV=development \
 ENTRYPOINT_DROP_USER= \
 SECRETS_DIR="$state_dir/secrets" \
 "$entrypoint" npm run build
+
+su-exec nextjs:nodejs node -e \
+  'process.title = "next-server (test)"; setInterval(() => {}, 1000)' &
+test_process_pid=$!
+sleep 1
+
+"$process_user_verifier" 1001
+
+if "$process_user_verifier" 0 >/dev/null 2>&1; then
+  echo "process user verifier accepted an unexpected UID" >&2
+  exit 1
+fi
+
+kill "$test_process_pid"
+wait "$test_process_pid" 2>/dev/null || true
+test_process_pid=
+
+if "$process_user_verifier" 1001 >/dev/null 2>&1; then
+  echo "process user verifier accepted a missing Node.js process" >&2
+  exit 1
+fi
 
 echo "entrypoint tests passed"
