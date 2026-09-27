@@ -37,9 +37,13 @@ on:
         required: true
       google_client_secret:
         required: true
-      api_url:
-        required: true
-      admin_allowed_emails:
+      admin_emails:
+        required: false
+      github_app_id:
+        required: false
+      github_app_installation_id:
+        required: false
+      github_app_private_key_base64:
         required: false
 
 jobs:
@@ -94,32 +98,69 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
 
-          ssh "$USERNAME@$HOST" -i private_key -p 22 "mkdir -p ~/pokenae-web/secrets ~/pokenae-web/docker"
+          ssh "$USERNAME@$HOST" -i private_key -p 22 "mkdir -p ~/pokenae-web/secrets"
 
           scp -i private_key -P 22 \
             docker-compose.yml \
             "${{ inputs.compose_file }}" \
             "$USERNAME@$HOST:~/pokenae-web/"
 
-          scp -i private_key -P 22 \
-            docker/entrypoint.sh \
-            "$USERNAME@$HOST:~/pokenae-web/docker/"
-
       - name: Create secrets on VPS
         env:
           SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
           HOST: ${{ secrets.host }}
           USERNAME: ${{ secrets.username }}
+          NEXTAUTH_SECRET: ${{ secrets.nextauth_secret }}
+          GOOGLE_CLIENT_ID: ${{ secrets.google_client_id }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.google_client_secret }}
+          ADMIN_EMAILS: ${{ secrets.admin_emails }}
+          GITHUB_APP_ID: ${{ secrets.github_app_id }}
+          GITHUB_APP_INSTALLATION_ID: ${{ secrets.github_app_installation_id }}
+          GITHUB_APP_PRIVATE_KEY_BASE64: ${{ secrets.github_app_private_key_base64 }}
         run: |
-          echo "$SSH_PRIVATE_KEY" > private_key
+          set -euo pipefail
+          umask 077
+
+          secret_upload_dir=".deploy-secrets"
+          trap 'rm -rf "$secret_upload_dir" private_key' EXIT
+
+          printf '%s' "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
 
+          rm -rf "$secret_upload_dir"
+          mkdir -m 700 "$secret_upload_dir"
+          printf '%s' "$NEXTAUTH_SECRET" > "$secret_upload_dir/nextauth_secret"
+          printf '%s' "$GOOGLE_CLIENT_ID" > "$secret_upload_dir/google_client_id"
+          printf '%s' "$GOOGLE_CLIENT_SECRET" > "$secret_upload_dir/google_client_secret"
+          printf '%s' "$ADMIN_EMAILS" > "$secret_upload_dir/admin_emails"
+          printf '%s' "$GITHUB_APP_ID" > "$secret_upload_dir/github_app_id"
+          printf '%s' "$GITHUB_APP_INSTALLATION_ID" > "$secret_upload_dir/github_app_installation_id"
+          printf '%s' "$GITHUB_APP_PRIVATE_KEY_BASE64" > "$secret_upload_dir/github_app_private_key_base64"
+          chmod 600 "$secret_upload_dir"/*
+
+          ssh "$USERNAME@$HOST" -i private_key -p 22 'set -eu
+            secret_dir="$HOME/pokenae-web/secrets"
+            deploy_owner="$(id -u):$(id -g)"
+            install -d -m 700 "$secret_dir"
+            chown "$deploy_owner" "$secret_dir"
+            find "$secret_dir" -type f -exec chown "$deploy_owner" {} +
+            find "$secret_dir" -type f -exec chmod 600 {} +
+            chmod 700 "$secret_dir"
+          '
+
+          scp -i private_key -P 22 \
+            "$secret_upload_dir"/* \
+            "$USERNAME@$HOST:~/pokenae-web/secrets/"
+
           ssh "$USERNAME@$HOST" -i private_key -p 22 \
-            "cd ~/pokenae-web && \
-             printf '%s' '${{ secrets.nextauth_secret }}' > secrets/nextauth_secret && \
-             printf '%s' '${{ secrets.google_client_id }}' > secrets/google_client_id && \
-             printf '%s' '${{ secrets.google_client_secret }}' > secrets/google_client_secret && \
-             chmod 644 secrets/*"
+            'set -eu
+              secret_dir="$HOME/pokenae-web/secrets"
+              deploy_owner="$(id -u):$(id -g)"
+              chown "$deploy_owner" "$secret_dir"
+              find "$secret_dir" -type f -exec chown "$deploy_owner" {} +
+              find "$secret_dir" -type f -exec chmod 600 {} +
+              chmod 700 "$secret_dir"
+            '
 
       - name: Deploy to VPS
         env:
@@ -312,10 +353,33 @@ jobs:
           fi
           EOF
 
-          curl --fail --silent --show-error \
-            --retry 5 --retry-all-errors --retry-delay 5 \
-            "${SITE_URL%/}/api/health" > /dev/null
+      - name: Verify application privilege drop
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
+          HOST: ${{ secrets.host }}
+          USERNAME: ${{ secrets.username }}
+        run: |
+          printf '%s' "$SSH_PRIVATE_KEY" > private_key
+          chmod 600 private_key
 
-          curl --fail --silent --show-error \
-            --retry 5 --retry-all-errors --retry-delay 5 \
-            "${SITE_URL%/}/api/public/account-type-masters" > /dev/null
+          ssh "$USERNAME@$HOST" -i private_key -p 22 \
+            "CONTAINER_NAME=${{ inputs.container_name }} bash -s" <<'EOF'
+          set -euo pipefail
+
+          node_uid="$(
+            docker exec "${CONTAINER_NAME}" sh -c '
+              for status in /proc/[0-9]*/status; do
+                [ "$(awk "/^Name:/ { print \$2 }" "$status")" = "node" ] || continue
+                awk "/^Uid:/ { print \$2; exit }" "$status"
+                exit
+              done
+            '
+          )"
+
+          if [ "${node_uid}" != "1001" ]; then
+            echo "[ERROR] Node.js is not running as UID 1001"
+            exit 1
+          fi
+
+          echo "[SUCCESS] Node.js is running as UID 1001"
+          EOF

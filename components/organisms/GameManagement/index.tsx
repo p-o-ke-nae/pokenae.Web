@@ -59,6 +59,8 @@ import BulkEditorDialog from './BulkEditorDialog';
 import { TrialBanner, PageCard, PageFrame } from './shared';
 import type { DashboardExtraCard, EditorDialogContext, ManagementTableRow, StoryProgressLabelMap } from './view-types';
 import type { AccountDto } from '@/lib/game-management/types';
+import ContentTagLinks from '@/components/molecules/ContentTagLinks';
+import type { TagDefinition } from '@/lib/content/types';
 
 type SaveDataListFieldHeader = {
   id: number;
@@ -370,6 +372,8 @@ export function GameManagementDashboard({
     sectionTitle = 'ゲーム管理ダッシュボード',
     sectionDescription = '各マスタ、所有ゲーム機、ゲームソフト、アカウント、メモリーカード、セーブデータの一覧確認と編集画面への遷移をここから行えます。',
     extraCards = [],
+    contentTags = [],
+    tagDefinitions = [],
   }: {
     basePath?: string;
     resourceKeys?: ResourceKey[];
@@ -378,6 +382,8 @@ export function GameManagementDashboard({
     sectionTitle?: string;
     sectionDescription?: string;
     extraCards?: DashboardExtraCard[];
+    contentTags?: string[];
+    tagDefinitions?: TagDefinition[];
   }) {
     const { data: session } = useSession();
     const isTrial = !session?.user;
@@ -479,6 +485,7 @@ export function GameManagementDashboard({
             ))}
           </div>
         )}
+        <ContentTagLinks tagIds={contentTags} tagDefinitions={tagDefinitions} listPath="/apps" />
       </PageFrame>
     );
   }

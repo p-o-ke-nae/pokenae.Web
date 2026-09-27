@@ -13,6 +13,12 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+RUN apk add --no-cache su-exec \
+    && addgroup -S -g 1001 nodejs \
+    && adduser -S -D -H -u 1001 -G nodejs nextjs \
+    && mkdir -p /app/.next \
+    && chown nextjs:nodejs /app /app/.next
+
 # NEXT_PUBLIC_ 環境変数はビルド時に埋め込まれるため ARG → ENV で設定
 ARG NEXT_PUBLIC_ENVIRONMENT=debug
 ARG NEXT_PUBLIC_API_BASE_URL
@@ -26,6 +32,7 @@ ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 ENV NEXT_PUBLIC_GOOGLE_REDIRECT_URI=$NEXT_PUBLIC_GOOGLE_REDIRECT_URI
+ENV ENTRYPOINT_DROP_USER=nextjs:nodejs
 
 # secrets を環境変数に展開するエントリポイント
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
@@ -41,7 +48,20 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 # ホットリロードが正しく動作する。
 CMD ["npx", "next", "dev", "--hostname", "0.0.0.0", "--webpack"]
 
-# Stage 3: Builder (本番ビルド用)
+# Stage 3: Entrypoint test
+FROM node:20-alpine AS entrypoint-test
+
+RUN apk add --no-cache su-exec \
+    && addgroup -S -g 1001 nodejs \
+    && adduser -S -D -H -u 1001 -G nodejs nextjs
+
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY docker/entrypoint.test.sh /usr/local/bin/entrypoint.test.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/entrypoint.test.sh \
+    && chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/entrypoint.test.sh \
+    && /usr/local/bin/entrypoint.test.sh
+
+# Stage 4: Builder (本番ビルド用)
 FROM node:20-alpine AS builder
 WORKDIR /app
 
@@ -62,7 +82,7 @@ ENV NEXT_PUBLIC_ENVIRONMENT=$NEXT_PUBLIC_ENVIRONMENT
 
 RUN npm run build
 
-# Stage 4: Runner (本番実行用)
+# Stage 5: Runner (本番実行用)
 FROM node:20-alpine AS runner
 WORKDIR /app
 
@@ -72,9 +92,11 @@ ENV NODE_ENV=production
 # Node.js RSS = V8ヒープ + コードキャッシュ + バッファ + ネイティブ等 のため、
 # ヒープ上限をコンテナ制限の約半分に設定する。
 ENV NODE_OPTIONS="--max-old-space-size=384"
+ENV ENTRYPOINT_DROP_USER=nextjs:nodejs
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN apk add --no-cache su-exec \
+    && addgroup -S -g 1001 nodejs \
+    && adduser -S -D -H -u 1001 -G nodejs nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
@@ -83,8 +105,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # secrets を環境変数に展開するエントリポイント
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
-
-USER nextjs
 
 EXPOSE 3000
 

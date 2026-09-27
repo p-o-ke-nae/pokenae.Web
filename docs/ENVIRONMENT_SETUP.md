@@ -50,10 +50,13 @@ Get-ChildItem secrets/ -Name
 
 1. `docker-compose.yml` のトップレベル `secrets` で `secrets/` ディレクトリのファイルを定義
 2. コンテナ起動時にファイルが `/run/secrets/` にマウントされる
-3. `docker/entrypoint.sh` が `/run/secrets/` 内のファイルを読み取り、ファイル名を大文字に変換して環境変数に展開
-4. アプリケーションが `process.env.NEXTAUTH_SECRET` 等で参照
+3. runner コンテナは root で entrypoint を開始し、`docker/entrypoint.sh` が `/run/secrets/` 内の `600` ファイルを読み取る
+4. ファイル名を大文字に変換して環境変数へ展開した後、`su-exec` で `nextjs:nodejs`（UID/GID 1001）へ権限降格する
+5. `node server.js` は非 root で実行され、アプリケーションが `process.env.NEXTAUTH_SECRET` 等で参照する
 
-> **CI/CD 環境**: GitHub Actions では GitHub Secrets から直接環境変数として渡すため、`secrets/` ディレクトリは不要です。
+entrypoint 自体を非 root で起動した場合は追加の権限変更を行わず、そのユーザーのままコマンドを `exec` します。デバッグ用 dev ステージも `nextjs:nodejs` で動作し、ホットリロード用の `/app/.next` は書き込み可能に設定されています。
+
+> **CI/CD 環境**: VPS デプロイでは GitHub Secrets を一時ファイルとして安全に転送し、VPS の `secrets/` ディレクトリから Docker Compose secrets として読み込みます。
 
 ### CI/CD（GitHub Actions）でのシークレット管理
 
@@ -73,54 +76,13 @@ GitHub Actions でのデプロイ時は、GitHub Secrets に登録した値を�
 | `ADMIN_ALLOWED_EMAILS` | 管理画面を利用できるメールアドレス（任意、カンマ区切り）        |
 | `DEV_NEXTAUTH_URL`     | 開発環境のNextAuth URL（例: `https://dev.pokenae.example.com`） |
 
-デプロイワークフロー（`.github/workflows/main.yml`）が自動的に VPS 上の `~/pokenae-web/secrets/` にファイルを作成し、Docker Compose secrets として利用します。
-本番の非機密設定も GitHub Actions から Docker Compose に明示的に渡すため、
-VPS 上の `.env.docker.production` は使用しません。
+デプロイワークフロー（`.github/workflows/main.yml`）が自動的に VPS 上の `~/pokenae-web/secrets/` にファイルを作成し、Docker Compose secrets として利用します。VPS 上ではデプロイ用ユーザーを所有者として、`secrets/` を `700`、既存ファイルを含む配下の全シークレットファイルを `600` に毎回矯正します。Docker runner は secrets の読み取り時だけ root で動作し、読み取り後は必ず UID/GID 1001 に降格します。デプロイ検証では Node.js プロセスの UID が 1001 であることも確認します。
 
-### VPS 本番環境
-
-本番は nginx が `127.0.0.1:3001` の Web コンテナへリバースプロキシします。
-コンテナの 3001 番ポートもループバックだけに公開し、外部から直接アクセスさせません。
-
-通常のデプロイは `main` ブランチへの push で実行します。ワークフローは次の順序で処理します。
-
-1. GHCR から新しいイメージを pull
-2. 必須環境変数と Compose 設定を検証
-3. 既存コンテナを先に削除せず、新しいイメージで更新
-4. コンテナの `/api/health` と公開 URL を検証
-5. 起動に失敗した場合は直前のイメージへロールバック
-
-本番障害時は、まず次の読み取り専用コマンドで状態を確認します。
+entrypoint のコンテナ単体テストは、Docker daemon が利用可能な環境で次のように実行できます。
 
 ```bash
-CONTAINER_ID="$(docker ps -aq \
-  --filter label=com.docker.compose.project=pokenae-prod \
-  --filter label=com.docker.compose.service=app | head -n 1)"
-docker ps -a \
-  --filter label=com.docker.compose.project=pokenae-prod \
-  --filter label=com.docker.compose.service=app
-docker inspect "$CONTAINER_ID" \
-  --format 'status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{end}} restarts={{.RestartCount}} oom={{.State.OOMKilled}}'
-docker logs --tail 200 "$CONTAINER_ID"
-curl --fail --show-error http://127.0.0.1:3001/api/health
-tail -n 100 /var/log/nginx/error.log
+docker build --target entrypoint-test -f docker/Dockerfile .
 ```
-
-手動復旧が必要な場合も、設定値は GitHub Actions を正として再デプロイすることを優先します。
-やむを得ず既存イメージを起動する場合は、`NEXTAUTH_URL`、API URL、
-`API_SERVICE_GAME_LIBRARY_API_BASE_URL` を明示し、既存の `secrets/` を利用します。
-秘密値をコマンド履歴や `.env` ファイルへ直接残さないでください。
-
-復旧後は次を順に確認します。
-
-```bash
-curl --fail http://127.0.0.1:3001/api/health
-curl --fail https://pokenae.com/api/health
-curl --fail https://pokenae.com/api/auth/session
-```
-
-その後、ブラウザで Google OAuth2 ログインを行い、認証済み API リクエストに
-Google アクセストークンが付与されることを確認します。
 
 ## 環境モードの種類
 
@@ -133,6 +95,16 @@ Google アクセストークンが付与されることを確認します。
   - ホットリロード機能が有効
   - 詳細なエラーメッセージが表示
   - ナビゲーションバーに赤色の「DEBUG」バッジが表示
+
+Docker Compose の debug 環境で `gray-matter` など、`package.json` と
+`package-lock.json` に記載済みのモジュールが解決できない場合は、古い匿名
+`node_modules` ボリュームが残っている可能性があります。対象プロジェクトだけの
+ボリュームを再作成してイメージをビルドします。
+
+```bash
+docker compose --env-file .env.docker.debug -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml down -v
+docker compose --env-file .env.docker.debug -p pokenae-debug -f docker-compose.yml -f docker-compose.debug.yml up --build
+```
 
 #### 設定方法：
 
@@ -270,19 +242,6 @@ ADMIN_ALLOWED_EMAILS=admin@example.com,another-admin@example.com
 - 追加サービスの URL は `API_SERVICE_<サービス名>_BASE_URL` で指定します。
 - サービス名にハイフンが含まれる場合は `_` に変換して大文字で指定します。
   - 例: `inventory-api` → `API_SERVICE_INVENTORY_API_BASE_URL`
-
-### CI/CD での game-library API 設定
-
-GitHub Actions からデプロイする本番 game-library API の接続先には、`.env.docker.production` を使用しません。このファイルは Git 管理対象外であり、デプロイ時に VPS へ転送されないため、既存ファイルの有無や内容に依存しないよう Repository Variable から明示的に上書きします。
-
-GitHub の **Settings → Secrets and variables → Actions → Variables** に、環境ごとの接続先を登録します。
-
-| Variable 名                     | 用途                                                         |
-| ------------------------------- | ------------------------------------------------------------ |
-| `PROD_GAME_LIBRARY_API_BASE_URL` | `main` から VPS へデプロイする本番 Web の game-library API |
-| `DEV_GAME_LIBRARY_API_BASE_URL`  | `develop` から ACA へデプロイする開発 Web の game-library API |
-
-`PROD_GAME_LIBRARY_API_BASE_URL` は HTTPS のベース URL として必須です。未設定、不正な URL、または疎通不能な場合、本番デプロイは失敗します。API キーなどの機密値が必要な場合は Variable ではなく Secret に登録してください。
 
 ### 管理画面用の許可リスト
 

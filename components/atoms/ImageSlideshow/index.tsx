@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 
 export type SlideItem = {
 	id: string;
 	src: string;
 	alt: string;
+	href?: string;
 };
 
 export type ImageSlideshowProps = {
@@ -85,7 +87,8 @@ export default function ImageSlideshow({
 						style={{ transform: `translateX(-${currentIndex * 100}%)` }}
 					>
 						{slides.map((slide, i) => (
-							<div key={slide.id} className="slideshow__slide">
+							<div key={slide.id} className="slideshow__slide" aria-hidden={i !== currentIndex}>
+								{slide.href ? <Link href={slide.href} className="slideshow__link" tabIndex={i === currentIndex ? 0 : -1}>
 								<Image
 									src={slide.src}
 									alt={slide.alt}
@@ -95,6 +98,7 @@ export default function ImageSlideshow({
 									style={{ objectFit: 'cover' }}
 									priority={i === 0}
 								/>
+								</Link> : <Image src={slide.src} alt={slide.alt} fill unoptimized sizes="(max-width: 1280px) 100vw, 1280px" style={{ objectFit: 'cover' }} priority={i === 0} />}
 							</div>
 						))}
 					</div>
@@ -173,6 +177,7 @@ export default function ImageSlideshow({
 					flex: 0 0 100%;
 					height: 100%;
 				}
+				.slideshow__link { display:block; position:relative; width:100%; height:100%; }
 
 				.slideshow__dots {
 					position: absolute;
@@ -234,6 +239,10 @@ export default function ImageSlideshow({
 
 				.slideshow__thumb:hover:not(.slideshow__thumb--active) {
 					opacity: 0.8;
+				}
+				@media(max-width:640px) {
+					.slideshow { aspect-ratio: 16 / 9; }
+					.slideshow__thumbnails { display:none; }
 				}
 			`}</style>
 		</>

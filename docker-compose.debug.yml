@@ -10,6 +10,9 @@ services:
       target: dev  # Dockerfile の dev ステージを使用（next dev でホットリロード）
       args:
         NEXT_PUBLIC_ENVIRONMENT: debug
+    # root で secrets を読み、entrypoint が nextjs:nodejs (1001:1001) へ降格する
+    user: "0:0"
+    container_name: pokenae-web-debug
     ports:
       - "${PORT:-5000}:3000"
     environment:
@@ -20,6 +23,15 @@ services:
       API_SERVICE_2_BASE_URL: ${API_SERVICE_2_BASE_URL:-}
       API_SERVICE_3_BASE_URL: ${API_SERVICE_3_BASE_URL:-}
       USER_API_BASE_URL: ${USER_API_BASE_URL:-}
+      CONTENT_SOURCE: ${CONTENT_SOURCE:-fixture}
+      CONTENT_REPOSITORY_OWNER: ${CONTENT_REPOSITORY_OWNER:-p-o-ke-nae}
+      CONTENT_REPOSITORY_NAME: ${CONTENT_REPOSITORY_NAME:-pokenae.Content}
+      CONTENT_REPOSITORY_REF: ${CONTENT_REPOSITORY_REF:-main}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_INSTALLATION_ID: ${GITHUB_APP_INSTALLATION_ID:-}
+      GITHUB_APP_PRIVATE_KEY_BASE64: ${GITHUB_APP_PRIVATE_KEY_BASE64:-}
+      GAME_LIBRARY_API_VERSION_RANGE: ${GAME_LIBRARY_API_VERSION_RANGE:-">=1.0.0 <2.0.0"}
       NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
       NEXT_PUBLIC_GOOGLE_REDIRECT_URI: ${NEXT_PUBLIC_GOOGLE_REDIRECT_URI:-}
       # webpack のファイル監視に polling を使用（Windows Docker 上での互換性向上）

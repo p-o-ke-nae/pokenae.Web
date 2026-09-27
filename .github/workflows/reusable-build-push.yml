@@ -9,6 +9,14 @@ on:
       environment:
         required: true
         type: string
+      azure_environment:
+        required: true
+        type: string
+        description: GitHub Environment used by the Azure OIDC federated credential
+      registry_server:
+        required: true
+        type: string
+        description: Azure Container Registry login server
     secrets:
       api_url:
         required: true
@@ -16,37 +24,96 @@ on:
         required: true
       google_client_id:
         required: true
+      azure_credentials:
+        required: false
+      azure_client_id:
+        required: false
+      azure_tenant_id:
+        required: false
+      azure_subscription_id:
+        required: false
     outputs:
       image_tag:
         description: Docker image tag
         value: ${{ jobs.build.outputs.image_tag }}
+      image:
+        description: Immutable fully qualified image name
+        value: ${{ jobs.build.outputs.image }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.azure_environment }}
     permissions:
       contents: read
       packages: write
+      id-token: write
     outputs:
       image_tag: ${{ steps.meta-info.outputs.image_tag }}
+      image: ${{ steps.meta-info.outputs.image }}
 
     env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: ${{ github.repository_owner }}/pokenae-web
+      REGISTRY: ${{ inputs.registry_server }}
+      IMAGE_NAME: pokenae-web
+      GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/pokenae-web
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      - name: Select Azure authentication mode
+        id: azure-auth
+        shell: bash
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.azure_credentials }}
+          AZURE_CLIENT_ID: ${{ secrets.azure_client_id }}
+          AZURE_TENANT_ID: ${{ secrets.azure_tenant_id }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.azure_subscription_id }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${AZURE_CREDENTIALS:-}" ]; then
+            echo "mode=service-principal" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ -z "${AZURE_CLIENT_ID:-}" ] || [ -z "${AZURE_TENANT_ID:-}" ] || [ -z "${AZURE_SUBSCRIPTION_ID:-}" ]; then
+            echo "[ERROR] Set either azure_credentials or all Azure OIDC secrets."
+            exit 1
+          fi
+
+          echo "mode=oidc" >> "$GITHUB_OUTPUT"
+
+      - name: Login to Azure (service principal JSON)
+        if: steps.azure-auth.outputs.mode == 'service-principal'
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.azure_credentials }}
+
+      - name: Login to Azure (OIDC)
+        if: steps.azure-auth.outputs.mode == 'oidc'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.azure_client_id }}
+          tenant-id: ${{ secrets.azure_tenant_id }}
+          subscription-id: ${{ secrets.azure_subscription_id }}
+
+      - name: Log in to Azure Container Registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          registry_name="${REGISTRY%%.*}"
+          az acr login --name "$registry_name"
+
+      - name: Log in to GitHub Container Registry for legacy consumers
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
@@ -55,15 +122,18 @@ jobs:
         run: |
           set -euo pipefail
           echo "image_tag=${{ inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          echo "image=${REGISTRY}/${IMAGE_NAME}:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            ${{ env.GHCR_IMAGE }}
           tags: |
             type=raw,value=${{ inputs.image_tag }}
-            type=sha,prefix=,format=short
+            type=raw,value=sha-${{ github.sha }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5

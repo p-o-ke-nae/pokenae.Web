@@ -48,7 +48,6 @@ export default function TickerBanner({
 			<div
 				className={`ticker${className ? ` ${className}` : ''}`}
 				aria-label="お知らせ"
-				role="marquee"
 			>
 				<div
 					ref={trackRef}
@@ -59,9 +58,10 @@ export default function TickerBanner({
 						<span
 							key={`${item.id}-${index}`}
 							className={`ticker__item${item.highlighted ? ' ticker__item--highlighted' : ''}`}
+							aria-hidden={index >= items.length ? true : undefined}
 						>
 							{item.href ? (
-								<a href={item.href} className="ticker__link">
+								<a href={item.href} className="ticker__link" tabIndex={index >= items.length ? -1 : undefined}>
 									{item.text}
 								</a>
 							) : (
@@ -78,15 +78,20 @@ export default function TickerBanner({
 					background: #1a1a2e;
 					color: #f0f0f0;
 					overflow: hidden;
-					border-top: 8px solid var(--color-accent-25);
-					border-bottom: 8px solid var(--color-accent-25);
+					position: relative;
+					border: solid 7px var(--color-accent-25);
+					border-inline-width: 30px;
+					border-radius: 5px;
+					margin-bottom: 15px;
 				}
 
 				.ticker__track {
 					display: inline-flex;
 					white-space: nowrap;
-					gap: 5rem;
-					padding: 1rem 0;
+					gap: 50px;
+					padding: 4px 0;
+					min-height: 30px;
+					align-items: center;
 					animation: ticker-scroll linear infinite;
 				}
 
@@ -100,7 +105,7 @@ export default function TickerBanner({
 				}
 
 				.ticker__item {
-					font-size: 1rem;
+					font-size: 20px;
 					font-weight: 700;
 					flex-shrink: 0;
 				}
@@ -124,6 +129,14 @@ export default function TickerBanner({
 
 				.ticker__link:hover {
 					text-decoration-color: currentColor;
+				}
+				@media (prefers-reduced-motion: reduce) {
+					.ticker__track { animation:none; display:flex; flex-wrap:wrap; white-space:normal; gap:.5rem 1.5rem; }
+					.ticker__item:nth-child(n + ${items.length + 1}) { display:none; }
+				}
+				@media (max-width: 640px) {
+					.ticker { border-inline-width: 12px; }
+					.ticker__item { font-size: 1rem; }
 				}
 			`}</style>
 		</>

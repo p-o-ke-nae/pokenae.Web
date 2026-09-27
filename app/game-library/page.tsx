@@ -1,7 +1,10 @@
 import { GameManagementDashboard } from '@/components/organisms/GameManagement';
 import { USER_RESOURCE_ORDER } from '@/lib/game-management/resources';
+import { getContentSnapshot } from '@/lib/content/repository';
 
-export default function GameLibraryPage() {
+export default async function GameLibraryPage() {
+  const { apps, tagDefinitions } = await getContentSnapshot();
+  const app = apps.find((item) => item.href === "/game-library");
   return (
     <GameManagementDashboard
       basePath="/game-library"
@@ -9,6 +12,8 @@ export default function GameLibraryPage() {
       sectionLabel="Game Library"
       sectionTitle="ゲームライブラリ"
       sectionDescription="所有しているゲーム機、ゲームソフト、アカウント、メモリーカード、セーブデータを管理します。"
+      contentTags={app?.tags ?? []}
+      tagDefinitions={tagDefinitions}
       extraCards={[
         {
           href: '/game-library/maintenance',
@@ -23,6 +28,13 @@ export default function GameLibraryPage() {
           title: '横断セーブデータ検索',
           description: '共通 variant と複数の schema 条件グループを使い、作品横断でセーブデータを検索できます。',
           actionLabel: '検索画面を開く',
+        },
+        {
+          href: '/game-management',
+          shortLabel: 'Master',
+          title: 'マスタ管理',
+          description: 'ゲーム機、ゲームソフト、セーブデータなどのマスタ情報を管理します。',
+          actionLabel: 'マスタ管理を開く',
         },
       ]}
     />

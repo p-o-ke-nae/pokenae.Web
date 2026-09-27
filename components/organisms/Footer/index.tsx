@@ -1,24 +1,25 @@
-import Link from 'next/link';
+import Link from "next/link";
+import PokenaeLogo from "@/components/atoms/PokenaeLogo";
+import { primaryNavigation } from "@/lib/config/site";
 
 export default function Footer() {
   return (
-    <footer className="w-full bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex justify-center items-center gap-6 text-sm text-zinc-500 dark:text-zinc-400">
-          <Link
-            href="/privacy-policy"
-            className="hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
-          >
-            プライバシーポリシー
-          </Link>
-          <Link
-            href="/terms-of-service"
-            className="hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
-          >
-            利用規約
-          </Link>
-        </div>
+    <footer className="site-footer">
+      <div className="site-footer__inner">
+        <Link href="/" aria-label="pokenae トップ"><PokenaeLogo width={150} height={48} /></Link>
+        <nav aria-label="フッターメニュー" className="site-footer__links">
+          {primaryNavigation.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}
+          <Link href="/privacy-policy">プライバシーポリシー</Link>
+          <Link href="/terms-of-service">利用規約</Link>
+        </nav>
+        <small>© {new Date().getFullYear()} pokenae</small>
       </div>
+      <style>{`
+        .site-footer { border-top:8px solid var(--color-accent-25); background:#f1eef2; color:var(--color-text-strong); }
+        .site-footer__inner { width:min(calc(100% - 2rem),var(--site-width)); margin:auto; padding:2rem 0; display:grid; justify-items:center; gap:1rem; }
+        .site-footer__links { display:flex; flex-wrap:wrap; justify-content:center; gap:.45rem 1.25rem; }
+        .site-footer__links a { color:inherit; font-size:.9rem; }
+      `}</style>
     </footer>
   );
 }

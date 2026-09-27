@@ -14,6 +14,9 @@ services:
       target: runner
       args:
         NEXT_PUBLIC_ENVIRONMENT: development
+    # root で 0600 の secrets を読み、entrypoint が nextjs:nodejs (1001:1001) へ降格する
+    user: "0:0"
+    container_name: pokenae-web-dev
     ports:
       - "${PORT:-3002}:3000"
     environment:
@@ -30,8 +33,14 @@ services:
       API_SERVICE_2_API_KEY: ${API_SERVICE_2_API_KEY:-}
       API_SERVICE_3_API_KEY: ${API_SERVICE_3_API_KEY:-}
       USER_API_API_KEY: ${USER_API_API_KEY:-}
-      ADMIN_ALLOWED_EMAILS: ${ADMIN_ALLOWED_EMAILS:-}
-      ADMIN_EMAIL_ALLOWLIST: ${ADMIN_EMAIL_ALLOWLIST:-}
+      CONTENT_REPOSITORY_OWNER: ${CONTENT_REPOSITORY_OWNER:-p-o-ke-nae}
+      CONTENT_REPOSITORY_NAME: ${CONTENT_REPOSITORY_NAME:-pokenae.Content}
+      CONTENT_REPOSITORY_REF: ${CONTENT_REPOSITORY_REF:-main}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_INSTALLATION_ID: ${GITHUB_APP_INSTALLATION_ID:-}
+      GITHUB_APP_PRIVATE_KEY_BASE64: ${GITHUB_APP_PRIVATE_KEY_BASE64:-}
+      GAME_LIBRARY_API_VERSION_RANGE: ${GAME_LIBRARY_API_VERSION_RANGE:-">=1.0.0 <2.0.0"}
     restart: unless-stopped
     # コンテナのリソース制限（本番より厳しく設定）
     deploy:
