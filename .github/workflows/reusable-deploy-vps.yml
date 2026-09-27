@@ -3,9 +3,19 @@ name: Reusable Deploy to VPS
 on:
   workflow_call:
     inputs:
+      deployment_environment:
+        required: true
+        type: string
       compose_file:
         required: true
         type: string
+      runtime_env_file:
+        required: true
+        type: string
+      required_runtime_env_keys:
+        required: false
+        type: string
+        default: ""
       project_name:
         required: true
         type: string
@@ -25,6 +35,9 @@ on:
         required: true
       ssh_private_key:
         required: true
+      vps_runtime_env:
+        required: false
+        description: Supplied by the selected GitHub Environment as VPS_RUNTIME_ENV
       nextauth_url:
         required: true
       nextauth_secret:
@@ -45,6 +58,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.deployment_environment }}
     permissions:
       contents: read
       packages: read
@@ -70,7 +84,10 @@ jobs:
           HOST: ${{ secrets.host }}
           USERNAME: ${{ secrets.username }}
         run: |
-          echo "$SSH_PRIVATE_KEY" > private_key
+          set -euo pipefail
+          trap 'rm -f private_key' EXIT
+
+          printf '%s' "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
 
           ssh "$USERNAME@$HOST" -i private_key -p 22 "mkdir -p ~/pokenae-web/secrets"
@@ -79,6 +96,107 @@ jobs:
             docker-compose.yml \
             "${{ inputs.compose_file }}" \
             "$USERNAME@$HOST:~/pokenae-web/"
+
+      - name: Create and transfer runtime environment to VPS
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
+          HOST: ${{ secrets.host }}
+          USERNAME: ${{ secrets.username }}
+          RUNTIME_ENV_CONTENT: ${{ secrets.vps_runtime_env }}
+          RUNTIME_ENV_FILE: ${{ inputs.runtime_env_file }}
+          REQUIRED_RUNTIME_ENV_KEYS: ${{ inputs.required_runtime_env_keys }}
+          DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment_environment }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          runtime_env_path=".deploy-runtime-env"
+          remote_staging_name=".${RUNTIME_ENV_FILE}.upload-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          trap 'rm -f "$runtime_env_path" private_key' EXIT
+
+          case "$RUNTIME_ENV_FILE" in
+            ""|*[!A-Za-z0-9._-]*)
+              echo "[ERROR] runtime_env_file must be a file name without path separators."
+              exit 1
+              ;;
+          esac
+
+          if [ -z "${RUNTIME_ENV_CONTENT:-}" ]; then
+            echo "[ERROR] VPS_RUNTIME_ENV is not configured in the ${DEPLOYMENT_ENVIRONMENT} GitHub Environment."
+            exit 1
+          fi
+
+          printf '%s\n' "$RUNTIME_ENV_CONTENT" | sed 's/\r$//' > "$runtime_env_path"
+          chmod 600 "$runtime_env_path"
+
+          awk '
+            /^[[:space:]]*($|#)/ { next }
+            !/^[A-Za-z_][A-Za-z0-9_]*=/ {
+              printf "[ERROR] Invalid runtime env syntax at line %d.\n", NR > "/dev/stderr"
+              invalid = 1
+              next
+            }
+            {
+              key = $0
+              sub(/=.*/, "", key)
+              if (seen[key]++) {
+                printf "[ERROR] Duplicate runtime env key: %s\n", key > "/dev/stderr"
+                invalid = 1
+              }
+            }
+            END { exit invalid }
+          ' "$runtime_env_path"
+
+          for key in $REQUIRED_RUNTIME_ENV_KEYS; do
+            case "$key" in
+              ""|[!A-Za-z_]*|*[!A-Za-z0-9_]*)
+                echo "[ERROR] Invalid required runtime env key: $key"
+                exit 1
+                ;;
+            esac
+
+            if ! awk -v required_key="$key" '
+              index($0, required_key "=") == 1 {
+                value = substr($0, length(required_key) + 2)
+                sub(/^[[:space:]]+/, "", value)
+                sub(/[[:space:]]+$/, "", value)
+
+                if (value ~ /^".*"$/ || value ~ /^\047.*\047$/) {
+                  value = substr(value, 2, length(value) - 2)
+                  sub(/^[[:space:]]+/, "", value)
+                  sub(/[[:space:]]+$/, "", value)
+                }
+
+                if (length(value) > 0 && value !~ /^#/) {
+                  found = 1
+                }
+              }
+              END { exit !found }
+            ' "$runtime_env_path"; then
+              echo "[ERROR] Missing or empty required runtime env key: $key"
+              exit 1
+            fi
+          done
+
+          printf '%s' "$SSH_PRIVATE_KEY" > private_key
+          chmod 600 private_key
+
+          scp -i private_key -P 22 \
+            "$runtime_env_path" \
+            "$USERNAME@$HOST:~/pokenae-web/$remote_staging_name"
+
+          printf -v remote_command \
+            'RUNTIME_ENV_FILE=%q REMOTE_STAGING_NAME=%q bash -s' \
+            "$RUNTIME_ENV_FILE" \
+            "$remote_staging_name"
+
+          ssh "$USERNAME@$HOST" -i private_key -p 22 "$remote_command" <<'EOF'
+          set -euo pipefail
+
+          cd ~/pokenae-web
+          test -s "$REMOTE_STAGING_NAME"
+          chmod 600 "$REMOTE_STAGING_NAME"
+          EOF
 
       - name: Create secrets on VPS
         env:
@@ -142,36 +260,101 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
           HOST: ${{ secrets.host }}
           USERNAME: ${{ secrets.username }}
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}
+          OVERRIDE_COMPOSE_FILE: ${{ inputs.compose_file }}
+          RUNTIME_ENV_FILE: ${{ inputs.runtime_env_file }}
+          RUNTIME_ENV_STAGING: .${{ inputs.runtime_env_file }}.upload-${{ github.run_id }}-${{ github.run_attempt }}
+          PROJECT_NAME: ${{ inputs.project_name }}
+          CONTAINER_NAME: ${{ inputs.container_name }}
+          NEXTAUTH_URL: ${{ secrets.nextauth_url }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_ACTOR: ${{ github.actor }}
         run: |
-          echo "$SSH_PRIVATE_KEY" > private_key
+          set -euo pipefail
+          trap 'rm -f private_key' EXIT
+
+          printf '%s' "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
 
-          ssh "$USERNAME@$HOST" -i private_key -p 22 \
-            "IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }} \
-             OVERRIDE_COMPOSE_FILE=${{ inputs.compose_file }} \
-             PROJECT_NAME=${{ inputs.project_name }} \
-             CONTAINER_NAME=${{ inputs.container_name }} \
-             NEXTAUTH_URL=${{ secrets.nextauth_url }} \
-             GITHUB_TOKEN=${{ github.token }} \
-             GITHUB_ACTOR=${{ github.actor }} \
-             bash -s" <<'EOF'
+          printf -v remote_command \
+            'IMAGE=%q OVERRIDE_COMPOSE_FILE=%q RUNTIME_ENV_FILE=%q RUNTIME_ENV_STAGING=%q PROJECT_NAME=%q CONTAINER_NAME=%q NEXTAUTH_URL=%q GITHUB_TOKEN=%q GITHUB_ACTOR=%q bash -s' \
+            "$IMAGE" \
+            "$OVERRIDE_COMPOSE_FILE" \
+            "$RUNTIME_ENV_FILE" \
+            "$RUNTIME_ENV_STAGING" \
+            "$PROJECT_NAME" \
+            "$CONTAINER_NAME" \
+            "$NEXTAUTH_URL" \
+            "$GITHUB_TOKEN" \
+            "$GITHUB_ACTOR"
+
+          ssh "$USERNAME@$HOST" -i private_key -p 22 "$remote_command" <<'EOF'
           set -euo pipefail
 
           cd ~/pokenae-web
 
+          if [ -z "${NEXTAUTH_URL:-}" ]; then
+            echo "[ERROR] nextauth_url is empty."
+            exit 1
+          fi
+
           LOCK_DIR="/tmp/pokenae-deploy-${PROJECT_NAME}.lock"
+          lock_acquired=0
           for i in $(seq 1 60); do
             if mkdir "${LOCK_DIR}" 2>/dev/null; then
+              lock_acquired=1
               break
             fi
             echo "[INFO] Waiting for deployment lock... (${i}/60)"
             sleep 2
           done
-          if [ ! -d "${LOCK_DIR}" ]; then
+          if [ "$lock_acquired" -ne 1 ]; then
             echo "[ERROR] Failed to acquire deployment lock: ${LOCK_DIR}"
             exit 1
           fi
-          trap 'rmdir "${LOCK_DIR}" 2>/dev/null || true' EXIT
+
+          runtime_env_backup="${RUNTIME_ENV_STAGING}.backup"
+          runtime_env_installed=0
+          runtime_env_validated=0
+          cleanup() {
+            status=$?
+            trap - EXIT
+
+            if [ "$runtime_env_installed" -eq 1 ] && [ "$runtime_env_validated" -eq 0 ]; then
+              if [ -f "$runtime_env_backup" ]; then
+                mv -f "$runtime_env_backup" "$RUNTIME_ENV_FILE"
+              else
+                rm -f "$RUNTIME_ENV_FILE"
+              fi
+            else
+              rm -f "$runtime_env_backup"
+            fi
+
+            rm -f "$RUNTIME_ENV_STAGING"
+            rmdir "${LOCK_DIR}" 2>/dev/null || true
+            exit "$status"
+          }
+          trap cleanup EXIT
+
+          test -s "$RUNTIME_ENV_STAGING"
+          if [ -f "$RUNTIME_ENV_FILE" ]; then
+            cp -p "$RUNTIME_ENV_FILE" "$runtime_env_backup"
+          fi
+          mv -f "$RUNTIME_ENV_STAGING" "$RUNTIME_ENV_FILE"
+          chmod 600 "$RUNTIME_ENV_FILE"
+          runtime_env_installed=1
+
+          echo "[INFO] Validating compose configuration..."
+          IMAGE="${IMAGE}" \
+          NEXTAUTH_URL="${NEXTAUTH_URL}" \
+          docker compose \
+            --env-file "${RUNTIME_ENV_FILE}" \
+            -p "${PROJECT_NAME}" \
+            -f docker-compose.yml \
+            -f "${OVERRIDE_COMPOSE_FILE}" \
+            config --quiet
+          runtime_env_validated=1
+          rm -f "$runtime_env_backup"
 
           echo "[INFO] Logging in to GitHub Container Registry..."
           echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
@@ -181,6 +364,7 @@ jobs:
 
           echo "[INFO] Stopping existing compose project..."
           IMAGE="${IMAGE}" docker compose \
+            --env-file "${RUNTIME_ENV_FILE}" \
             -p "${PROJECT_NAME}" \
             -f docker-compose.yml \
             -f "${OVERRIDE_COMPOSE_FILE}" \
@@ -205,6 +389,7 @@ jobs:
           IMAGE="${IMAGE}" \
           NEXTAUTH_URL="${NEXTAUTH_URL}" \
           docker compose \
+            --env-file "${RUNTIME_ENV_FILE}" \
             -p "${PROJECT_NAME}" \
             -f docker-compose.yml \
             -f "${OVERRIDE_COMPOSE_FILE}" \
@@ -220,7 +405,10 @@ jobs:
           HOST: ${{ secrets.host }}
           USERNAME: ${{ secrets.username }}
         run: |
-          echo "$SSH_PRIVATE_KEY" > private_key
+          set -euo pipefail
+          trap 'rm -f private_key' EXIT
+
+          printf '%s' "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
 
           ssh "$USERNAME@$HOST" -i private_key -p 22 \
@@ -258,6 +446,9 @@ jobs:
           HOST: ${{ secrets.host }}
           USERNAME: ${{ secrets.username }}
         run: |
+          set -euo pipefail
+          trap 'rm -f private_key' EXIT
+
           printf '%s' "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
 
@@ -281,4 +472,28 @@ jobs:
           fi
 
           echo "[SUCCESS] Node.js is running as UID 1001"
+          EOF
+
+      - name: Clean up deployment artifacts
+        if: always()
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ssh_private_key }}
+          HOST: ${{ secrets.host }}
+          USERNAME: ${{ secrets.username }}
+          RUNTIME_ENV_STAGING: .${{ inputs.runtime_env_file }}.upload-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          trap 'rm -f private_key' EXIT
+
+          printf '%s' "$SSH_PRIVATE_KEY" > private_key
+          chmod 600 private_key
+          printf -v remote_command \
+            'RUNTIME_ENV_STAGING=%q bash -s' \
+            "$RUNTIME_ENV_STAGING"
+
+          ssh "$USERNAME@$HOST" -i private_key -p 22 "$remote_command" <<'EOF'
+          set -euo pipefail
+          rm -f \
+            "$HOME/pokenae-web/$RUNTIME_ENV_STAGING" \
+            "$HOME/pokenae-web/$RUNTIME_ENV_STAGING.backup"
           EOF

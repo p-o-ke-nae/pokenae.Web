@@ -107,8 +107,12 @@ jobs:
       contents: read
       packages: read
     uses: ./.github/workflows/reusable-deploy-vps.yml
+    # VPS_RUNTIME_ENV is read from the production Environment by the called job.
     with:
+      deployment_environment: production
       compose_file: docker-compose.prod.yml
+      runtime_env_file: .env.docker.production
+      required_runtime_env_keys: API_SERVICES API_SERVICE_GAME_LIBRARY_API_BASE_URL
       project_name: pokenae-prod
       container_name: pokenae-web-prod
       image_tag: main
