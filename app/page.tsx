@@ -4,6 +4,7 @@ import TickerBanner from "@/components/atoms/TickerBanner";
 import { BlogSection, InfoSection, PickupSection, SocialSection } from "@/components/organisms/HomeSections";
 import { getContentSnapshot, isActiveContent } from "@/lib/content/repository";
 import { toPublicContentItems } from "@/lib/content/presentation";
+import { isPublishedPost } from "@/lib/content/post-publication";
 
 export const metadata: Metadata = {
   title: {
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
 
 export default async function Home() {
   const snapshot = await getContentSnapshot();
-  const posts = snapshot.posts.filter((post) => post.status === "published");
+  const posts = snapshot.posts.filter((post) => isPublishedPost(post));
   const slides = snapshot.banners.filter((item) => isActiveContent(item.startsAt, item.endsAt)).sort((a, b) => a.order - b.order).map((item) => ({ id: item.id, src: item.image, alt: item.alt, href: item.href }));
   const announcements = snapshot.announcements.filter((item) => isActiveContent(item.startsAt, item.endsAt)).map((item) => ({ id: item.id, text: item.text, href: item.href, highlighted: item.severity !== "normal" }));
 

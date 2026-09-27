@@ -13,6 +13,7 @@ import {
 } from "@/lib/github/content-writer";
 import { assignNewTagsToPost, serializeTagFiles } from "../../../../../../lib/content/tags-admin";
 import { PostImageReferenceError, serializePostSource } from "../../../../../../lib/content/post-source";
+import { getPostUpdatePublishedAt, preparePostForWrite } from "../../../../../../lib/content/post-publication";
 
 const allowedImages = new Map([["image/png", ".png"], ["image/jpeg", ".jpg"], ["image/webp", ".webp"]]);
 
@@ -120,7 +121,8 @@ export async function PUT(
       body: input.body,
     });
     if (!parsed.success) return NextResponse.json({ error: "記事の入力内容が不正です。", issues: parsed.error.issues }, { status: 400 });
-    const updatedPost = { ...parsed.data.post, updatedAt: new Date().toISOString() };
+    const now = new Date();
+    const updatedPost = preparePostForWrite(parsed.data.post, true, now);
     const parsedTagDefinitions = tagDefinitionListSchema.safeParse(assigned.definitions);
     if (!parsedTagDefinitions.success) {
       return NextResponse.json({ error: "タグ一覧が不正です。", issues: parsedTagDefinitions.error.issues }, { status: 400 });
@@ -149,10 +151,10 @@ export async function PUT(
       : serializeTagFiles(parsedTagDefinitions.data);
     const update = updateContentSchema.safeParse({
       id: pullRequest.updatePath.slice("content/updates/".length, -".json".length),
-      publishedAt: new Date().toISOString(),
+      publishedAt: getPostUpdatePublishedAt(updatedPost.publishedAt, now),
       target: "post",
-      summary: parsed.data.post.changeNote || `${parsed.data.post.title}を更新`,
-      href: `/blog/${parsed.data.post.slug}`,
+      summary: updatedPost.changeNote || `${updatedPost.title}を更新`,
+      href: `/blog/${updatedPost.slug}`,
       visible: true,
     });
     if (!update.success) {
@@ -176,7 +178,7 @@ export async function PUT(
     const result = await updateEditablePostPullRequest({
       number,
       expectedRevision: parsed.data.baseRevision,
-      title: `content: ${parsed.data.post.title}`,
+      title: `content: ${updatedPost.title}`,
       body: skipInfo
         ? `管理画面から修正\n\nContent-Update: skip\nContent-Update-Reason: INFOに表示しない設定\n\n投稿者: ${auth.session.user?.email ?? "unknown"}`
         : `管理画面から修正\n\n投稿者: ${auth.session.user?.email ?? "unknown"}`,

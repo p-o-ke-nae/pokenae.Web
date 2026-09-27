@@ -57,6 +57,8 @@ node -e "const fs=require('fs'); process.stdout.write(Buffer.from(fs.readFileSyn
 
 記事作成・編集画面では、既存タグを表示名または ID で検索して選択できます。新規タグは ID と表示名を入力して記事へ追加し、記事とタグ正本を同じ Pull Request に保存します。記事保存から既存タグ自体を削除することはできず、削除はタグ管理画面で行います。
 
+記事の公開日は選択日の日本時間 00:00 として保存します。`status` が「公開」でも未来の公開日を指定した記事は予約公開となり、公開時刻までは一覧、詳細URL、PICKUP、関連記事、RSS、サイトマップ、INFOに表示されません。公開済み記事を未来日に変更した場合も、Pull Requestのマージ後は同様に一時非公開となり、公開時刻後に最大約5分のキャッシュ更新を経て自動的に再公開されます。公開前の編集では更新日時を設定せず、公開後に編集した場合だけ公開日時より後の更新日時を表示します。
+
 記事の `legacyUrl` は移行元ページが存在する場合だけ保存する任意項目です。記事画像は `content/posts/<slug>/images/` に格納し、frontmatter と Markdown では `./images/<file>` の相対パスを正本とします。管理画面のプレビューと公開ページだけが commit SHA 固定の raw URL に解決します。同じ Content リポジトリ・同じ記事配下の raw URL が古い下書きや既存 PR に残っている場合は保存時に相対パスへ戻しますが、その他の外部画像 URL は保存できません。新規作成時だけでなく既存の記事 Pull Request を修正するときも、paste した画像は同じ head branch へ追加します。
 
 バナー画像は5MB以下・4096×4096以下のPNG/JPEG/WebPのみ受け付け、回転補正・縮小後にWebPへ変換して `content/home/images/<banner-id>-<hash>.webp` に保存します。バナーの画像参照は、既存head treeと今回追加する画像を合成したproposed tree内に存在する相対pathだけを許可します。`/mock/...` や外部URLはContent用画像として保存できません。
