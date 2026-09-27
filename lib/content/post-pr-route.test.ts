@@ -145,7 +145,7 @@ describe("PUT /api/content/posts/pull-requests/[number]", () => {
     expect(article).toMatch(/updatedAt: "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z"/);
   });
 
-  it("removes updatedAt and schedules INFO when moving publication into the future", async () => {
+  it("matches updatedAt to the future publication and schedules INFO", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-27T02:00:00Z"));
     const { PUT } = await import("../../app/api/content/posts/pull-requests/[number]/route");
@@ -167,7 +167,7 @@ describe("PUT /api/content/posts/pull-requests/[number]", () => {
     const article = files.find(({ path }) => path.endsWith("/index.md"))?.content;
     const update = files.find(({ path }) => path.startsWith("content/updates/"))?.content;
     expect(article).toContain('publishedAt: "2026-09-28T00:00:00+09:00"');
-    expect(article).not.toContain("updatedAt:");
+    expect(article).toContain('updatedAt: "2026-09-28T00:00:00+09:00"');
     expect(JSON.parse(update ?? "{}")).toMatchObject({
       publishedAt: "2026-09-28T00:00:00+09:00",
     });

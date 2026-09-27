@@ -37,17 +37,15 @@ describe("post publication dates", () => {
     },
   );
 
-  it("removes updatedAt while an existing post is scheduled for the future", () => {
-    const result = preparePostForWrite({
+  it("matches updatedAt to publishedAt while an existing post is scheduled for the future", () => {
+    expect(preparePostForWrite({
       ...basePost,
       publishedAt: "2026-09-28",
       updatedAt: "2026-09-27T00:00:00Z",
-    }, true, new Date("2026-09-27T02:00:00Z"));
-
-    expect(result).toMatchObject({
+    }, true, new Date("2026-09-27T02:00:00Z"))).toMatchObject({
       publishedAt: "2026-09-28T00:00:00+09:00",
+      updatedAt: "2026-09-28T00:00:00+09:00",
     });
-    expect(result).not.toHaveProperty("updatedAt");
   });
 
   it("sets updatedAt to the edit time after publication", () => {
@@ -60,16 +58,14 @@ describe("post publication dates", () => {
     });
   });
 
-  it("does not add updatedAt to a newly created post", () => {
-    const result = preparePostForWrite({
+  it("matches updatedAt to publishedAt for a newly created post", () => {
+    expect(preparePostForWrite({
       ...basePost,
       publishedAt: "2026-09-27",
-    }, false, new Date("2026-09-27T02:00:00Z"));
-
-    expect(result).toMatchObject({
+    }, false, new Date("2026-09-27T02:00:00Z"))).toMatchObject({
       publishedAt: "2026-09-27T00:00:00+09:00",
+      updatedAt: "2026-09-27T00:00:00+09:00",
     });
-    expect(result).not.toHaveProperty("updatedAt");
   });
 
   it("schedules INFO at publication time instead of creating an early link", () => {

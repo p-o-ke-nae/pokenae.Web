@@ -160,7 +160,7 @@ describe("POST /api/content/posts", () => {
     }));
   });
 
-  it("writes a scheduled publication as JST midnight without an update date", async () => {
+  it("writes a scheduled publication with matching canonical dates", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-27T02:00:00Z"));
     mocks.createContentPullRequest.mockResolvedValue({ html_url: "https://example.test/pr/2", number: 2 });
@@ -181,7 +181,7 @@ describe("POST /api/content/posts", () => {
     const article = files.find(({ path }) => path.endsWith("/index.md"))?.content;
     const update = files.find(({ path }) => path.startsWith("content/updates/"))?.content;
     expect(article).toContain('publishedAt: "2026-09-28T00:00:00+09:00"');
-    expect(article).not.toContain("updatedAt:");
+    expect(article).toContain('updatedAt: "2026-09-28T00:00:00+09:00"');
     expect(JSON.parse(update ?? "{}")).toMatchObject({
       publishedAt: "2026-09-28T00:00:00+09:00",
     });

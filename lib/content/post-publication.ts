@@ -32,12 +32,11 @@ export function preparePostForWrite(
 ): PostWriteRequest["post"] {
   const publishedAt = normalizePostPublishedAt(post.publishedAt);
   const result = { ...post, publishedAt };
-  delete result.updatedAt;
   const publishedTime = Date.parse(publishedAt);
 
-  if (existing && Number.isFinite(publishedTime) && now.getTime() > publishedTime) {
-    result.updatedAt = now.toISOString();
-  }
+  result.updatedAt = existing && Number.isFinite(publishedTime) && now.getTime() > publishedTime
+    ? now.toISOString()
+    : publishedAt;
   return result;
 }
 
