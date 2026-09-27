@@ -1,12 +1,16 @@
 import Link from "next/link";
 import CustomHeader from "@/components/atoms/CustomHeader";
+import ResponsiveActionGroup from "@/components/molecules/ResponsiveActionGroup";
 import PostList from "@/components/organisms/PostList";
 import { getFreshContentSnapshotWithRevision } from "@/lib/content/repository";
 import { getOpenContentPullRequests } from "@/lib/github/content-writer";
 
 export default async function AdminPostsPage() {
   const [{ revision, content }, pullRequests] = await Promise.all([getFreshContentSnapshotWithRevision(), getOpenContentPullRequests()]);
-  return <main className="page-container"><header className="page-header"><CustomHeader>記事管理</CustomHeader><p><Link className="button-link" href="/admin/posts/new">新規記事</Link> <Link className="button-link button-link--secondary" href="/admin/posts/home">バナー・ニュース・ツール設定</Link></p></header>
+  return <main className="page-container"><header className="page-header"><CustomHeader>記事管理</CustomHeader><ResponsiveActionGroup>
+      <Link className="button-link" href="/admin/posts/new">新規記事</Link>
+      <Link className="button-link button-link--secondary" href="/admin/posts/home">バナー・ニュース・ツール設定</Link>
+    </ResponsiveActionGroup></header>
     <PostList posts={content.posts} baseRevision={revision} />
     <section className="stack"><CustomHeader level={2}>レビュー待ちPR</CustomHeader>{pullRequests.length ? pullRequests.map((pr) => {
       const isPostPullRequest = /^content\/[a-z0-9]+(?:-[a-z0-9]+)*-\d{14}$/.test(pr.head.ref);

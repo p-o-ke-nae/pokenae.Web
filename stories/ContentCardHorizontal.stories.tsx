@@ -37,6 +37,24 @@ export const LongTitle: Story = {
   },
 };
 
+export const CompactMobile: Story = {
+  args: {
+    id: 'card-compact',
+    title: '個体値特定ツール ver3',
+    description: '最新バージョンへのアップデートで認識精度が向上',
+    publishedAt: '2024-03-01',
+    imageSrc: '/mock/thumb2.svg',
+    imageAlt: '個体値特定ツールのスクリーンショット',
+    href: '#',
+    variant: 'compact',
+  },
+  parameters: {
+    viewport: {
+      defaultViewport: 'mobile1',
+    },
+  },
+};
+
 export const List: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '800px' }}>

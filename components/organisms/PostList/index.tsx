@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import DataTable, { type DataTableColumn } from '@/components/molecules/DataTable';
+import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
 import type { Post } from '@/lib/content/types';
 
 type PostTableRow = Post & Record<string, unknown>;
@@ -45,18 +46,24 @@ export default function PostList({ posts, baseRevision }: { posts: Post[]; baseR
     {
       key: 'slug',
       header: '操作',
+      width: '13rem',
       render: (_, post) => (
-        <div className="stack" style={{ gap: '.5rem' }}>
-          <a href={`/admin/posts/${post.slug}`}>編集してPRを作成</a>
+        <ResponsiveActionGroup className="post-list__actions">
+          <a className="button-link" href={`/admin/posts/${post.slug}`}>編集してPRを作成</a>
           {post.status === 'published' && <button type="button" className="button-link button-link--secondary" disabled={pendingSlug !== null || isRefreshing} onClick={() => void unpublishPost(post)}>
             {pendingSlug === post.slug ? '非公開化PRを作成中...' : '非公開化'}
           </button>}
-        </div>
+        </ResponsiveActionGroup>
       ),
     },
   ];
 
   return <>
+    <style jsx global>{`
+      .post-list__actions > .button-link {
+        width: 100%;
+      }
+    `}</style>
     {message && <p className="notice" role="status" aria-live="polite">{message}</p>}
     <DataTable<PostTableRow>
       columns={columns}

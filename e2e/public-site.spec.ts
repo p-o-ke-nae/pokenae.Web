@@ -55,6 +55,35 @@ test("公開導線とモバイルSidebar順序", async ({ page }, testInfo) => {
       child.classList.contains("sidebar") ? "sidebar" : child.className
     )));
     expect(order).toEqual(["site-frame__content", "sidebar"]);
+
+    const compactCard = page.locator(".sidebar .card-h--compact").first();
+    const compactImage = compactCard.locator(".card-h__image-wrap");
+    const compactDescription = compactCard.locator(".card-h__description");
+    const compactMeta = compactCard.locator(".card-h__meta");
+    const [cardBox, imageBox, descriptionBox, metaBox] = await Promise.all([
+      compactCard.boundingBox(),
+      compactImage.boundingBox(),
+      compactDescription.boundingBox(),
+      compactMeta.boundingBox(),
+    ]);
+    expect(cardBox).not.toBeNull();
+    expect(imageBox).not.toBeNull();
+    expect(descriptionBox).not.toBeNull();
+    expect(metaBox).not.toBeNull();
+    expect(imageBox!.height).toBeLessThanOrEqual(121);
+    expect(cardBox!.height).toBeLessThan(240);
+    expect(metaBox!.y - (descriptionBox!.y + descriptionBox!.height)).toBeLessThanOrEqual(8);
+
+    await page.goto("/apps");
+    const standardCard = page.locator("main .card-h:not(.card-h--compact)").first();
+    const [standardCardBox, standardImageBox] = await Promise.all([
+      standardCard.boundingBox(),
+      standardCard.locator(".card-h__image-wrap").boundingBox(),
+    ]);
+    expect(standardCardBox).not.toBeNull();
+    expect(standardImageBox).not.toBeNull();
+    expect(standardImageBox!.height).toBeLessThanOrEqual(145);
+    expect(standardCardBox!.height).toBeLessThan(300);
   }
 });
 
