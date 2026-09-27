@@ -482,22 +482,14 @@ jobs:
             exit 1
           fi
 
-          node_uid="$(
-            docker exec "${container_id}" sh -c '
-              for status in /proc/[0-9]*/status; do
-                [ "$(awk "/^Name:/ { print \$2 }" "$status")" = "node" ] || continue
-                awk "/^Uid:/ { print \$2; exit }" "$status"
-                exit
-              done
-            '
-          )"
-
-          if [ "${node_uid}" != "1001" ]; then
-            echo "[ERROR] Node.js is not running as UID 1001"
+          if ! docker exec "${container_id}" \
+            /usr/local/bin/verify-process-user.sh 1001; then
+            echo "[ERROR] Application privilege drop verification failed"
+            docker top "${container_id}" -eo pid,user,args || true
             exit 1
           fi
 
-          echo "[SUCCESS] Node.js is running as UID 1001"
+          echo "[SUCCESS] Application privilege drop verified"
           EOF
 
       - name: Clean up deployment artifacts

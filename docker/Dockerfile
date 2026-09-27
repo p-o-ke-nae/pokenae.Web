@@ -56,9 +56,15 @@ RUN apk add --no-cache su-exec \
     && adduser -S -D -H -u 1001 -G nodejs nextjs
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY docker/entrypoint.test.sh /usr/local/bin/entrypoint.test.sh
-RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/entrypoint.test.sh \
-    && chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/entrypoint.test.sh \
+COPY docker/entrypoint.test.sh docker/verify-process-user.sh /usr/local/bin/
+RUN sed -i 's/\r$//' \
+      /usr/local/bin/entrypoint.sh \
+      /usr/local/bin/entrypoint.test.sh \
+      /usr/local/bin/verify-process-user.sh \
+    && chmod +x \
+      /usr/local/bin/entrypoint.sh \
+      /usr/local/bin/entrypoint.test.sh \
+      /usr/local/bin/verify-process-user.sh \
     && /usr/local/bin/entrypoint.test.sh
 
 # Stage 4: Builder (本番ビルド用)
@@ -104,7 +110,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # secrets を環境変数に展開するエントリポイント
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
+COPY docker/verify-process-user.sh /usr/local/bin/verify-process-user.sh
+RUN sed -i 's/\r$//' \
+      /usr/local/bin/entrypoint.sh \
+      /usr/local/bin/verify-process-user.sh \
+    && chmod +x \
+      /usr/local/bin/entrypoint.sh \
+      /usr/local/bin/verify-process-user.sh
 
 EXPOSE 3000
 
