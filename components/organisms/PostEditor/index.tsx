@@ -1,12 +1,21 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Post, TagDefinition } from "@/lib/content/types";
 import type { PostWriteRequest } from "@/lib/content/schemas";
-import { createMarkdownImageLink, createPastedImageFile, insertMarkdownAtSelection, isSupportedPastedImage } from "@/lib/content/markdown-paste";
+import {
+  collectMarkdownImagePaths,
+  createMarkdownImageLinkFromPath,
+  createPastedImageFile,
+  createUploadedImageFile,
+  insertMarkdownAtSelection,
+  toPostImagePath,
+  validatePostImageFiles,
+} from "@/lib/content/markdown-paste";
 import SafeMarkdown from "@/components/organisms/SafeMarkdown";
 import TagPicker from "@/components/molecules/TagPicker";
-import type { RepositoryMarkdownContext } from "@/lib/tools/readme-urls";
+import MarkdownImagePicker, { type MarkdownImageCandidate } from "@/components/molecules/MarkdownImagePicker";
+import { resolveRepositoryReference, type RepositoryMarkdownContext } from "@/lib/tools/readme-urls";
 import { normalizePostPublishedAt, toJapanDateInputValue } from "@/lib/content/post-publication";
 
 const blank: Post = { slug: "", title: "", summary: "", publishedAt: normalizePostPublishedAt(toJapanDateInputValue()), status: "draft", category: "blog", tags: [], relatedTags: [], priority: 0, showInPickup: false, body: "" };
@@ -19,6 +28,12 @@ type SavedPostDraft = {
   post: Post;
   tagDefinitions: TagDefinition[];
   skipInfo: boolean;
+};
+
+type PendingImage = {
+  file: File;
+  path: string;
+  previewUrl: string;
 };
 
 type PostEditorProps = {
@@ -46,7 +61,7 @@ export default function PostEditor({ initial = blank, baseRevision, pullRequestN
   const [skipInfo, setSkipInfo] = useState(false);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
-  const [pastedImages, setPastedImages] = useState<File[]>([]);
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [availableDraft, setAvailableDraft] = useState<SavedPostDraft | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -55,6 +70,31 @@ export default function PostEditor({ initial = blank, baseRevision, pullRequestN
   const generatedChangeNoteRef = useRef(normalizedInitial.changeNote);
   const changeNoteEditedRef = useRef(false);
   const draftStorageKey = `pokenae.post-editor.${initial.slug || "new"}`;
+  const previewUrlsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    const previewUrls = previewUrlsRef.current;
+    return () => {
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+      previewUrls.clear();
+    };
+  }, []);
+
+  const referencedImagePaths = useMemo(() => collectMarkdownImagePaths(post.body), [post.body]);
+  const localImages = useMemo(
+    () => Object.fromEntries(pendingImages.map((image) => [image.path, image.previewUrl])),
+    [pendingImages],
+  );
+  const imageCandidates = useMemo<MarkdownImageCandidate[]>(() => {
+    const pendingPaths = new Set(pendingImages.map((image) => image.path));
+    return [
+      ...pendingImages.map((image) => ({ path: image.path, previewUrl: image.previewUrl, label: image.path.slice("./images/".length), pending: true })),
+      ...referencedImagePaths
+        .filter((path) => !pendingPaths.has(path))
+        .map((path) => ({ path, previewUrl: resolveRepositoryReference(path, repositoryContext, "image"), label: path.slice("./images/".length), pending: false })),
+    ];
+  }, [pendingImages, referencedImagePaths, repositoryContext]);
+  const attachedImages = pendingImages.filter((image) => referencedImagePaths.includes(image.path));
 
   useEffect(() => {
     if (draftRestoredRef.current) return;
@@ -120,10 +160,44 @@ export default function PostEditor({ initial = blank, baseRevision, pullRequestN
     changeNoteEditedRef.current = availableDraft.post.changeNote !== generatedDraftNote;
     generatedChangeNoteRef.current = generatedDraftNote;
     setAvailableDraft(null);
-    setMessage("下書きを復元しました。添付画像は再度選択してください。");
+    setMessage("下書きを復元しました。未保存の画像は「画像を挿入」から再度追加してください。");
   }
 
-  function handleBodyPaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+  const addImages = useCallback((files: File[], prepare: (file: File) => File) => {
+    const { valid, message: validationMessage } = validatePostImageFiles(files);
+    if (validationMessage) setMessage(validationMessage);
+    const prepared = valid.map((file) => {
+      const renamed = prepare(file);
+      const previewUrl = URL.createObjectURL(renamed);
+      previewUrlsRef.current.add(previewUrl);
+      return { file: renamed, path: toPostImagePath(renamed.name), previewUrl };
+    });
+    if (prepared.length) setPendingImages((current) => [...current, ...prepared]);
+    return prepared;
+  }, []);
+
+  function insertAtCursor(markdown: string) {
+    const textarea = bodyRef.current;
+    const selectionStart = textarea?.selectionStart ?? post.body.length;
+    const selectionEnd = textarea?.selectionEnd ?? selectionStart;
+    setPost((current) => ({ ...current, body: insertMarkdownAtSelection(current.body, selectionStart, selectionEnd, markdown) }));
+    window.requestAnimationFrame(() => {
+      const cursor = selectionStart + markdown.length;
+      textarea?.focus();
+      textarea?.setSelectionRange(cursor, cursor);
+    });
+  }
+
+  function removePendingImage(path: string) {
+    setPendingImages((current) => current.filter((image) => {
+      if (image.path !== path) return true;
+      URL.revokeObjectURL(image.previewUrl);
+      previewUrlsRef.current.delete(image.previewUrl);
+      return false;
+    }));
+  }
+
+  function handleEditorPaste(event: React.ClipboardEvent<HTMLFormElement>) {
     const images = Array.from(event.clipboardData.items)
       .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
       .map((item) => item.getAsFile())
@@ -131,25 +205,13 @@ export default function PostEditor({ initial = blank, baseRevision, pullRequestN
     if (images.length === 0) return;
 
     event.preventDefault();
-    const acceptedImages = images.filter(isSupportedPastedImage);
-    if (acceptedImages.length !== images.length) {
-      setMessage("貼り付けできる画像は PNG/JPEG/WebP のみです。");
+    const prepared = addImages(images, (file) => createPastedImageFile(file));
+    if (prepared.length === 0) return;
+    if (event.target === bodyRef.current) {
+      insertAtCursor(prepared.map((image) => createMarkdownImageLinkFromPath(image.path)).join("\n"));
+    } else {
+      setMessage(`画像 ${prepared.length}件を候補に追加しました。「画像を挿入」から本文に挿入できます。`);
     }
-    const oversizedImage = acceptedImages.find((file) => file.size > 5 * 1024 * 1024);
-    if (oversizedImage) {
-      setMessage("貼り付ける画像は5MB以下にしてください。");
-    }
-    const validImages = acceptedImages.filter((file) => file.size <= 5 * 1024 * 1024);
-    if (validImages.length === 0) return;
-
-    const preparedImages = validImages.map((file) => createPastedImageFile(file));
-    const markdown = preparedImages.map((file) => createMarkdownImageLink(file.name)).join("\n");
-    const textarea = bodyRef.current;
-    const selectionStart = textarea?.selectionStart ?? post.body.length;
-    const selectionEnd = textarea?.selectionEnd ?? selectionStart;
-    const nextBody = insertMarkdownAtSelection(post.body, selectionStart, selectionEnd, markdown);
-    setPost((current) => ({ ...current, body: nextBody }));
-    setPastedImages((current) => [...current, ...preparedImages]);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -163,7 +225,7 @@ export default function PostEditor({ initial = blank, baseRevision, pullRequestN
     form.set("baseRevision", payload.baseRevision);
     form.set("tagDefinitions", JSON.stringify(tagDefinitions));
     form.set("skipInfo", String(skipInfo));
-    pastedImages.forEach((file) => form.append("images", file, file.name));
+    attachedImages.forEach(({ file }) => form.append("images", file, file.name));
     const response = pullRequestNumber
       ? await fetch(`/api/content/posts/pull-requests/${pullRequestNumber}`, { method: "PUT", body: form })
       : await fetch("/api/content/posts", { method: "POST", body: form });
@@ -178,7 +240,7 @@ export default function PostEditor({ initial = blank, baseRevision, pullRequestN
           : data.error ?? "保存に失敗しました。");
     setSaving(false);
   }
-  return <form className="post-editor" onSubmit={submit}>
+  return <form className="post-editor" onSubmit={submit} onPaste={handleEditorPaste}>
     {availableDraft && <div className="post-editor__draft" role="status">
       <p>前回の下書き（{new Date(availableDraft.savedAt).toLocaleString("ja-JP")}）があります。</p>
       <div className="post-editor__draft-actions">
@@ -200,9 +262,27 @@ export default function PostEditor({ initial = blank, baseRevision, pullRequestN
       onSelectedIdsChange={(tags) => setPost((current) => ({ ...current, tags }))}
     />
     <label>変更概要<input value={post.changeNote ?? ""} onChange={(event) => { changeNoteEditedRef.current = true; setPost({ ...post, changeNote: event.target.value }); }} /></label>
-    <div className="post-editor__workspace"><label>Markdown本文<textarea ref={bodyRef} className="post-editor__body" required value={post.body} onChange={(event) => setPost({ ...post, body: event.target.value })} onPaste={handleBodyPaste} /></label><section aria-label="プレビュー" className="post-editor__preview"><strong>プレビュー</strong><SafeMarkdown source={post.body} allowedEmbed={post.category === "showcase" ? post.embed?.component : undefined} repositoryContext={repositoryContext} /></section></div>
-    <label>添付画像（PNG/JPEG/WebP・各5MB以下）<input name="images" type="file" accept="image/png,image/jpeg,image/webp" multiple /></label>
-    {pastedImages.length > 0 && <p role="status">貼り付け画像 {pastedImages.length}件を保存時に添付します。</p>}
+    <div className="post-editor__workspace">
+      <div className="post-editor__body-field">
+        <div className="post-editor__toolbar">
+          <label htmlFor={`${draftStorageKey}-body`}>Markdown本文</label>
+          <MarkdownImagePicker
+            candidates={imageCandidates}
+            disabled={saving}
+            onInsert={(path, alt) => insertAtCursor(createMarkdownImageLinkFromPath(path, alt))}
+            onFilesSelected={(files) => {
+              const prepared = addImages(files, (file) => createUploadedImageFile(file));
+              if (prepared.length) setMessage(`画像 ${prepared.length}件を候補に追加しました。`);
+            }}
+            onRemove={removePendingImage}
+          />
+        </div>
+        <textarea id={`${draftStorageKey}-body`} ref={bodyRef} className="post-editor__body" required value={post.body} onChange={(event) => setPost({ ...post, body: event.target.value })} />
+        <p className="post-editor__hint post-editor__hint--flush">画像は本文へ貼り付けるとその位置に挿入されます。「画像を挿入」から端末の画像を追加し、候補を選んで挿入することもできます。</p>
+      </div>
+      <section aria-label="プレビュー" className="post-editor__preview"><strong>プレビュー</strong><SafeMarkdown source={post.body} allowedEmbed={post.category === "showcase" ? post.embed?.component : undefined} repositoryContext={repositoryContext} localImages={localImages} /></section>
+    </div>
+    {pendingImages.length > 0 && <p role="status">本文で参照している画像 {attachedImages.length}件を保存時に添付します（候補 {pendingImages.length}件）。</p>}
     <label className="post-editor__check"><input type="checkbox" checked={skipInfo} onChange={(event) => setSkipInfo(event.target.checked)} />INFOに表示しない</label>
     <label className="post-editor__check"><input type="checkbox" checked={post.showInPickup} onChange={(event) => setPost({ ...post, showInPickup: event.target.checked })} />PICKUPに表示</label>
     <button type="submit" disabled={saving}>{saving ? "PRを保存中…" : pullRequestNumber ? "Pull Requestを更新" : "ブランチ・コミット・PRを作成"}</button>
@@ -223,6 +303,9 @@ export default function PostEditor({ initial = blank, baseRevision, pullRequestN
       .post-editor__draft-actions button { min-height:44px; padding:.5rem .75rem; border:1px solid var(--color-base-70-dark); border-radius:.25rem; background:#fff; color:var(--foreground); }
       .post-editor__draft-status { margin:0; color:var(--color-base-70-dark); font-size:.875rem; }
       .post-editor__hint { margin:-.5rem 0 0; color:var(--color-base-70-dark); font-size:.875rem; }
+      .post-editor__hint--flush { margin:0; }
+      .post-editor__body-field { display:grid; gap:.3rem; min-width:0; }
+      .post-editor__toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.5rem; }
       .post-editor button { min-height:48px; border:0; border-radius:.3rem; background:var(--color-accent-25-strong); color:#fff; font-weight:700; }
       @media(max-width:760px){.post-editor__row,.post-editor__workspace{grid-template-columns:1fr}}
     `}</style>
