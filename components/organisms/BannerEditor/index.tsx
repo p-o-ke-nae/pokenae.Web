@@ -2,8 +2,10 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import ValidationMessage from "../../molecules/ValidationMessage";
+import ContentItemGrid from "../ContentItemGrid";
 import { bannerListSchema } from "../../../lib/content/schemas";
 import type { ValidationIssue } from "../../../lib/content/canonical-validation";
+import { collectInvalidIndexes, formatGridDateTime } from "../../../lib/content/admin-grid";
 
 type BannerDraft = {
   key: string;
@@ -101,6 +103,7 @@ export default function BannerEditor({ initial, baseRevision }: BannerEditorProp
   }, []);
 
   const errors = useMemo(() => new Map(issues.map((issue) => [issueKey(issue.path), issue.message])), [issues]);
+  const invalidIndexes = useMemo(() => collectInvalidIndexes(issues, "banners"), [issues]);
   const fieldError = (index: number, field: keyof BannerDraft) => errors.get(`banners.${index}.${field}`);
   const errorId = (index: number, field: keyof BannerDraft) => `banner-${index}-${field}-error`;
 
@@ -264,9 +267,31 @@ export default function BannerEditor({ initial, baseRevision }: BannerEditorProp
       </label>
       {selected && <a href={selected.url} target="_blank" rel="noreferrer">選択中の Pull Request を開く</a>}
     </div>
-    <form onSubmit={submit} className="stack">
-      {banners.map((banner, index) => <fieldset key={banner.key} className="banner-editor__card">
-        <legend>バナー {index + 1}</legend>
+    <ContentItemGrid
+      title="バナー一覧"
+      itemLabel="バナー"
+      rows={banners.map((banner) => ({
+        key: banner.key,
+        id: banner.id,
+        alt: banner.alt,
+        startsAt: formatGridDateTime(banner.startsAt),
+        endsAt: formatGridDateTime(banner.endsAt),
+      }))}
+      columns={[
+        { key: "id", header: "ID", width: "9rem" },
+        { key: "alt", header: "代替テキスト", width: "14rem" },
+        { key: "startsAt", header: "開始日時", width: "9.5rem" },
+        { key: "endsAt", header: "終了日時", width: "9.5rem" },
+      ]}
+      invalidIndexes={invalidIndexes}
+      disabled={saving || loadingPullRequest}
+      onAdd={add}
+      onMove={move}
+      onRemove={remove}
+      getDialogTitle={(index) => `バナー ${index + 1}${banners[index]?.id ? `: ${banners[index].id}` : ""}`}
+      renderEditor={(index) => {
+        const banner = banners[index];
+        return <div className="banner-editor__card">
         <div className="banner-editor__grid">
           <label>ID<input required pattern="[a-z0-9-]+" value={banner.id} aria-invalid={Boolean(fieldError(index, "id"))} aria-describedby={fieldError(index, "id") ? errorId(index, "id") : undefined} onChange={(event) => update(index, { id: event.target.value })} /><ValidationMessage id={errorId(index, "id")}>{fieldError(index, "id")}</ValidationMessage></label>
           <label>表示順<input required min={0} type="number" value={banner.order} aria-invalid={Boolean(fieldError(index, "order"))} aria-describedby={fieldError(index, "order") ? errorId(index, "order") : undefined} onChange={(event) => update(index, { order: Number(event.target.value) })} /><ValidationMessage id={errorId(index, "order")}>{fieldError(index, "order")}</ValidationMessage></label>
@@ -280,15 +305,13 @@ export default function BannerEditor({ initial, baseRevision }: BannerEditorProp
               const file = event.target.files?.[0];
               if (file) setUploads((current) => ({ ...current, [banner.key]: file }));
             }} />
+            {uploads[banner.key] ? <span className="banner-editor__upload">置換予定: {uploads[banner.key].name}</span> : null}
           </label>
         </div>
-        <div className="banner-editor__actions">
-          <button type="button" className="button-link button-link--secondary" disabled={index === 0} onClick={() => move(index, -1)}>上へ</button>
-          <button type="button" className="button-link button-link--secondary" disabled={index === banners.length - 1} onClick={() => move(index, 1)}>下へ</button>
-          <button type="button" className="button-link button-link--secondary" onClick={() => remove(index)}>削除</button>
-        </div>
-      </fieldset>)}
-      <button type="button" className="button-link button-link--secondary" onClick={add}>バナーを追加</button>
+      </div>;
+      }}
+    />
+    <form onSubmit={submit} className="stack" noValidate>
       <button type="submit" className="button-link" disabled={saving || loadingPullRequest}>{saving ? "保存中…" : selected ? "同じ Pull Request を更新" : "Pull Request を作成"}</button>
       {message && <p role={messageIsError ? "alert" : "status"} className={messageIsError ? "notice notice--error" : "notice"}>{message}</p>}
     </form>
@@ -297,11 +320,10 @@ export default function BannerEditor({ initial, baseRevision }: BannerEditorProp
       .banner-editor__source label { display:grid; gap:.35rem; flex:1 1 320px; font-weight:700; }
       .banner-editor select,.banner-editor input { width:100%; min-height:44px; padding:.55rem; border:1px solid var(--color-base-70-dark); border-radius:.25rem; background:#fff; color:var(--foreground); }
       .banner-editor__card { display:grid; gap:1rem; padding:1rem; border:1px solid var(--color-base-70); border-radius:.35rem; background:#fff; }
-      .banner-editor__card legend { padding:0 .4rem; font-weight:700; }
+      .banner-editor__upload { font-weight:400; font-size:.9rem; }
       .banner-editor__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
       .banner-editor__grid label { display:grid; align-content:start; gap:.3rem; font-weight:700; }
       .banner-editor__wide { grid-column:1/-1; }
-      .banner-editor__actions { display:flex; flex-wrap:wrap; gap:.5rem; }
       .validation-message { color:#751b16; font-size:.9rem; font-weight:400; }
       @media(max-width:760px){.banner-editor__grid{grid-template-columns:1fr}.banner-editor__wide{grid-column:auto}}
     `}</style>

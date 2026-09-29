@@ -6,6 +6,8 @@ import type { TagDefinition } from "@/lib/content/types";
 import { tagDefinitionListSchema } from "@/lib/content/schemas";
 import type { ValidationIssue } from "@/lib/content/canonical-validation";
 import ValidationMessage from "@/components/molecules/ValidationMessage";
+import ContentItemGrid from "@/components/organisms/ContentItemGrid";
+import { collectInvalidIndexes } from "@/lib/content/admin-grid";
 
 type PullRequest = {
   number: number;
@@ -40,6 +42,7 @@ export default function TagEditor({ initial, baseRevision }: TagEditorProps) {
     () => new Map(issues.map((issue) => [issue.path.join("."), issue.message])),
     [issues],
   );
+  const invalidIndexes = useMemo(() => collectInvalidIndexes(issues, "tags"), [issues]);
 
   useEffect(() => {
     let active = true;
@@ -183,7 +186,7 @@ export default function TagEditor({ initial, baseRevision }: TagEditorProps) {
   }
 
   return (
-    <form className="tag-editor stack" onSubmit={submit}>
+    <div className="tag-editor stack">
       <label>
         編集対象
         <select
@@ -198,12 +201,29 @@ export default function TagEditor({ initial, baseRevision }: TagEditorProps) {
         </select>
       </label>
       <p className="tag-editor__help">tag ID は保存時に000001〜999999から自動採番され、既存 ID は変更できません。表示名はいつでも変更でき、タグ削除時は全記事の tags / relatedTags から同じ ID を除去します。</p>
-      <div className="tag-editor__list">
-        {tags.map((tag, index) => {
+      <ContentItemGrid
+        title="タグ一覧"
+        itemLabel="タグ"
+        rows={tags.map((tag) => ({
+          key: tag.key,
+          id: tag.isNew ? "保存時に自動採番" : tag.id,
+          label: tag.label,
+        }))}
+        columns={[
+          { key: "id", header: "tag ID", width: "9rem" },
+          { key: "label", header: "表示名", width: "16rem" },
+        ]}
+        invalidIndexes={invalidIndexes}
+        disabled={busy}
+        onAdd={add}
+        onRemove={remove}
+        getDialogTitle={(index) => `タグ: ${tags[index]?.label || (tags[index]?.isNew ? "新規" : tags[index]?.id)}`}
+        renderEditor={(index) => {
+          const tag = tags[index];
           const idError = errors.get(`tags.${index}.id`);
           const labelError = errors.get(`tags.${index}.label`);
           return (
-            <article className="tag-editor__item" key={tag.key}>
+            <div className="tag-editor__item">
               <div><strong>tag ID</strong><p>{tag.isNew ? "保存時に自動採番" : tag.id}</p><ValidationMessage id={`tag-${index}-id-error`}>{idError}</ValidationMessage></div>
               <label>
                 表示名
@@ -215,28 +235,25 @@ export default function TagEditor({ initial, baseRevision }: TagEditorProps) {
                 />
                 <ValidationMessage id={`tag-${index}-label-error`}>{labelError}</ValidationMessage>
               </label>
-              <CustomButton type="button" variant="ghost" onClick={() => remove(index)}>削除</CustomButton>
-            </article>
+            </div>
           );
-        })}
-      </div>
-      <div className="tag-editor__actions">
-        <CustomButton type="button" variant="neutral" onClick={add}>タグを追加</CustomButton>
+        }}
+      />
+      <form className="tag-editor__actions" onSubmit={submit}>
         <CustomButton type="submit" variant="accent" isLoading={busy} loadingLabel="保存中…">
           {selected ? "Pull Request を更新" : "タグ更新 Pull Request を作成"}
         </CustomButton>
-      </div>
+      </form>
       {message ? <p className={messageIsError ? "notice notice--error" : "notice"} role={messageIsError ? "alert" : "status"}>{message}</p> : null}
       <style jsx>{`
         .tag-editor label { display:grid; gap:.35rem; font-weight:700; }
         .tag-editor input,.tag-editor select { width:100%; min-height:44px; padding:.55rem; border:1px solid var(--color-base-70-dark); border-radius:.25rem; background:#fff; color:var(--foreground); }
         .tag-editor input:disabled { background:var(--color-base-70-light); color:var(--color-text-strong); opacity:.8; }
         .tag-editor__help { margin:0; }
-        .tag-editor__list { display:grid; gap:.75rem; }
-        .tag-editor__item { display:grid; grid-template-columns:minmax(10rem,1fr) minmax(12rem,2fr) auto; gap:.75rem; align-items:end; padding:.75rem; border:1px solid var(--color-base-70); border-radius:.5rem; }
+        .tag-editor__item { display:grid; grid-template-columns:minmax(10rem,1fr) minmax(12rem,2fr); gap:.75rem; align-items:end; }
         .tag-editor__actions { display:flex; flex-wrap:wrap; gap:.75rem; justify-content:space-between; }
         @media(max-width:760px){.tag-editor__item{grid-template-columns:1fr}.tag-editor__actions{display:grid}}
       `}</style>
-    </form>
+    </div>
   );
 }

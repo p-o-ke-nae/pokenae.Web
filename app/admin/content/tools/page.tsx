@@ -8,6 +8,6 @@ export default async function ToolAdminPage() {
   return <main className="page-container stack">
     <AdminContentNavigation current="/admin/content/tools" />
     <header className="page-header"><CustomHeader>ツール設定</CustomHeader><p className="page-lead">公開ツールとライブラリを編集します。</p></header>
-    <ToolEditor initial={snapshot.tools} baseRevision={snapshot.revision} />
+    <ToolEditor initial={snapshot.tools} baseRevision={snapshot.revision} tagDefinitions={snapshot.tags} />
   </main>;
 }

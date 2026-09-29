@@ -8,6 +8,6 @@ export default async function AppAdminPage() {
   return <main className="page-container stack">
     <AdminContentNavigation current="/admin/content/apps" />
     <header className="page-header"><CustomHeader>Webアプリ設定</CustomHeader><p className="page-lead">Webアプリの公開情報と表示順を編集します。</p></header>
-    <AppEditor initial={snapshot.apps} baseRevision={snapshot.revision} />
+    <AppEditor initial={snapshot.apps} baseRevision={snapshot.revision} tagDefinitions={snapshot.tags} />
   </main>;
 }

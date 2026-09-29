@@ -1,7 +1,12 @@
 "use client";
 
 import { cloneElement, type FormEvent, type ReactElement, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import ValidationMessage from "../../molecules/ValidationMessage";
+import TagPicker from "../../molecules/TagPicker";
+import ContentItemGrid from "../ContentItemGrid";
+import { collectInvalidIndexes } from "../../../lib/content/admin-grid";
+import type { TagDefinition } from "../../../lib/content/types";
 import { appListSchema } from "../../../lib/content/schemas";
 import type { AppContent } from "../../../lib/content/admin-config";
 import type { ValidationIssue } from "../../../lib/content/canonical-validation";
@@ -19,7 +24,7 @@ export type AppDraft = {
   metaLabel: string;
   status: AppStatus;
   order: string;
-  tags: string;
+  tags: string[];
 };
 
 type PullRequest = {
@@ -65,7 +70,7 @@ export function normalizeApps(value: unknown): AppDraft[] {
       metaLabel: text(source.metaLabel),
       status,
       order: typeof source.order === "number" ? String(source.order) : "",
-      tags: Array.isArray(source.tags) ? source.tags.filter((tag): tag is string => typeof tag === "string").join(", ") : "",
+      tags: Array.isArray(source.tags) ? source.tags.filter((tag): tag is string => typeof tag === "string") : [],
     };
   });
 }
@@ -81,7 +86,7 @@ export function serializeApps(apps: readonly AppDraft[]): AppContent[] {
     metaLabel: app.metaLabel.trim(),
     status: app.status,
     order: app.order.trim() === "" ? Number.NaN : Number(app.order),
-    tags: app.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+    tags: app.tags.map((tag) => tag.trim()).filter(Boolean),
   }));
 }
 
@@ -97,7 +102,7 @@ function newApp(index: number): AppDraft {
     metaLabel: "Webアプリ",
     status: "draft",
     order: String(index),
-    tags: "",
+    tags: [],
   };
 }
 
@@ -105,7 +110,13 @@ function issueKey(path: Array<string | number>) {
   return path.join(".");
 }
 
-export default function AppEditor({ initial, baseRevision }: { initial: unknown; baseRevision: string }) {
+const statusLabels: Record<AppStatus, string> = {
+  draft: "下書き",
+  published: "公開",
+  archived: "アーカイブ",
+};
+
+export default function AppEditor({ initial, baseRevision, tagDefinitions = [] }: { initial: unknown; baseRevision: string; tagDefinitions?: TagDefinition[] }) {
   const initialApps = useMemo(() => normalizeApps(initial), [initial]);
   const [apps, setApps] = useState(initialApps);
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
@@ -145,6 +156,7 @@ export default function AppEditor({ initial, baseRevision }: { initial: unknown;
     errors.get(`apps.${index}.${field}`)
     ?? [...errors].find(([path]) => path.startsWith(`apps.${index}.${field}.`))?.[1];
   const errorId = (index: number, field: string) => `app-${index}-${field}-error`;
+  const invalidIndexes = useMemo(() => collectInvalidIndexes(issues, "apps"), [issues]);
   const busy = saving || loadingPullRequest;
 
   function clearFeedback() {
@@ -264,10 +276,37 @@ export default function AppEditor({ initial, baseRevision }: { initial: unknown;
         {selected ? <a href={selected.url} target="_blank" rel="noreferrer">選択中の Pull Request を開く</a> : null}
       </div>
 
-      <form className="stack" aria-busy={busy} noValidate onSubmit={submit}>
-        {apps.map((app, index) => (
-          <fieldset key={app.key} className="app-editor__card" disabled={busy}>
-            <legend>Webアプリ {index + 1}{app.displayName ? `: ${app.displayName}` : ""}</legend>
+      <ContentItemGrid
+        title="Webアプリ一覧"
+        itemLabel="Webアプリ"
+        rows={apps.map((app) => ({
+          key: app.key,
+          displayName: app.displayName,
+          slug: app.slug,
+          status: statusLabels[app.status],
+          href: app.href,
+        }))}
+        columns={[
+          { key: "displayName", header: "表示名", width: "12rem" },
+          { key: "slug", header: "slug", width: "10rem" },
+          { key: "status", header: "公開状態", width: "6rem" },
+          { key: "href", header: "アプリURL", width: "12rem" },
+        ]}
+        invalidIndexes={invalidIndexes}
+        disabled={busy}
+        onAdd={() => {
+          setApps((current) => [...current, newApp(current.length)]);
+          clearFeedback();
+        }}
+        onMove={move}
+        onRemove={(index) => {
+          setApps((current) => current.filter((_, appIndex) => appIndex !== index));
+          clearFeedback();
+        }}
+        getDialogTitle={(index) => `Webアプリ ${index + 1}${apps[index]?.displayName ? `: ${apps[index].displayName}` : ""}`}
+        renderEditor={(index) => {
+          const app = apps[index];
+          return <fieldset className="app-editor__card" disabled={busy}>
             <div className="app-editor__grid">
               <Field label="slug" error={fieldError(index, "slug")} errorId={errorId(index, "slug")}>
                 <input required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={app.slug} onChange={(event) => update(index, { slug: event.target.value })} />
@@ -300,24 +339,21 @@ export default function AppEditor({ initial, baseRevision }: { initial: unknown;
               <Field label="表示順" error={fieldError(index, "order")} errorId={errorId(index, "order")}>
                 <input type="number" min="0" step="1" required value={app.order} onChange={(event) => update(index, { order: event.target.value })} />
               </Field>
-              <Field wide label="タグID（カンマ区切り）" error={fieldError(index, "tags")} errorId={errorId(index, "tags")}>
-                <input value={app.tags} placeholder="000001, 000002" onChange={(event) => update(index, { tags: event.target.value })} />
-              </Field>
+              <div className="app-editor__wide">
+                <TagPicker
+                  tags={tagDefinitions}
+                  selectedIds={app.tags}
+                  onSelectedIdsChange={(tags) => update(index, { tags })}
+                  createHint={<p>新しいタグは<Link href="/admin/content/tags">タグ設定</Link>で追加してください。</p>}
+                />
+                <ValidationMessage id={errorId(index, "tags")}>{fieldError(index, "tags")}</ValidationMessage>
+              </div>
             </div>
-            <div className="app-editor__actions" aria-label={`Webアプリ ${index + 1} の操作`}>
-              <button type="button" className="button-link button-link--secondary" disabled={index === 0} onClick={() => move(index, -1)}>上へ</button>
-              <button type="button" className="button-link button-link--secondary" disabled={index === apps.length - 1} onClick={() => move(index, 1)}>下へ</button>
-              <button type="button" className="button-link button-link--secondary" onClick={() => {
-                setApps((current) => current.filter((_, appIndex) => appIndex !== index));
-                clearFeedback();
-              }}>削除</button>
-            </div>
-          </fieldset>
-        ))}
-        <button type="button" className="button-link button-link--secondary" disabled={busy} onClick={() => {
-          setApps((current) => [...current, newApp(current.length)]);
-          clearFeedback();
-        }}>Webアプリを追加</button>
+          </fieldset>;
+        }}
+      />
+
+      <form className="stack" aria-busy={busy} noValidate onSubmit={submit}>
         <button type="submit" className="button-link" disabled={busy}>
           {saving ? "保存中…" : loadingPullRequest ? "読込中…" : selected ? "同じ Pull Request を更新" : "Pull Request を作成"}
         </button>
@@ -330,11 +366,9 @@ export default function AppEditor({ initial, baseRevision }: { initial: unknown;
         .app-editor input,.app-editor select,.app-editor textarea { width:100%; min-height:44px; padding:.55rem; border:1px solid var(--color-base-70-dark); border-radius:.25rem; background:#fff; color:var(--foreground); }
         .app-editor textarea { resize:vertical; }
         .app-editor__card { display:grid; gap:1rem; padding:1rem; border:1px solid var(--color-base-70); border-radius:.35rem; background:#fff; }
-        .app-editor__card > legend { padding:0 .4rem; font-weight:700; }
         .app-editor__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
         .app-editor__field { display:grid; align-content:start; gap:.3rem; font-weight:700; }
         .app-editor__wide { grid-column:1/-1; }
-        .app-editor__actions { display:flex; flex-wrap:wrap; gap:.5rem; }
         .app-editor .validation-message { color:#751b16; font-size:.9rem; font-weight:400; }
         @media(max-width:760px){.app-editor__grid{grid-template-columns:1fr}.app-editor__wide{grid-column:auto}}
       `}</style>
