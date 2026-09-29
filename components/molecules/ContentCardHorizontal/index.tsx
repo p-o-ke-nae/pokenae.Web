@@ -16,6 +16,7 @@ export type ContentCardHorizontalProps = {
 	imageAlt: string;
 	href: string;
 	variant?: 'default' | 'compact';
+	descriptionLines?: 2 | 3;
 } & ContentCardMetadata;
 
 export default function ContentCardHorizontal({
@@ -27,10 +28,11 @@ export default function ContentCardHorizontal({
 	imageAlt,
 	href,
 	variant = 'default',
+	descriptionLines = 2,
 }: ContentCardHorizontalProps) {
 	return (
 		<>
-			<Link href={href} className={`card-h card-h--${variant}`}>
+			<Link href={href} className={`card-h card-h--${variant}${descriptionLines === 3 ? ' card-h--description-3' : ''}`}>
 				<div className="card-h__image-wrap">
 					<Image
 						src={imageSrc}
@@ -127,6 +129,8 @@ export default function ContentCardHorizontal({
 				margin-top: auto;
 				white-space: nowrap;
 			}
+			.card-h--description-3 .card-h__image-wrap { flex-basis: 30%; min-height: 120px; }
+			.card-h--description-3 .card-h__description { -webkit-line-clamp: 3; }
 			.card-h--compact .card-h__image-wrap { flex-basis: 38%; min-height: 96px; }
 			.card-h--compact .card-h__body { gap: .25rem; padding: .6rem; }
 			.card-h--compact .card-h__title { font-size: .85rem; -webkit-line-clamp: 2; }
@@ -142,6 +146,11 @@ export default function ContentCardHorizontal({
 					min-height:0;
 				}
 				.card-h__body { gap:.35rem; padding:.75rem; }
+				.card-h--description-3 .card-h__image-wrap {
+					flex-basis:auto;
+					height:clamp(5.5rem, 28vw, 7rem);
+					min-height:0;
+				}
 				.card-h--compact .card-h__image-wrap {
 					flex-basis:auto;
 					height:clamp(6rem, 32vw, 7.5rem);

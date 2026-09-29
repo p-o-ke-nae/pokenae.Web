@@ -2,7 +2,7 @@
 
 公開ページは `p-o-ke-nae/pokenae.Content` の `main` にある `content/posts`、`content/tools`、`content/apps`、`content/home`、`content/updates` を Server Component から取得し、300秒キャッシュします。最初に `main` のcommit SHAとtree SHAを解決し、Git Trees APIとraw配信の双方をその不変commitへ固定します。GitHub App設定時は読み取りにもinstallation tokenを使用します。未設定時は公開リポジトリを匿名で読み取ります。
 
-トップページと `/info` のINFO欄には、公開対象のブログ（`post`）、ツール開発室（`tool`）、Webアプリ（`app`）の追加・更新だけを表示します。バナー・ニュース（`home`）とナビゲーション（`navigation`）の更新履歴は表示しません。
+トップページと `/info` のINFO欄には、公開対象のブログ（`post`）、ツール開発室（`tool`）、Webアプリ（`app`）の追加・更新だけを表示します。バナー・ニュース（`home`）とナビゲーション（`navigation`）の更新履歴は表示しません。記事とツールの保存時は「INFOに表示しない」を選ぶと、更新履歴（`visible: false`）は残したままINFO欄から除外できます。
 
 ローカルで固定データを使う場合とE2Eでは `.env.docker.debug` に `CONTENT_SOURCE=fixture` を明示してください。fixtureは読み取り確認専用であり、管理画面からPull Requestは作成できません。ローカルの管理画面から実際にPull Requestを作成する場合は `CONTENT_SOURCE=github` を設定し、debugコンテナを再起動してください。fixtureへの切替は明示設定またはtest環境だけで行い、GitHub取得失敗をfixture成功として隠しません。`reference/` は入力専用でGit管理対象外です。
 
@@ -53,7 +53,7 @@ node -e "const fs=require('fs'); process.stdout.write(Buffer.from(fs.readFileSyn
 
 既存4桁IDの移行では、番号を変えず左側をゼロ埋めし、タグ定義と記事の `tags` / `relatedTags` を同じ対応表で更新します。移行期間中の公開読取は4桁参照を6桁へ正規化しますが、管理画面からの新規書込は6桁だけを受け付けます。Content側の移行PRを先にマージし、未定義参照・重複・旧4桁IDがないことを確認してからWeb側の変更をリリースしてください。
 
-公開側の `/blog`、`/tools`、`/apps` は、ページ見出し・導入文の直下でタイトル部分一致とタグによる絞り込みを行えます。複数タグは `?tags=000001&tags=000002` のように指定し、すべてのタグを含むコンテンツだけを表示します。各詳細ページ末尾のタグリンクも同じ検索 URL を使用します。
+公開側の `/blog`、`/tools`、`/apps` は、ページ見出し・導入文の直下でキーワードとタグによる絞り込みを行えます。キーワードは `/blog` ではタイトル、`/tools` と `/apps` ではタイトルまたは概要の部分一致で検索します。複数タグは `?tags=000001&tags=000002` のように指定し、すべてのタグを含むコンテンツだけを表示します。各詳細ページ末尾のタグリンクも同じ検索 URL を使用します。
 
 記事作成・編集画面では、既存タグを表示名または ID で検索して選択できます。新規タグは ID と表示名を入力して記事へ追加し、記事とタグ正本を同じ Pull Request に保存します。記事保存から既存タグ自体を削除することはできず、削除はタグ管理画面で行います。
 

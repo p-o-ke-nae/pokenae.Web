@@ -58,6 +58,7 @@ type ApiResponse = {
   pullRequests?: PullRequest[];
   tools?: unknown;
   value?: unknown;
+  update?: unknown;
   pullRequestUrl?: string;
   headRevision?: string;
 };
@@ -203,6 +204,7 @@ export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
   const [saving, setSaving] = useState(false);
   const [loadingPullRequests, setLoadingPullRequests] = useState(true);
   const [loadingPullRequest, setLoadingPullRequest] = useState(false);
+  const [skipInfo, setSkipInfo] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -307,6 +309,7 @@ export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
     setSelected(null);
     setRevision(baseRevision);
     setTools(initialTools);
+    setSkipInfo(false);
     clearFeedback();
   }
 
@@ -324,6 +327,7 @@ export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
       setSelected(data.pullRequest);
       setRevision(data.pullRequest.headRevision);
       setTools(normalizeTools(readToolsPayload(data)));
+      setSkipInfo(record(data.update).visible === false);
       setIssues((data.issues ?? []).map(withToolsPrefix));
       setMessageIsError(Boolean(data.issues?.length));
       setMessage(data.issues?.length ? "既存の検証エラーを修正して保存してください。" : "Pull Request を読み込みました。");
@@ -353,8 +357,8 @@ export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
     }
 
     const body = selected
-      ? { kind: "tools", value: local.data, expectedRevision: revision, changeNote: "ツールを管理画面から更新" }
-      : { kind: "tools", value: local.data, baseRevision: revision, changeNote: "ツールを管理画面から更新" };
+      ? { kind: "tools", value: local.data, expectedRevision: revision, changeNote: "ツールを管理画面から更新", skipInfo }
+      : { kind: "tools", value: local.data, baseRevision: revision, changeNote: "ツールを管理画面から更新", skipInfo };
     try {
       const response = await fetch(
         selected ? `/api/content/config/pull-requests/${selected.number}?kind=tools` : "/api/content/config",
@@ -506,6 +510,10 @@ export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
         setTools((current) => [...current, newTool(current.length)]);
         clearFeedback();
       }}>ツールを追加</button>
+      <label className="tool-editor__check">
+        <input type="checkbox" checked={skipInfo} disabled={busy} onChange={(event) => { setSkipInfo(event.target.checked); clearFeedback(); }} />
+        INFOに表示しない
+      </label>
       <button type="submit" className="button-link" disabled={busy}>{saving ? "保存中…" : loadingPullRequest ? "読込中…" : selected ? "同じ Pull Request を更新" : "Pull Request を作成"}</button>
       {message && <p role={messageIsError ? "alert" : "status"} className={messageIsError ? "notice notice--error" : "notice"}>{message}</p>}
     </form>
@@ -515,6 +523,8 @@ export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
       .tool-editor__source label { display:grid; gap:.35rem; flex:1 1 320px; font-weight:700; }
       .tool-editor input,.tool-editor select,.tool-editor textarea { width:100%; min-height:44px; padding:.55rem; border:1px solid var(--color-base-70-dark); border-radius:.25rem; background:#fff; color:var(--foreground); }
       .tool-editor textarea { resize:vertical; }
+      .tool-editor .tool-editor__check { display:flex; align-items:center; gap:.5rem; font-weight:700; }
+      .tool-editor .tool-editor__check input { width:auto; min-height:0; }
       .tool-editor__card,.tool-editor__group { display:grid; gap:1rem; padding:1rem; border:1px solid var(--color-base-70); border-radius:.35rem; background:#fff; }
       .tool-editor__card > legend,.tool-editor__group > legend { padding:0 .4rem; font-weight:700; }
       .tool-editor__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
