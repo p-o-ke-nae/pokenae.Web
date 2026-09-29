@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import matter from "gray-matter";
 import CustomHeader from "@/components/atoms/CustomHeader";
+import AdminContentNavigation from "@/components/molecules/AdminContentNavigation";
 import PostEditor from "@/components/organisms/PostEditor";
 import { getContentMarkdownContext } from "@/lib/content/repository";
 import { postFrontmatterSchema } from "@/lib/content/schemas";
@@ -15,7 +16,8 @@ export default async function EditPostPullRequestPage({ params }: { params: Prom
     pullRequest = await getEditablePostPullRequest(number);
   } catch (error) {
     console.error("記事PRの編集画面を取得できませんでした", error);
-    return <main className="page-container">
+    return <main className="page-container stack">
+      <AdminContentNavigation current="/admin/posts" />
       <header className="page-header">
         <CustomHeader>記事PRを編集できません</CustomHeader>
         <p className="notice" role="alert">
@@ -27,7 +29,8 @@ export default async function EditPostPullRequestPage({ params }: { params: Prom
   const source = matter(pullRequest.source);
   const frontmatter = postFrontmatterSchema.safeParse(source.data);
   if (!frontmatter.success) {
-    return <main className="page-container">
+    return <main className="page-container stack">
+      <AdminContentNavigation current="/admin/posts" />
       <header className="page-header">
         <CustomHeader>記事PRを編集できません</CustomHeader>
         <p className="notice" role="alert">Pull Request内の記事メタデータが現在の仕様に適合しません。タグIDなどを確認してから再試行してください。</p>
@@ -36,7 +39,8 @@ export default async function EditPostPullRequestPage({ params }: { params: Prom
   }
   const post = { ...frontmatter.data, body: source.content.trim() };
 
-  return <main className="page-container">
+  return <main className="page-container stack">
+      <AdminContentNavigation current="/admin/posts" />
       <header className="page-header">
         <CustomHeader>記事PRを修正</CustomHeader>
         <p className="page-lead">#{pullRequest.number} の既存Pull Requestへ修正コミットを追加します。</p>

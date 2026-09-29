@@ -10,9 +10,9 @@ export const metadata: Metadata = { title: "ツール開発室" };
 export default async function ToolsPage({ searchParams }: { searchParams: Promise<ContentSearchParams> }) {
   const search = parseContentSearch(await searchParams);
   const { tools: allTools, tagDefinitions } = await getContentSnapshot();
-  const tools = allTools.filter((tool) => matchesContentSearch({ title: tool.name, tags: tool.tags }, search));
+  const tools = allTools.filter((tool) => matchesContentSearch({ title: tool.name, summary: tool.summary, tags: tool.tags }, search));
   return <main className="page-container"><header className="page-header"><CustomHeader>ツール開発室</CustomHeader><p className="page-lead">Windows アプリと、開発者向けライブラリを公開しています。</p></header>
-    <ContentSearchForm key={`${search.query}:${search.tagIds.join(",")}:${search.invalidTag}`} action="/tools" tags={tagDefinitions} search={search} resultCount={tools.length} />
-    {tools.length ? <div className="card-grid">{tools.map((tool) => <ContentCardVertical key={tool.slug} id={tool.slug} title={tool.name} metaLabel={tool.kind === "library" ? "開発者向けライブラリ" : "Windows アプリ"} imageSrc={tool.image ?? "/pokenaeLogo.png"} imageAlt="" href={`/tools/${tool.slug}`} tag={tool.kind === "library" ? "LIBRARY" : "APP"} />)}</div> : <p className="empty-state">条件に一致するツールはありません。</p>}
+    <ContentSearchForm key={`${search.query}:${search.tagIds.join(",")}:${search.invalidTag}`} action="/tools" queryMode="keyword" tags={tagDefinitions} search={search} resultCount={tools.length} />
+    {tools.length ? <div className="card-grid">{tools.map((tool) => <ContentCardVertical key={tool.slug} id={tool.slug} title={tool.name} description={tool.summary} metaLabel={tool.kind === "library" ? "開発者向けライブラリ" : "Windows アプリ"} imageSrc={tool.image ?? "/pokenaeLogo.png"} imageAlt="" href={`/tools/${tool.slug}`} tag={tool.kind === "library" ? "LIBRARY" : "APP"} />)}</div> : <p className="empty-state">条件に一致するツールはありません。</p>}
   </main>;
 }

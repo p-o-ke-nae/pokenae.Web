@@ -152,6 +152,34 @@ describe("buildToolContentChanges", () => {
     ]));
   });
 
+  it("hides tool updates from INFO when visible is false", () => {
+    const result = prepareToolWrite({
+      rawValue: [{
+        slug: "hidden",
+        displayName: "Hidden",
+        summary: "hidden from info",
+        repository: "p-o-ke-nae/hidden",
+        kind: "library",
+        docs: { readme: "README.md", paths: [] },
+        release: { channel: "stable", manifestRequired: false },
+        showInPickup: false,
+        priority: 0,
+      }],
+      currentPaths: [],
+      toolSchema,
+      updateSchema,
+      updatePath: "content/updates/tools-20260926100000.json",
+      updateId: "tools-20260926100000",
+      summary: "ツールを修正",
+      visible: false,
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const update = result.files.find((file) => file.path === "content/updates/tools-20260926100000.json");
+    expect(JSON.parse(String(update?.content))).toMatchObject({ target: "tool", visible: false });
+  });
+
   it("rejects duplicate tool slugs before building file changes", () => {
     const tool = {
       slug: "duplicate",

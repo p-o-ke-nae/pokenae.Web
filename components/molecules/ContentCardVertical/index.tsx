@@ -11,6 +11,7 @@ type ContentCardMetadata =
 export type ContentCardVerticalProps = {
 	id: string;
 	title: string;
+	description?: string;
 	imageSrc: string;
 	imageAlt: string;
 	href: string;
@@ -19,6 +20,7 @@ export type ContentCardVerticalProps = {
 
 export default function ContentCardVertical({
 	title,
+	description,
 	publishedAt,
 	metaLabel,
 	imageSrc,
@@ -28,7 +30,7 @@ export default function ContentCardVertical({
 }: ContentCardVerticalProps) {
 	return (
 		<>
-			<Link href={href} className="card-v">
+			<Link href={href} className={description ? 'card-v card-v--with-description' : 'card-v'}>
 				<div className="card-v__image-wrap">
 					<Image
 						src={imageSrc}
@@ -42,6 +44,7 @@ export default function ContentCardVertical({
 				</div>
 				<div className="card-v__body">
 					<h3 className="card-v__title">{title}</h3>
+					{description && <p className="card-v__description">{description}</p>}
 					{publishedAt
 						? <time className="card-v__meta" dateTime={publishedAt}>{formatContentDate(publishedAt)}</time>
 						: <span className="card-v__meta">{metaLabel}</span>}
@@ -108,6 +111,22 @@ export default function ContentCardVertical({
 					font-weight: 600;
 					color: var(--color-text-strong);
 					line-height: 1.5;
+				}
+
+				.card-v--with-description .card-v__image-wrap {
+					aspect-ratio: 16 / 9;
+				}
+
+				.card-v__description {
+					margin: 0;
+					font-size: 0.85rem;
+					color: var(--foreground);
+					opacity: 0.8;
+					line-height: 1.6;
+					display: -webkit-box;
+					-webkit-line-clamp: 3;
+					-webkit-box-orient: vertical;
+					overflow: hidden;
 				}
 
 				.card-v__meta {

@@ -12,9 +12,10 @@ type ContentSearchFormProps = {
   tags: TagDefinition[];
   search: ContentSearch;
   resultCount: number;
+  queryMode?: "title" | "keyword";
 };
 
-export default function ContentSearchForm({ action, tags, search, resultCount }: ContentSearchFormProps) {
+export default function ContentSearchForm({ action, tags, search, resultCount, queryMode = "title" }: ContentSearchFormProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [tagQuery, setTagQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState(search.tagIds);
@@ -55,8 +56,8 @@ export default function ContentSearchForm({ action, tags, search, resultCount }:
     <h2 id="content-search-title" className="sr-only">コンテンツを検索</h2>
     <form action={action} method="get" className="content-search__form">
       <label className="content-search__query">
-        タイトル
-        <input name="q" type="search" defaultValue={search.query} placeholder="タイトルの一部を入力" />
+        {queryMode === "keyword" ? "キーワード" : "タイトル"}
+        <input name="q" type="search" defaultValue={search.query} placeholder={queryMode === "keyword" ? "タイトル・概要の一部を入力" : "タイトルの一部を入力"} />
       </label>
       <fieldset className="content-search__tag-field">
         <legend>タグ（複数選択はすべてを含む条件）</legend>

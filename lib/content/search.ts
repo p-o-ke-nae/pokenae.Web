@@ -24,13 +24,14 @@ export function parseContentSearch(params: ContentSearchParams): ContentSearch {
 }
 
 export function matchesContentSearch(
-  item: { title: string; tags: readonly string[] },
+  item: { title: string; summary?: string; tags: readonly string[] },
   search: ContentSearch,
 ) {
   if (search.invalidTag) return false;
   const normalizedQuery = search.query.toLocaleLowerCase("ja-JP");
-  return (!normalizedQuery || item.title.toLocaleLowerCase("ja-JP").includes(normalizedQuery))
-    && search.tagIds.every((tag) => item.tags.includes(tag));
+  const matchesQuery = !normalizedQuery || [item.title, item.summary]
+    .some((value) => value?.toLocaleLowerCase("ja-JP").includes(normalizedQuery));
+  return matchesQuery && search.tagIds.every((tag) => item.tags.includes(tag));
 }
 
 export function searchResultLabel(count: number, invalidTag: boolean) {

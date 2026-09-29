@@ -2,6 +2,8 @@
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import ValidationMessage from "../../molecules/ValidationMessage";
+import ContentItemGrid from "../ContentItemGrid";
+import { collectInvalidIndexes, formatGridDateTime } from "../../../lib/content/admin-grid";
 import { announcementContentSchema } from "../../../lib/content/schemas";
 import type { ValidationIssue } from "../../../lib/content/canonical-validation";
 
@@ -85,6 +87,12 @@ export function serializeAnnouncements(announcements: AnnouncementDraft[]) {
   }));
 }
 
+const variantLabels: Record<AnnouncementDraft["variant"], string> = {
+  normal: "通常",
+  emphasis: "強調",
+  urgent: "緊急",
+};
+
 function issueKey(path: Array<string | number>) {
   return path.join(".");
 }
@@ -132,6 +140,7 @@ export default function AnnouncementEditor({ initial, baseRevision }: Announceme
     () => new Map(issues.map((issue) => [issueKey(issue.path), issue.message])),
     [issues],
   );
+  const invalidIndexes = useMemo(() => collectInvalidIndexes(issues, "announcements"), [issues]);
   const fieldError = (index: number, field: keyof AnnouncementDraft) =>
     errors.get(`announcements.${index}.${field}`) ?? errors.get(`${index}.${field}`);
   const errorId = (index: number, field: keyof AnnouncementDraft) =>
@@ -320,10 +329,32 @@ export default function AnnouncementEditor({ initial, baseRevision }: Announceme
         <a href={selected.url} target="_blank" rel="noreferrer">選択中の Pull Request を開く</a>}
     </div>
 
-    <form onSubmit={submit} className="stack" noValidate aria-busy={busy || loadingList}>
-      {announcements.map((announcement, index) =>
-        <fieldset key={announcement.key} className="announcement-editor__card" disabled={busy}>
-          <legend>ニュース {index + 1}</legend>
+    <ContentItemGrid
+      title="ニュース一覧"
+      itemLabel="ニュース"
+      rows={announcements.map((announcement) => ({
+        key: announcement.key,
+        id: announcement.id,
+        text: announcement.text,
+        variant: variantLabels[announcement.variant],
+        startsAt: formatGridDateTime(announcement.startsAt),
+        endsAt: formatGridDateTime(announcement.endsAt),
+      }))}
+      columns={[
+        { key: "id", header: "ID", width: "9rem" },
+        { key: "text", header: "本文", width: "16rem" },
+        { key: "variant", header: "種別", width: "4.5rem" },
+        { key: "startsAt", header: "開始日時", width: "9.5rem" },
+        { key: "endsAt", header: "終了日時", width: "9.5rem" },
+      ]}
+      invalidIndexes={invalidIndexes}
+      disabled={busy}
+      onAdd={add}
+      onMove={move}
+      onRemove={remove}
+      renderEditor={(index) => {
+        const announcement = announcements[index];
+        return <fieldset className="announcement-editor__card" disabled={busy}>
           <div className="announcement-editor__grid">
             <label>
               ID
@@ -398,15 +429,11 @@ export default function AnnouncementEditor({ initial, baseRevision }: Announceme
               <ValidationMessage id={errorId(index, "endsAt")}>{fieldError(index, "endsAt")}</ValidationMessage>
             </label>
           </div>
-          <div className="announcement-editor__actions">
-            <button type="button" className="button-link button-link--secondary" disabled={index === 0} onClick={() => move(index, -1)}>上へ</button>
-            <button type="button" className="button-link button-link--secondary" disabled={index === announcements.length - 1} onClick={() => move(index, 1)}>下へ</button>
-            <button type="button" className="button-link button-link--secondary" onClick={() => remove(index)}>削除</button>
-          </div>
-        </fieldset>)}
-      <button type="button" className="button-link button-link--secondary" disabled={busy} onClick={add}>
-        ニュースを追加
-      </button>
+        </fieldset>;
+      }}
+    />
+
+    <form onSubmit={submit} className="stack" noValidate aria-busy={busy || loadingList}>
       <button type="submit" className="button-link" disabled={busy || loadingList}>
         {saving ? "保存中…" : loadingPullRequest ? "読込中…" : selected ? "同じ Pull Request を更新" : "Pull Request を作成"}
       </button>
@@ -433,11 +460,9 @@ export default function AnnouncementEditor({ initial, baseRevision }: Announceme
       .announcement-editor__source label { display:grid; gap:.35rem; flex:1 1 320px; font-weight:700; }
       .announcement-editor select,.announcement-editor input { width:100%; min-height:44px; padding:.55rem; border:1px solid var(--color-base-70-dark); border-radius:.25rem; background:#fff; color:var(--foreground); }
       .announcement-editor__card { display:grid; gap:1rem; padding:1rem; border:1px solid var(--color-base-70); border-radius:.35rem; background:#fff; }
-      .announcement-editor__card legend { padding:0 .4rem; font-weight:700; }
       .announcement-editor__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
       .announcement-editor__grid label { display:grid; align-content:start; gap:.3rem; font-weight:700; }
       .announcement-editor__wide { grid-column:1/-1; }
-      .announcement-editor__actions { display:flex; flex-wrap:wrap; gap:.5rem; }
       .announcement-editor .validation-message { color:#751b16; font-size:.9rem; font-weight:400; }
       @media(max-width:760px){.announcement-editor__grid{grid-template-columns:1fr}.announcement-editor__wide{grid-column:auto}}
     `}</style>

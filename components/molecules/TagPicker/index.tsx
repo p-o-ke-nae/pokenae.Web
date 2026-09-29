@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type ReactNode, useId, useMemo, useState } from "react";
 import CustomButton from "@/components/atoms/CustomButton";
 import Dialog, { DialogFooterLayout } from "@/components/molecules/Dialog";
 import type { TagDefinition } from "@/lib/content/types";
@@ -8,8 +8,13 @@ import type { TagDefinition } from "@/lib/content/types";
 type TagPickerProps = {
   tags: TagDefinition[];
   selectedIds: string[];
-  onTagsChange: (tags: TagDefinition[]) => void;
+  /** 新規タグを追加したときの一覧更新。未指定時は新規タグ作成欄を表示しない */
+  onTagsChange?: (tags: TagDefinition[]) => void;
   onSelectedIdsChange: (ids: string[]) => void;
+  legend?: string;
+  disabled?: boolean;
+  /** 新規タグを作成できない画面で表示する案内 */
+  createHint?: ReactNode;
 };
 
 export default function TagPicker({
@@ -17,7 +22,11 @@ export default function TagPicker({
   selectedIds,
   onTagsChange,
   onSelectedIdsChange,
+  legend = "タグ",
+  disabled = false,
+  createHint,
 }: TagPickerProps) {
+  const idPrefix = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [newLabel, setNewLabel] = useState("");
@@ -37,6 +46,7 @@ export default function TagPicker({
   }
 
   function addNewTag() {
+    if (!onTagsChange) return;
     const label = newLabel.trim();
     if (!label) {
       setError("表示名を入力してください。");
@@ -51,8 +61,8 @@ export default function TagPicker({
   }
 
   return (
-    <fieldset className="tag-picker">
-      <legend>タグ</legend>
+    <fieldset className="tag-picker" disabled={disabled}>
+      <legend>{legend}</legend>
       <div className="tag-picker__selected">
         {selectedIds.length
           ? selectedIds.map((id) => (
@@ -63,13 +73,13 @@ export default function TagPicker({
             ))
           : <span className="tag-picker__empty">タグは選択されていません。</span>}
       </div>
-      <CustomButton type="button" variant="neutral" onClick={() => setOpen(true)}>
-        タグを検索・追加
+      <CustomButton type="button" variant="neutral" disabled={disabled} onClick={() => setOpen(true)}>
+        {onTagsChange ? "タグを検索・追加" : "タグを検索・選択"}
       </CustomButton>
       <Dialog
         open={open}
         onClose={() => setOpen(false)}
-        title="タグを検索・追加"
+        title={onTagsChange ? "タグを検索・追加" : "タグを検索・選択"}
         size="md"
         footer={<DialogFooterLayout trailing={<CustomButton type="button" variant="accent" onClick={() => setOpen(false)}>完了</CustomButton>} />}
       >
@@ -95,13 +105,13 @@ export default function TagPicker({
               </label>
             )) : <p>該当するタグはありません。</p>}
           </div>
-          <section className="tag-picker__new" aria-labelledby="new-tag-title">
-            <h3 id="new-tag-title">新規タグ</h3>
+          {onTagsChange ? <section className="tag-picker__new" aria-labelledby={`${idPrefix}-new-tag-title`}>
+            <h3 id={`${idPrefix}-new-tag-title`}>新規タグ</h3>
             <label>表示名<input value={newLabel} placeholder="第7世代" onChange={(event) => setNewLabel(event.target.value)} /></label>
             <p>IDは保存時に自動採番されます。</p>
             <CustomButton type="button" variant="neutral" onClick={addNewTag}>新規タグを追加</CustomButton>
             {error ? <p className="tag-picker__error" role="alert">{error}</p> : null}
-          </section>
+          </section> : createHint ? <div className="tag-picker__new">{createHint}</div> : null}
         </div>
       </Dialog>
       <style jsx>{`

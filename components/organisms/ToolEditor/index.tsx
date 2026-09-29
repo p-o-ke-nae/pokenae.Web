@@ -1,7 +1,12 @@
 "use client";
 
 import { cloneElement, FormEvent, type ReactElement, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import ValidationMessage from "../../molecules/ValidationMessage";
+import TagPicker from "../../molecules/TagPicker";
+import ContentItemGrid from "../ContentItemGrid";
+import { collectInvalidIndexes } from "../../../lib/content/admin-grid";
+import type { TagDefinition } from "../../../lib/content/types";
 import { toolListSchema } from "../../../lib/content/schemas";
 import type { ToolContent } from "../../../lib/content/admin-config";
 import type { ValidationIssue } from "../../../lib/content/canonical-validation";
@@ -48,6 +53,13 @@ type PullRequest = {
 type ToolEditorProps = {
   initial: unknown;
   baseRevision: string;
+  tagDefinitions?: TagDefinition[];
+};
+
+const kindLabels: Record<ToolKind | "", string> = {
+  "windows-app": "Windows アプリ",
+  library: "ライブラリ",
+  "": "未選択",
 };
 
 type ApiResponse = {
@@ -58,6 +70,7 @@ type ApiResponse = {
   pullRequests?: PullRequest[];
   tools?: unknown;
   value?: unknown;
+  update?: unknown;
   pullRequestUrl?: string;
   headRevision?: string;
 };
@@ -191,7 +204,7 @@ function newTool(index: number): ToolDraft {
   };
 }
 
-export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
+export default function ToolEditor({ initial, baseRevision, tagDefinitions = [] }: ToolEditorProps) {
   const initialTools = useMemo(() => normalizeTools(initial), [initial]);
   const [tools, setTools] = useState(initialTools);
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
@@ -203,6 +216,7 @@ export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
   const [saving, setSaving] = useState(false);
   const [loadingPullRequests, setLoadingPullRequests] = useState(true);
   const [loadingPullRequest, setLoadingPullRequest] = useState(false);
+  const [skipInfo, setSkipInfo] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -230,6 +244,7 @@ export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
   );
   const fieldError = (index: number, field: string) => errors.get(`tools.${index}.${field}`);
   const errorId = (index: number, field: string) => `tool-${index}-${field.replaceAll(".", "-")}-error`;
+  const invalidIndexes = useMemo(() => collectInvalidIndexes(issues, "tools"), [issues]);
 
   function clearFeedback() {
     setIssues([]);
@@ -307,6 +322,7 @@ export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
     setSelected(null);
     setRevision(baseRevision);
     setTools(initialTools);
+    setSkipInfo(false);
     clearFeedback();
   }
 
@@ -324,6 +340,7 @@ export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
       setSelected(data.pullRequest);
       setRevision(data.pullRequest.headRevision);
       setTools(normalizeTools(readToolsPayload(data)));
+      setSkipInfo(record(data.update).visible === false);
       setIssues((data.issues ?? []).map(withToolsPrefix));
       setMessageIsError(Boolean(data.issues?.length));
       setMessage(data.issues?.length ? "既存の検証エラーを修正して保存してください。" : "Pull Request を読み込みました。");
@@ -353,8 +370,8 @@ export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
     }
 
     const body = selected
-      ? { kind: "tools", value: local.data, expectedRevision: revision, changeNote: "ツールを管理画面から更新" }
-      : { kind: "tools", value: local.data, baseRevision: revision, changeNote: "ツールを管理画面から更新" };
+      ? { kind: "tools", value: local.data, expectedRevision: revision, changeNote: "ツールを管理画面から更新", skipInfo }
+      : { kind: "tools", value: local.data, baseRevision: revision, changeNote: "ツールを管理画面から更新", skipInfo };
     try {
       const response = await fetch(
         selected ? `/api/content/config/pull-requests/${selected.number}?kind=tools` : "/api/content/config",
@@ -398,9 +415,34 @@ export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
       {selected && <a href={selected.url} target="_blank" rel="noreferrer">選択中の Pull Request を開く</a>}
     </div>
 
-    <form onSubmit={submit} className="stack" aria-busy={busy} noValidate>
-      {tools.map((tool, index) => <fieldset key={tool.key} className="tool-editor__card" disabled={busy}>
-        <legend>ツール {index + 1}{tool.displayName ? `: ${tool.displayName}` : ""}</legend>
+    <ContentItemGrid
+      title="ツール一覧"
+      itemLabel="ツール"
+      rows={tools.map((tool) => ({
+        key: tool.key,
+        displayName: tool.displayName,
+        slug: tool.slug,
+        kind: kindLabels[tool.kind],
+        repository: tool.repository,
+      }))}
+      columns={[
+        { key: "displayName", header: "表示名", width: "12rem" },
+        { key: "slug", header: "slug", width: "10rem" },
+        { key: "kind", header: "種別", width: "7.5rem" },
+        { key: "repository", header: "リポジトリ", width: "13rem" },
+      ]}
+      invalidIndexes={invalidIndexes}
+      disabled={busy}
+      onAdd={() => {
+        setTools((current) => [...current, newTool(current.length)]);
+        clearFeedback();
+      }}
+      onMove={moveTool}
+      onRemove={removeTool}
+      getDialogTitle={(index) => `ツール ${index + 1}${tools[index]?.displayName ? `: ${tools[index].displayName}` : ""}`}
+      renderEditor={(index) => {
+        const tool = tools[index];
+        return <fieldset className="tool-editor__card" disabled={busy}>
         <div className="tool-editor__grid">
           <Field label="slug" error={fieldError(index, "slug")} errorId={errorId(index, "slug")}>
             <input required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={tool.slug} onChange={(event) => update(index, { slug: event.target.value })} />
@@ -442,18 +484,15 @@ export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
             onMove={(itemIndex, direction) => moveArrayItem(index, "supportedOs", itemIndex, direction)}
             onRemove={(itemIndex) => removeArrayItem(index, "supportedOs", itemIndex)}
           />
-          <ArrayField
-            label="タグID"
-            values={tool.tags}
-            path="tags"
-            toolIndex={index}
-            fieldError={fieldError}
-            errorId={errorId}
-            onAdd={() => addArrayItem(index, "tags")}
-            onChange={(itemIndex, value) => updateArray(index, "tags", itemIndex, value)}
-            onMove={(itemIndex, direction) => moveArrayItem(index, "tags", itemIndex, direction)}
-            onRemove={(itemIndex) => removeArrayItem(index, "tags", itemIndex)}
-          />
+          <div className="tool-editor__wide">
+            <TagPicker
+              tags={tagDefinitions}
+              selectedIds={tool.tags}
+              onSelectedIdsChange={(tags) => update(index, { tags })}
+              createHint={<p>新しいタグは<Link href="/admin/content/tags">タグ設定</Link>で追加してください。</p>}
+            />
+            <ValidationMessage id={errorId(index, "tags")}>{fieldError(index, "tags") ?? tool.tags.map((_, tagIndex) => fieldError(index, `tags.${tagIndex}`)).find(Boolean)}</ValidationMessage>
+          </div>
 
           <fieldset className="tool-editor__group tool-editor__wide">
             <legend>ドキュメント（canonical schemaで必須）</legend>
@@ -496,16 +535,15 @@ export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
             <input type="number" step="1" value={tool.priority} onChange={(event) => update(index, { priority: event.target.value })} />
           </Field>
         </div>
-        <div className="tool-editor__actions">
-          <button type="button" className="button-link button-link--secondary" disabled={index === 0} onClick={() => moveTool(index, -1)}>上へ</button>
-          <button type="button" className="button-link button-link--secondary" disabled={index === tools.length - 1} onClick={() => moveTool(index, 1)}>下へ</button>
-          <button type="button" className="button-link button-link--secondary" onClick={() => removeTool(index)}>削除</button>
-        </div>
-      </fieldset>)}
-      <button type="button" className="button-link button-link--secondary" disabled={busy} onClick={() => {
-        setTools((current) => [...current, newTool(current.length)]);
-        clearFeedback();
-      }}>ツールを追加</button>
+      </fieldset>;
+      }}
+    />
+
+    <form onSubmit={submit} className="stack" aria-busy={busy} noValidate>
+      <label className="tool-editor__check">
+        <input type="checkbox" checked={skipInfo} disabled={busy} onChange={(event) => { setSkipInfo(event.target.checked); clearFeedback(); }} />
+        INFOに表示しない
+      </label>
       <button type="submit" className="button-link" disabled={busy}>{saving ? "保存中…" : loadingPullRequest ? "読込中…" : selected ? "同じ Pull Request を更新" : "Pull Request を作成"}</button>
       {message && <p role={messageIsError ? "alert" : "status"} className={messageIsError ? "notice notice--error" : "notice"}>{message}</p>}
     </form>
@@ -515,8 +553,10 @@ export default function ToolEditor({ initial, baseRevision }: ToolEditorProps) {
       .tool-editor__source label { display:grid; gap:.35rem; flex:1 1 320px; font-weight:700; }
       .tool-editor input,.tool-editor select,.tool-editor textarea { width:100%; min-height:44px; padding:.55rem; border:1px solid var(--color-base-70-dark); border-radius:.25rem; background:#fff; color:var(--foreground); }
       .tool-editor textarea { resize:vertical; }
+      .tool-editor .tool-editor__check { display:flex; align-items:center; gap:.5rem; font-weight:700; }
+      .tool-editor .tool-editor__check input { width:auto; min-height:0; }
       .tool-editor__card,.tool-editor__group { display:grid; gap:1rem; padding:1rem; border:1px solid var(--color-base-70); border-radius:.35rem; background:#fff; }
-      .tool-editor__card > legend,.tool-editor__group > legend { padding:0 .4rem; font-weight:700; }
+      .tool-editor__group > legend { padding:0 .4rem; font-weight:700; }
       .tool-editor__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
       .tool-editor__field { display:grid; align-content:start; gap:.3rem; font-weight:700; }
       .tool-editor__wide { grid-column:1/-1; }

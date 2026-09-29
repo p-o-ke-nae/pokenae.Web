@@ -2,7 +2,7 @@
 
 公開ページは `p-o-ke-nae/pokenae.Content` の `main` にある `content/posts`、`content/tools`、`content/apps`、`content/home`、`content/updates` を Server Component から取得し、300秒キャッシュします。最初に `main` のcommit SHAとtree SHAを解決し、Git Trees APIとraw配信の双方をその不変commitへ固定します。GitHub App設定時は読み取りにもinstallation tokenを使用します。未設定時は公開リポジトリを匿名で読み取ります。
 
-トップページと `/info` のINFO欄には、公開対象のブログ（`post`）、ツール開発室（`tool`）、Webアプリ（`app`）の追加・更新だけを表示します。バナー・ニュース（`home`）とナビゲーション（`navigation`）の更新履歴は表示しません。
+トップページと `/info` のINFO欄には、公開対象のブログ（`post`）、ツール開発室（`tool`）、Webアプリ（`app`）の追加・更新だけを表示します。バナー・ニュース（`home`）とナビゲーション（`navigation`）の更新履歴は表示しません。記事とツールの保存時は「INFOに表示しない」を選ぶと、更新履歴（`visible: false`）は残したままINFO欄から除外できます。
 
 ローカルで固定データを使う場合とE2Eでは `.env.docker.debug` に `CONTENT_SOURCE=fixture` を明示してください。fixtureは読み取り確認専用であり、管理画面からPull Requestは作成できません。ローカルの管理画面から実際にPull Requestを作成する場合は `CONTENT_SOURCE=github` を設定し、debugコンテナを再起動してください。fixtureへの切替は明示設定またはtest環境だけで行い、GitHub取得失敗をfixture成功として隠しません。`reference/` は入力専用でGit管理対象外です。
 
@@ -35,7 +35,7 @@ node -e "const fs=require('fs'); process.stdout.write(Buffer.from(fs.readFileSyn
 - `/admin/content/apps`: Webアプリ
 - `/admin/content/tags`: タグ
 
-旧URL `/admin/posts/home` は `/admin/content` へリダイレクトします。各ページでは項目の追加、編集、削除に対応し、ツールではWeb側schemaの任意項目も指定できます。Webアプリでは表示名、slug、概要、アプリ内href、画像、代替テキスト、メタラベル、公開状態、表示順、タグを編集します。画像を指定しない場合もContent側canonical schemaに従って `image: null` を保存します。
+旧URL `/admin/posts/home` は `/admin/content` へリダイレクトします。記事管理（`/admin/posts`）と各設定ページの上部には共通の管理画面メニューを表示します。各ページでは項目をグリッドで一覧表示し、行をクリックするとダイアログで編集します。ダイアログから並べ替え・削除を行い、「〜を追加」で新しい項目を作成します。検証エラーのある行はグリッドの「確認」列に「要修正」と表示されます。ツールとWebアプリのタグは記事と同じタグ選択UIで既存タグから選択し、新しいタグはタグ設定ページで作成します。ツールではWeb側schemaの任意項目も指定できます。Webアプリでは表示名、slug、概要、アプリ内href、画像、代替テキスト、メタラベル、公開状態、表示順、タグを編集します。画像を指定しない場合もContent側canonical schemaに従って `image: null` を保存します。
 
 新規作成に加え、管理画面が作成した open な `content/<kind>-YYYYMMDDhhmmss` Pull Request を種類ごとに選び、同じ head branch に修正commitを追加できます。Webアプリは `content/apps-YYYYMMDDhhmmss` branchで、各項目を `content/apps/<slug>.json`、更新情報を `content/updates/apps-YYYYMMDDhhmmss.json` へ保存します。対象は次をすべて満たすPRだけです。
 
@@ -53,13 +53,17 @@ node -e "const fs=require('fs'); process.stdout.write(Buffer.from(fs.readFileSyn
 
 既存4桁IDの移行では、番号を変えず左側をゼロ埋めし、タグ定義と記事の `tags` / `relatedTags` を同じ対応表で更新します。移行期間中の公開読取は4桁参照を6桁へ正規化しますが、管理画面からの新規書込は6桁だけを受け付けます。Content側の移行PRを先にマージし、未定義参照・重複・旧4桁IDがないことを確認してからWeb側の変更をリリースしてください。
 
-公開側の `/blog`、`/tools`、`/apps` は、ページ見出し・導入文の直下でタイトル部分一致とタグによる絞り込みを行えます。複数タグは `?tags=000001&tags=000002` のように指定し、すべてのタグを含むコンテンツだけを表示します。各詳細ページ末尾のタグリンクも同じ検索 URL を使用します。
+公開側の `/blog`、`/tools`、`/apps` は、ページ見出し・導入文の直下でキーワードとタグによる絞り込みを行えます。キーワードは `/blog` ではタイトル、`/tools` と `/apps` ではタイトルまたは概要の部分一致で検索します。複数タグは `?tags=000001&tags=000002` のように指定し、すべてのタグを含むコンテンツだけを表示します。各詳細ページ末尾のタグリンクも同じ検索 URL を使用します。
 
 記事作成・編集画面では、既存タグを表示名または ID で検索して選択できます。新規タグは ID と表示名を入力して記事へ追加し、記事とタグ正本を同じ Pull Request に保存します。記事保存から既存タグ自体を削除することはできず、削除はタグ管理画面で行います。
 
 記事の公開日は選択日の日本時間 00:00 として保存します。`status` が「公開」でも未来の公開日を指定した記事は予約公開となり、公開時刻までは一覧、詳細URL、PICKUP、関連記事、RSS、サイトマップ、INFOに表示されません。公開済み記事を未来日に変更した場合も、Pull Requestのマージ後は同様に一時非公開となり、公開時刻後に最大約5分のキャッシュ更新を経て自動的に再公開されます。Content schemaで必須の更新日時は公開前には公開日時と同値で保存し、公開後に編集した場合だけ実際の編集日時へ進めます。画面では更新日時が公開日時より後の場合だけ更新日を表示します。
 
 記事の `legacyUrl` は移行元ページが存在する場合だけ保存する任意項目です。記事画像は `content/posts/<slug>/images/` に格納し、frontmatter と Markdown では `./images/<file>` の相対パスを正本とします。管理画面のプレビューと公開ページだけが commit SHA 固定の raw URL に解決します。同じ Content リポジトリ・同じ記事配下の raw URL が古い下書きや既存 PR に残っている場合は保存時に相対パスへ戻しますが、その他の外部画像 URL は保存できません。新規作成時だけでなく既存の記事 Pull Request を修正するときも、paste した画像は同じ head branch へ追加します。
+
+記事編集画面では、本文欄に画像を貼り付けるとカーソル位置へ `![画像](./images/<file>.webp)` を挿入します。本文以外の場所に貼り付けた画像や「画像を挿入」ダイアログで端末から選んだ画像は候補に追加され、候補をクリックすると代替テキスト付きの Markdown としてカーソル位置へ挿入します。保存時は本文から参照されている候補画像だけを添付します。
+
+記事本文の ```` ```mermaid ```` コードブロックは Mermaid 図として描画し、拡大・縮小・リセットのボタンで表示倍率を調整できます。描画に失敗した場合はソースをそのまま表示します。
 
 バナー画像は5MB以下・4096×4096以下のPNG/JPEG/WebPのみ受け付け、回転補正・縮小後にWebPへ変換して `content/home/images/<banner-id>-<hash>.webp` に保存します。バナーの画像参照は、既存head treeと今回追加する画像を合成したproposed tree内に存在する相対pathだけを許可します。`/mock/...` や外部URLはContent用画像として保存できません。
 

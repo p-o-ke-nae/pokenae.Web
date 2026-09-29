@@ -18,6 +18,20 @@ describe("content search", () => {
     )).toBe(false);
   });
 
+  it("matches a keyword against the title or summary when a summary is provided", () => {
+    const search = parseContentSearch({ q: "セーブデータ" });
+
+    expect(matchesContentSearch(
+      { title: "ゲームライブラリ", summary: "セーブデータを管理するWebアプリ", tags: [] },
+      search,
+    )).toBe(true);
+    expect(matchesContentSearch({ title: "ゲームライブラリ", tags: [] }, search)).toBe(false);
+    expect(matchesContentSearch(
+      { title: "図鑑", summary: "ポケモンの記録", tags: [] },
+      search,
+    )).toBe(false);
+  });
+
   it("preserves repeated tag parameters and rejects invalid IDs", () => {
     expect(parseContentSearch({ tags: ["000002", "000001"] })).toMatchObject({
       tagIds: ["000002", "000001"],
