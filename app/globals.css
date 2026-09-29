@@ -75,6 +75,11 @@ img { max-width: 100%; }
 .page-container { width: 100%; }
 .page-header { margin-bottom: 1.5rem; }
 .page-lead { color: #605966; max-width: 70ch; }
+.legal-document { display:grid; gap:2rem; padding:clamp(1rem, 3vw, 2rem); border:1px solid var(--color-base-70); background:var(--background); color:var(--foreground); line-height:1.8; }
+.legal-document section { display:grid; gap:.75rem; }
+.legal-document p { margin:0; }
+.legal-document ul { margin:0; padding-left:1.5rem; list-style:disc; display:grid; gap:.25rem; }
+.legal-document__footer { padding-top:1rem; border-top:1px solid var(--color-base-70); color:#605966; font-size:.875rem; }
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));

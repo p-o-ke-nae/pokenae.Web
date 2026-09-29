@@ -50,10 +50,11 @@ function zodIssues(prefix: string, issues: Array<{ path: PropertyKey[]; message:
 
 function updateMetadata(update: unknown) {
   if (typeof update !== "object" || update === null) return {};
-  const candidate = update as { publishedAt?: unknown; summary?: unknown };
+  const candidate = update as { publishedAt?: unknown; summary?: unknown; visible?: unknown };
   return {
     publishedAt: typeof candidate.publishedAt === "string" ? candidate.publishedAt : undefined,
     summary: typeof candidate.summary === "string" ? candidate.summary : undefined,
+    visible: typeof candidate.visible === "boolean" ? candidate.visible : undefined,
   };
 }
 
@@ -154,7 +155,7 @@ export async function PUT(request: Request, context: Context) {
   try {
     const isMultipart = request.headers.get("content-type")?.includes("multipart/form-data");
     const form = isMultipart ? await request.formData() : new FormData();
-    let data: { kind?: string; expectedRevision?: string; value?: unknown; changeNote?: string };
+    let data: { kind?: string; expectedRevision?: string; value?: unknown; changeNote?: string; skipInfo?: unknown };
     try {
       data = isMultipart
         ? {
@@ -162,6 +163,7 @@ export async function PUT(request: Request, context: Context) {
             expectedRevision: String(form.get("expectedRevision") ?? ""),
             value: JSON.parse(String(form.get("value") ?? form.get("banners") ?? "null")) as unknown,
             changeNote: String(form.get("changeNote") ?? ""),
+            ...(form.has("skipInfo") ? { skipInfo: form.get("skipInfo") === "true" } : {}),
           }
         : await request.json() as typeof data;
     } catch {
@@ -206,6 +208,7 @@ export async function PUT(request: Request, context: Context) {
             currentPaths: snapshot.toolPaths,
             toolSchema: snapshot.schemas.tool,
             ...common,
+            visible: typeof data.skipInfo === "boolean" ? !data.skipInfo : metadata.visible,
           })
           : queryKind === "apps"
             ? prepareAppWrite({

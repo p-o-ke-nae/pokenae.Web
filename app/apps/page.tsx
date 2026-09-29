@@ -12,10 +12,10 @@ export default async function AppsPage({ searchParams }: { searchParams: Promise
   const { apps: allApps, tagDefinitions } = await getContentSnapshot();
   const apps = allApps.filter((app) => (
     app.status === "published"
-    && matchesContentSearch({ title: app.name, tags: app.tags }, search)
+    && matchesContentSearch({ title: app.name, summary: app.summary, tags: app.tags }, search)
   ));
   return <main className="page-container"><header className="page-header"><CustomHeader>Webアプリ</CustomHeader><p className="page-lead">Google OAuth2 で安全に認証し、pokenae の API を利用するWebアプリです。</p></header>
-    <ContentSearchForm key={`${search.query}:${search.tagIds.join(",")}:${search.invalidTag}`} action="/apps" tags={tagDefinitions} search={search} resultCount={apps.length} />
-    {apps.length ? <div className="stack">{apps.map((app) => <ContentCardHorizontal key={app.slug} id={app.slug} title={app.name} description={app.summary} metaLabel={app.metaLabel ?? "Webアプリ"} imageSrc={app.image ?? "/pokenaeLogo.png"} imageAlt={app.imageAlt} href={app.href} />)}</div> : <p className="empty-state">条件に一致するWebアプリはありません。</p>}
+    <ContentSearchForm key={`${search.query}:${search.tagIds.join(",")}:${search.invalidTag}`} action="/apps" queryMode="keyword" tags={tagDefinitions} search={search} resultCount={apps.length} />
+    {apps.length ? <div className="stack">{apps.map((app) => <ContentCardHorizontal key={app.slug} id={app.slug} title={app.name} description={app.summary} descriptionLines={3} metaLabel={app.metaLabel ?? "Webアプリ"} imageSrc={app.image ?? "/pokenaeLogo.png"} imageAlt={app.imageAlt} href={app.href} />)}</div> : <p className="empty-state">条件に一致するWebアプリはありません。</p>}
   </main>;
 }

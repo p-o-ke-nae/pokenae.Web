@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   try {
     const isMultipart = request.headers.get("content-type")?.includes("multipart/form-data");
     const form = isMultipart ? await request.formData() : new FormData();
-    let data: { kind?: ConfigKind; value?: unknown; baseRevision?: string; changeNote?: string };
+    let data: { kind?: ConfigKind; value?: unknown; baseRevision?: string; changeNote?: string; skipInfo?: unknown };
     if (isMultipart) {
       try {
         data = {
@@ -40,6 +40,7 @@ export async function POST(request: Request) {
           value: JSON.parse(String(form.get("value") ?? "null")) as unknown,
           baseRevision: String(form.get("baseRevision") ?? ""),
           changeNote: String(form.get("changeNote") ?? ""),
+          skipInfo: form.get("skipInfo") === "true",
         };
       } catch {
         return NextResponse.json({ error: "送信データの JSON が不正です。", issues: [{ path: ["banners"], message: "JSON を解析できません。" }] }, { status: 400 });
@@ -72,6 +73,7 @@ export async function POST(request: Request) {
         updatePath,
         updateId,
         summary: data.changeNote || "ツールを更新",
+        visible: data.skipInfo !== true,
       });
       if (!prepared.success) {
         return NextResponse.json({

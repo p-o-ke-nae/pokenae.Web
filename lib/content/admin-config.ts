@@ -20,6 +20,7 @@ type UpdateInput = {
   summary: string;
   target: "tool" | "app" | "home";
   href: "/tools" | "/apps" | "/";
+  visible?: boolean;
 };
 
 function zodIssues(prefix: string, issues: Array<{ path: PropertyKey[]; message: string }>): ValidationIssue[] {
@@ -38,7 +39,7 @@ function prepareUpdate(input: UpdateInput, updateSchema: string) {
     target: input.target,
     summary: input.summary,
     href: input.href,
-    visible: true,
+    visible: input.visible ?? true,
   });
   if (!parsed.success) return { success: false as const, issues: zodIssues("update", parsed.error.issues) };
   const issues = validateCanonicalJson(updateSchema, parsed.data)
@@ -113,6 +114,7 @@ export function prepareToolWrite(input: {
   updateId: string;
   summary: string;
   publishedAt?: string;
+  visible?: boolean;
 }): ConfigWriteResult<ToolContent[]> {
   const parsed = toolListSchema.safeParse(input.rawValue);
   if (!parsed.success) return { success: false, issues: zodIssues("tools", parsed.error.issues) };
@@ -125,6 +127,7 @@ export function prepareToolWrite(input: {
     summary: input.summary,
     target: "tool",
     href: "/tools",
+    visible: input.visible,
   }, input.updateSchema);
   if (!update.success) return update;
   return {

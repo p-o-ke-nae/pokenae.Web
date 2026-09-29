@@ -80,6 +80,7 @@ describe("POST /api/content/config", () => {
             docs: { type: "object" },
             release: { type: "object" },
             supportedOs: { type: "array" },
+            tags: { type: "array" },
             showInPickup: { type: "boolean" },
             priority: { type: "integer" },
           },
@@ -225,6 +226,40 @@ describe("POST /api/content/config", () => {
       ]),
     });
     expect(mocks.createContentPullRequest).not.toHaveBeenCalled();
+  });
+
+  it("creates a tool update hidden from INFO when skipInfo is requested", async () => {
+    mocks.createContentPullRequest.mockResolvedValue({
+      html_url: "https://example.test/pull/6",
+      number: 6,
+      base: { sha: "1111111111111111111111111111111111111111" },
+    });
+    const { POST } = await import("../../app/api/content/config/route");
+    const response = await POST(new Request("http://localhost/api/content/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "tools",
+        baseRevision: "1111111111111111111111111111111111111111",
+        skipInfo: true,
+        value: [{
+          slug: "new-tool",
+          displayName: "New Tool",
+          summary: "tool",
+          repository: "p-o-ke-nae/new-tool",
+          kind: "library",
+          docs: { readme: "README.md", paths: [] },
+          release: { channel: "stable", manifestRequired: false },
+          showInPickup: false,
+          priority: 0,
+        }],
+      }),
+    }));
+
+    expect(response.status).toBe(201);
+    const files = mocks.createContentPullRequest.mock.calls[0][0].files as Array<{ path: string; content: string | null }>;
+    const update = files.find((file) => /^content\/updates\/tools-\d{14}\.json$/.test(file.path));
+    expect(JSON.parse(String(update?.content))).toMatchObject({ target: "tool", visible: false });
   });
 
   it("creates a canonical banner and update file set from multipart input", async () => {
