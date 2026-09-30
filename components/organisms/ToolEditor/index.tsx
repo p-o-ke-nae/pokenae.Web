@@ -8,6 +8,7 @@ import ContentItemGrid from "../ContentItemGrid";
 import { collectInvalidIndexes } from "../../../lib/content/admin-grid";
 import type { TagDefinition } from "../../../lib/content/types";
 import { toolListSchema } from "../../../lib/content/schemas";
+import { buildContentChangeNote } from "../../../lib/content/change-note";
 import type { ToolContent } from "../../../lib/content/admin-config";
 import type { ValidationIssue } from "../../../lib/content/canonical-validation";
 
@@ -207,6 +208,7 @@ function newTool(index: number): ToolDraft {
 export default function ToolEditor({ initial, baseRevision, tagDefinitions = [] }: ToolEditorProps) {
   const initialTools = useMemo(() => normalizeTools(initial), [initial]);
   const [tools, setTools] = useState(initialTools);
+  const [baselineTools, setBaselineTools] = useState(initialTools);
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
   const [selected, setSelected] = useState<PullRequest | null>(null);
   const [revision, setRevision] = useState(baseRevision);
@@ -322,6 +324,7 @@ export default function ToolEditor({ initial, baseRevision, tagDefinitions = [] 
     setSelected(null);
     setRevision(baseRevision);
     setTools(initialTools);
+    setBaselineTools(initialTools);
     setSkipInfo(false);
     clearFeedback();
   }
@@ -339,7 +342,9 @@ export default function ToolEditor({ initial, baseRevision, tagDefinitions = [] 
       if (!response.ok || !data.pullRequest) throw new Error(data.error ?? "Pull Request を取得できませんでした。");
       setSelected(data.pullRequest);
       setRevision(data.pullRequest.headRevision);
-      setTools(normalizeTools(readToolsPayload(data)));
+      const loadedTools = normalizeTools(readToolsPayload(data));
+      setTools(loadedTools);
+      setBaselineTools(loadedTools);
       setSkipInfo(record(data.update).visible === false);
       setIssues((data.issues ?? []).map(withToolsPrefix));
       setMessageIsError(Boolean(data.issues?.length));
@@ -369,9 +374,10 @@ export default function ToolEditor({ initial, baseRevision, tagDefinitions = [] 
       return;
     }
 
+    const changeNote = buildContentChangeNote("ツール", serializeTools(baselineTools), local.data);
     const body = selected
-      ? { kind: "tools", value: local.data, expectedRevision: revision, changeNote: "ツールを管理画面から更新", skipInfo }
-      : { kind: "tools", value: local.data, baseRevision: revision, changeNote: "ツールを管理画面から更新", skipInfo };
+      ? { kind: "tools", value: local.data, expectedRevision: revision, changeNote, skipInfo }
+      : { kind: "tools", value: local.data, baseRevision: revision, changeNote, skipInfo };
     try {
       const response = await fetch(
         selected ? `/api/content/config/pull-requests/${selected.number}?kind=tools` : "/api/content/config",

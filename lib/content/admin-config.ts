@@ -149,6 +149,7 @@ export function prepareAppWrite(input: {
   updateId: string;
   summary: string;
   publishedAt?: string;
+  visible?: boolean;
 }): ConfigWriteResult<AppContent[]> {
   const parsed = appListSchema.safeParse(input.rawValue);
   if (!parsed.success) return { success: false, issues: zodIssues("apps", parsed.error.issues) };
@@ -162,6 +163,7 @@ export function prepareAppWrite(input: {
     summary: input.summary,
     target: "app",
     href: "/apps",
+    visible: input.visible,
   }, input.updateSchema);
   if (!update.success) return update;
   return {

@@ -1209,6 +1209,7 @@ export function GameManagementDashboard({
 
   return (
     <PageFrame
+      eyebrowLabel={basePath === '/game-library' ? '' : 'Game Management'}
       title={definition.label}
       description={definition.description}
       layoutMode={layoutMode}
@@ -1218,7 +1219,6 @@ export function GameManagementDashboard({
             <Link href={basePath} className="button-link button-link--secondary">
               ダッシュボードへ戻る
             </Link>
-            <PageModeToggle mode={pageMode} onChange={setPageMode} />
           </ResponsiveActionGroup>
           <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={definition.canCreate ? 2 : 1} align="end">
             {definition.canCreate ? (
@@ -1298,6 +1298,7 @@ export function GameManagementDashboard({
             <PageSection title="データ一覧">
             <div className="tool-toolbar">
               <div className="tool-toolbar__meta">
+                <PageModeToggle mode={pageMode} onChange={setPageMode} />
                 <span>表示件数: {rows.length} 件</span>
                 {selectedVisibleRowCount > 0 && reorderEnabled ? (
                   <span className="text-xs text-[var(--color-text-muted)]">

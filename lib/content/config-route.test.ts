@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   usesContentFixtures: vi.fn(),
   createContentPullRequest: vi.fn(),
   getReservedTagDefinitions: vi.fn(),
+  getEditableContentPullRequest: vi.fn(),
+  updateEditableContentPullRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/admin", () => ({ getAdminAuthorization: mocks.getAdminAuthorization }));
@@ -18,6 +20,8 @@ vi.mock("@/lib/content/repository", () => ({
 vi.mock("@/lib/github/content-writer", () => ({
   createContentPullRequest: mocks.createContentPullRequest,
   getReservedTagDefinitions: mocks.getReservedTagDefinitions,
+  getEditableContentPullRequest: mocks.getEditableContentPullRequest,
+  updateEditableContentPullRequest: mocks.updateEditableContentPullRequest,
 }));
 vi.mock("@/lib/content/schemas", async () => import("./schemas"));
 vi.mock("@/lib/content/admin-config", async () => import("./admin-config"));
@@ -35,6 +39,11 @@ describe("POST /api/content/config", () => {
     });
     mocks.usesContentFixtures.mockReturnValue(false);
     mocks.getReservedTagDefinitions.mockResolvedValue([]);
+    mocks.updateEditableContentPullRequest.mockResolvedValue({
+      url: "https://example.test/pull/5",
+      number: 5,
+      headRevision: "2222222222222222222222222222222222222222",
+    });
     mocks.getFreshContentAdminSnapshot.mockResolvedValue({
       revision: "1111111111111111111111111111111111111111",
       banners: [],
@@ -348,6 +357,7 @@ describe("POST /api/content/config", () => {
       body: JSON.stringify({
         kind: "apps",
         baseRevision: "1111111111111111111111111111111111111111",
+        skipInfo: true,
         value: [{
           slug: "new-app",
           displayName: "New App",
@@ -363,6 +373,9 @@ describe("POST /api/content/config", () => {
     }));
 
     expect(response.status).toBe(201);
+    const files = mocks.createContentPullRequest.mock.calls[0][0].files as Array<{ path: string; content: string | null }>;
+    const update = files.find((file) => /^content\/updates\/apps-\d{14}\.json$/.test(file.path));
+    expect(JSON.parse(String(update?.content))).toMatchObject({ target: "app", visible: false });
     expect(mocks.createContentPullRequest).toHaveBeenCalledWith(expect.objectContaining({
       branch: expect.stringMatching(/^content\/apps-\d{14}$/),
       files: expect.arrayContaining([
@@ -371,5 +384,49 @@ describe("POST /api/content/config", () => {
         expect.objectContaining({ path: expect.stringMatching(/^content\/updates\/apps-\d{14}\.json$/) }),
       ]),
     }));
+  });
+
+  it("updates an app pull request with the requested INFO visibility", async () => {
+    mocks.getEditableContentPullRequest.mockResolvedValue({
+      headRevision: "1111111111111111111111111111111111111111",
+      updatePath: "content/updates/apps-20260926100000.json",
+      update: {
+        publishedAt: "2026-09-26T10:00:00.000Z",
+        summary: "既存アプリを更新",
+        visible: true,
+      },
+      branch: "content/apps-20260926100000",
+      appPaths: [],
+      schemas: {
+        app: JSON.stringify({ type: "object" }),
+        update: JSON.stringify({ type: "object" }),
+      },
+    });
+    const { PUT } = await import("../../app/api/content/config/pull-requests/[number]/route");
+    const response = await PUT(new Request("http://localhost/api/content/config/pull-requests/5?kind=apps", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "apps",
+        expectedRevision: "1111111111111111111111111111111111111111",
+        skipInfo: true,
+        value: [{
+          slug: "app",
+          displayName: "App",
+          summary: "Updated app",
+          href: "/app",
+          imageAlt: "",
+          metaLabel: "Webアプリ",
+          status: "published",
+          order: 0,
+          tags: [],
+        }],
+      }),
+    }), { params: Promise.resolve({ number: "5" }) });
+
+    expect(response.status).toBe(200);
+    const files = mocks.updateEditableContentPullRequest.mock.calls[0][0].files as Array<{ path: string; content: string | null }>;
+    const update = files.find((file) => file.path === "content/updates/apps-20260926100000.json");
+    expect(JSON.parse(String(update?.content))).toMatchObject({ target: "app", visible: false });
   });
 });

@@ -216,6 +216,7 @@ export async function PUT(request: Request, context: Context) {
                 currentPaths: snapshot.appPaths,
                 appSchema: snapshot.schemas.app,
                 ...common,
+                visible: typeof data.skipInfo === "boolean" ? !data.skipInfo : metadata.visible,
               })
             : prepareTagWrite({
               rawValue: data.value,

@@ -146,7 +146,7 @@ export function PageFrame({
   return (
     <main className="page-container tool-page">
       <header className="page-header">
-        <p className="tool-page__eyebrow">{eyebrowLabel}</p>
+        {eyebrowLabel ? <p className="tool-page__eyebrow">{eyebrowLabel}</p> : null}
         <CustomHeader level={1}>{title}</CustomHeader>
         <p className="page-lead select-none">{description}</p>
         {actions ? (

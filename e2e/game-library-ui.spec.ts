@@ -199,6 +199,10 @@ test.describe("ゲームライブラリ UI", () => {
     await page.goto("/game-library/game-consoles");
     await expect(page.getByRole("heading", { level: 2, name: "データ一覧" })).toBeVisible();
     await expect(page.getByRole("link", { name: "ダッシュボードへ戻る" })).toHaveAttribute("href", "/game-library");
+    await expect(page.getByText("Game Management", { exact: true })).toHaveCount(0);
+    const modeSwitch = page.getByRole("switch", { name: /閲覧モード/ });
+    await expect(modeSwitch).toBeVisible();
+    await expect(modeSwitch.evaluate((element) => element.closest("section")?.querySelector("h2")?.textContent)).resolves.toBe("データ一覧");
     await expectUnboxedSections(page);
     expect((await page.locator("main").first().boundingBox())!.width).toBeGreaterThanOrEqual(blogWidth - 1);
 

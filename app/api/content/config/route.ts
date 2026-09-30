@@ -92,6 +92,7 @@ export async function POST(request: Request) {
         updatePath,
         updateId,
         summary: data.changeNote || "Webアプリを更新",
+        visible: data.skipInfo !== true,
       });
       if (!prepared.success) {
         return NextResponse.json({
