@@ -365,7 +365,7 @@ describe("POST /api/content/config", () => {
           href: "/new-app",
           imageAlt: "",
           metaLabel: "Webアプリ",
-          status: "draft",
+          status: "published",
           order: 0,
           tags: [],
         }],
@@ -375,7 +375,7 @@ describe("POST /api/content/config", () => {
     expect(response.status).toBe(201);
     const files = mocks.createContentPullRequest.mock.calls[0][0].files as Array<{ path: string; content: string | null }>;
     const update = files.find((file) => /^content\/updates\/apps-\d{14}\.json$/.test(file.path));
-    expect(JSON.parse(String(update?.content))).toMatchObject({ target: "app", visible: false });
+    expect(JSON.parse(String(update?.content))).toMatchObject({ target: "app", href: "/new-app", visible: false });
     expect(mocks.createContentPullRequest).toHaveBeenCalledWith(expect.objectContaining({
       branch: expect.stringMatching(/^content\/apps-\d{14}$/),
       files: expect.arrayContaining([
@@ -395,6 +395,17 @@ describe("POST /api/content/config", () => {
         summary: "既存アプリを更新",
         visible: true,
       },
+      value: [{
+        slug: "app",
+        displayName: "App",
+        summary: "Old summary",
+        href: "/app",
+        imageAlt: "",
+        metaLabel: "Webアプリ",
+        status: "published",
+        order: 0,
+        tags: [],
+      }],
       branch: "content/apps-20260926100000",
       appPaths: [],
       schemas: {
@@ -427,6 +438,6 @@ describe("POST /api/content/config", () => {
     expect(response.status).toBe(200);
     const files = mocks.updateEditableContentPullRequest.mock.calls[0][0].files as Array<{ path: string; content: string | null }>;
     const update = files.find((file) => file.path === "content/updates/apps-20260926100000.json");
-    expect(JSON.parse(String(update?.content))).toMatchObject({ target: "app", visible: false });
+    expect(JSON.parse(String(update?.content))).toMatchObject({ target: "app", href: "/app", visible: false });
   });
 });

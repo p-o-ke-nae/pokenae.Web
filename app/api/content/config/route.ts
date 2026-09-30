@@ -4,6 +4,7 @@ import { announcementContentSchema, gitCommitShaSchema, updateContentSchema } fr
 import { createContentPullRequest, getReservedTagDefinitions } from "@/lib/github/content-writer";
 import { getFreshContentAdminSnapshot, usesContentFixtures } from "@/lib/content/repository";
 import { prepareAppWrite, prepareToolWrite } from "@/lib/content/admin-config";
+import { buildContentInfoHref } from "@/lib/content/change-note";
 import { isContentConflictError } from "@/lib/github/content-conflict";
 import { contentAdminGitHubError, logContentAdminGitHubError } from "../../../../lib/github/admin-error";
 import { prepareBannerWrite } from "../../../../lib/content/banner-admin";
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
         updateId,
         summary: data.changeNote || "ツールを更新",
         visible: data.skipInfo !== true,
+        href: buildContentInfoHref("tools", currentSnapshot.tools, data.value),
       });
       if (!prepared.success) {
         return NextResponse.json({
@@ -93,6 +95,7 @@ export async function POST(request: Request) {
         updateId,
         summary: data.changeNote || "Webアプリを更新",
         visible: data.skipInfo !== true,
+        href: buildContentInfoHref("apps", currentSnapshot.apps, data.value),
       });
       if (!prepared.success) {
         return NextResponse.json({

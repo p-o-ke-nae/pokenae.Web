@@ -3,6 +3,7 @@ import { getAdminAuthorization } from "@/lib/auth/admin";
 import { prepareBannerWrite, validateBannerImageReferences } from "../../../../../../lib/content/banner-admin";
 import { validateCanonicalItems, validateCanonicalJson, type ValidationIssue } from "../../../../../../lib/content/canonical-validation";
 import { prepareAnnouncementWrite, prepareAppWrite, prepareToolWrite } from "../../../../../../lib/content/admin-config";
+import { buildContentInfoHref } from "../../../../../../lib/content/change-note";
 import {
   announcementContentSchema,
   appListSchema,
@@ -209,6 +210,7 @@ export async function PUT(request: Request, context: Context) {
             toolSchema: snapshot.schemas.tool,
             ...common,
             visible: typeof data.skipInfo === "boolean" ? !data.skipInfo : metadata.visible,
+            href: buildContentInfoHref("tools", snapshot.value, data.value),
           })
           : queryKind === "apps"
             ? prepareAppWrite({
@@ -217,6 +219,7 @@ export async function PUT(request: Request, context: Context) {
                 appSchema: snapshot.schemas.app,
                 ...common,
                 visible: typeof data.skipInfo === "boolean" ? !data.skipInfo : metadata.visible,
+                href: buildContentInfoHref("apps", snapshot.value, data.value),
               })
             : prepareTagWrite({
               rawValue: data.value,

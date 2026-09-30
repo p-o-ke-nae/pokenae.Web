@@ -19,7 +19,7 @@ type UpdateInput = {
   publishedAt?: string;
   summary: string;
   target: "tool" | "app" | "home";
-  href: "/tools" | "/apps" | "/";
+  href: string;
   visible?: boolean;
 };
 
@@ -115,6 +115,7 @@ export function prepareToolWrite(input: {
   summary: string;
   publishedAt?: string;
   visible?: boolean;
+  href?: string;
 }): ConfigWriteResult<ToolContent[]> {
   const parsed = toolListSchema.safeParse(input.rawValue);
   if (!parsed.success) return { success: false, issues: zodIssues("tools", parsed.error.issues) };
@@ -126,7 +127,7 @@ export function prepareToolWrite(input: {
     publishedAt: input.publishedAt,
     summary: input.summary,
     target: "tool",
-    href: "/tools",
+    href: input.href ?? "/tools",
     visible: input.visible,
   }, input.updateSchema);
   if (!update.success) return update;
@@ -150,6 +151,7 @@ export function prepareAppWrite(input: {
   summary: string;
   publishedAt?: string;
   visible?: boolean;
+  href?: string;
 }): ConfigWriteResult<AppContent[]> {
   const parsed = appListSchema.safeParse(input.rawValue);
   if (!parsed.success) return { success: false, issues: zodIssues("apps", parsed.error.issues) };
@@ -162,7 +164,7 @@ export function prepareAppWrite(input: {
     publishedAt: input.publishedAt,
     summary: input.summary,
     target: "app",
-    href: "/apps",
+    href: input.href ?? "/apps",
     visible: input.visible,
   }, input.updateSchema);
   if (!update.success) return update;
