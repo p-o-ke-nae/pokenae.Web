@@ -113,14 +113,14 @@ export function PageFrame({
   const headerLayoutClasses = 'flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between';
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-4 py-8 dark:bg-black sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[var(--background)] px-4 py-8 text-[var(--foreground)] sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
-        <div className="flex flex-col gap-4 rounded-3xl bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(241,245,249,0.95))] p-6 shadow-sm ring-1 ring-zinc-200 dark:bg-[linear-gradient(135deg,rgba(24,24,27,0.95),rgba(9,9,11,0.95))] dark:ring-zinc-800">
+        <div className="flex flex-col gap-4 border-b border-[var(--color-base-70)] pb-6">
           <div className={headerLayoutClasses}>
             <div className="space-y-3">
-              <p className="select-none text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">{eyebrowLabel}</p>
+              <p className="select-none text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent-25-strong)]">{eyebrowLabel}</p>
               <CustomHeader level={1}>{title}</CustomHeader>
-              <p className="select-none max-w-3xl text-sm leading-6 text-zinc-600 dark:text-zinc-300">{description}</p>
+              <p className="select-none max-w-3xl text-sm leading-6 text-[var(--foreground)]">{description}</p>
             </div>
             {actions ? (
               <ResponsiveActionGroup
