@@ -153,6 +153,13 @@ test.describe("ゲームライブラリ UI", () => {
     await expect(page.getByRole("heading", { level: 1, name: "ゲームライブラリ" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "データ管理" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "関連画面" })).toBeVisible();
+    await expect(page.getByText("Game Library", { exact: true })).toHaveCount(0);
+    for (const label of ["Maintenance", "Search", "Master"]) {
+      await expect(page.getByText(label, { exact: true })).toHaveCount(0);
+    }
+    for (const label of ["保守", "横断検索", "マスタ管理"]) {
+      await expect(page.locator(".admin-card__eyebrow").getByText(label, { exact: true })).toBeVisible();
+    }
     await expect(page.locator("main main")).toHaveCount(0);
     await expectUnboxedSections(page);
 
@@ -207,11 +214,13 @@ test.describe("ゲームライブラリ UI", () => {
     expect((await page.locator("main").first().boundingBox())!.width).toBeGreaterThanOrEqual(blogWidth - 1);
 
     await page.goto("/game-library/maintenance");
+    await expect(page.getByText("Game Library", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 2, name: "保守対象" })).toBeVisible();
     await expect(page.getByRole("link", { name: "ダッシュボードへ戻る" })).toHaveAttribute("href", "/game-library");
     await expectUnboxedSections(page);
 
     await page.goto("/game-library/save-data-search");
+    await expect(page.getByText("Game Library", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 2, name: "条件グループ" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "検索結果" })).toBeVisible();
     await expect(page.getByRole("link", { name: "ダッシュボードへ戻る" })).toHaveAttribute("href", "/game-library");

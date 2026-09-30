@@ -241,7 +241,7 @@ export default function MaintenanceDashboardPage() {
 
   return (
     <PageFrame
-      eyebrowLabel="Game Library"
+      eyebrowLabel=""
       title="保守履歴"
       description="ゲーム機・ゲームソフト・メモリーカードの最新保守状態を横断表示し、選択した対象を順次記録できます。"
       layoutMode={layoutMode}

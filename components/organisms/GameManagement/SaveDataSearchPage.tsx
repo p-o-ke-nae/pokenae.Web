@@ -350,7 +350,7 @@ export default function SaveDataSearchPage() {
 
   return (
     <PageFrame
-      eyebrowLabel="Game Library"
+      eyebrowLabel=""
       title="横断セーブデータ検索"
       description="共通 variant と複数の schema 条件グループを組み合わせ、セーブデータを作品横断で検索します。"
       layoutMode={layoutMode}

@@ -368,7 +368,7 @@ export function GameManagementDashboard({
     basePath = '/game-management',
     resourceKeys,
     requiresAdmin = false,
-    sectionLabel = 'Game Management',
+    sectionLabel = '',
     sectionTitle = 'ゲーム管理ダッシュボード',
     sectionDescription = '各マスタ、所有ゲーム機、ゲームソフト、アカウント、メモリーカード、セーブデータの一覧確認と編集画面への遷移をここから行えます。',
     extraCards = [],
@@ -1209,7 +1209,7 @@ export function GameManagementDashboard({
 
   return (
     <PageFrame
-      eyebrowLabel={basePath === '/game-library' ? '' : 'Game Management'}
+      eyebrowLabel=""
       title={definition.label}
       description={definition.description}
       layoutMode={layoutMode}

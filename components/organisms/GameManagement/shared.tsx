@@ -129,7 +129,7 @@ export function PageSection({
  * サイト共通の本文幅をそのまま使う（独自の余白や最大幅で狭めない）。
  */
 export function PageFrame({
-  eyebrowLabel = 'Game Management',
+  eyebrowLabel = '',
   title,
   description,
   actions,
