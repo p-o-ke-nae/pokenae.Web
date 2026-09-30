@@ -93,9 +93,10 @@ test("ゲームライブラリの案内とカードを既存サイトのスタ�
   await expect(page.getByRole("heading", { name: "ゲームライブラリ" })).toBeVisible();
   await expect(page.getByText("ゲーム機やソフト、関連データを管理します。")).toBeVisible();
 
-  const pageHeader = page.locator("main > div > div").first();
+  const pageHeader = page.locator("main > header.page-header").first();
   await expect(pageHeader).toHaveCSS("background-image", "none");
-  await expect(pageHeader).toHaveCSS("border-bottom-style", "solid");
+  await expect(pageHeader.getByRole("heading", { level: 1 })).toHaveCSS("border-left-style", "solid");
+  await expect(page.getByRole("heading", { level: 2, name: "データ管理" })).toHaveCSS("border-bottom-style", "solid");
 
   const maintenanceCard = page.getByRole("link", { name: /保守履歴/ });
   await expect(maintenanceCard).toHaveAttribute("href", "/game-library/maintenance");

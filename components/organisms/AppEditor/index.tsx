@@ -365,7 +365,7 @@ export default function AppEditor({ initial, baseRevision, tagDefinitions = [] }
         .app-editor__source label { display:grid; gap:.35rem; flex:1 1 320px; font-weight:700; }
         .app-editor input,.app-editor select,.app-editor textarea { width:100%; min-height:44px; padding:.55rem; border:1px solid var(--color-base-70-dark); border-radius:.25rem; background:#fff; color:var(--foreground); }
         .app-editor textarea { resize:vertical; }
-        .app-editor__card { display:grid; gap:1rem; padding:1rem; border:1px solid var(--color-base-70); border-radius:.35rem; background:#fff; }
+        .app-editor__card { display:grid; gap:1rem; min-width:0; margin:0; padding:0; border:0; }
         .app-editor__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
         .app-editor__field { display:grid; align-content:start; gap:.3rem; font-weight:700; }
         .app-editor__wide { grid-column:1/-1; }

@@ -21,8 +21,8 @@ export default function EnvironmentBadge({ className = '' }: EnvironmentBadgePro
   // 環境に応じたバッジの色とテキストを定義
   const badgeConfig = {
     debug: {
-      bgColor: 'bg-red-100 dark:bg-red-900',
-      textColor: 'text-red-800 dark:text-red-200',
+      bgColor: 'bg-red-100',
+      textColor: 'text-[var(--color-danger)]',
       icon: (
         <svg 
           className="w-4 h-4 mr-1.5" 
@@ -40,8 +40,8 @@ export default function EnvironmentBadge({ className = '' }: EnvironmentBadgePro
       label: 'DEBUG',
     },
     development: {
-      bgColor: 'bg-amber-100 dark:bg-amber-900',
-      textColor: 'text-amber-800 dark:text-amber-200',
+      bgColor: 'bg-amber-100',
+      textColor: 'text-amber-800',
       icon: (
         <svg 
           className="w-4 h-4 mr-1.5" 

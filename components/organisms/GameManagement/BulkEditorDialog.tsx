@@ -235,7 +235,7 @@ export default function BulkEditorDialog({
       footer={
         <DialogFooterLayout
           layoutMode={layoutMode}
-          status={isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">更新中はダイアログを閉じられません。</span> : null}
+          status={isPending ? <span role="status" aria-live="polite" className="text-xs text-[var(--color-text-muted)]">更新中はダイアログを閉じられません。</span> : null}
           trailing={
             <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
               <CustomButton onClick={onClose} disabled={isPending}>キャンセル</CustomButton>
@@ -250,7 +250,7 @@ export default function BulkEditorDialog({
       <div className="space-y-4">
         {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
         {success ? <CustomMessageArea variant="success">{success}</CustomMessageArea> : null}
-        <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+        <p className="text-sm leading-6 text-[var(--color-text-muted)]">
           有効にした項目の値を、選択中の {targetRecordIds.length} 件すべてに適用します。
         </p>
         <div className="space-y-4">

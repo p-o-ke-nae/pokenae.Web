@@ -56,7 +56,7 @@ import {
 import AccountMoveDialog from './AccountMoveDialog';
 import EditorDialog from './EditorDialog';
 import BulkEditorDialog from './BulkEditorDialog';
-import { TrialBanner, PageCard, PageFrame } from './shared';
+import { TrialBanner, PageFrame, PageSection } from './shared';
 import type { DashboardExtraCard, EditorDialogContext, ManagementTableRow, StoryProgressLabelMap } from './view-types';
 import type { AccountDto } from '@/lib/game-management/types';
 import ContentTagLinks from '@/components/molecules/ContentTagLinks';
@@ -297,7 +297,7 @@ function ContentGroupChildTable({
                 recordId: row.id,
                 parentContentGroupId: row.parentContentGroupId ?? null,
               })}
-              className="text-sm font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+              className="text-sm font-semibold text-[var(--color-link)] underline-offset-2 hover:underline"
             >
               編集
             </button>
@@ -308,7 +308,7 @@ function ContentGroupChildTable({
   }, [effectiveReorderEnabled, handleSelectionAwareMove, openEditorDialog, orderedChildRows.length]);
 
   return (
-    <div className="space-y-3 rounded-2xl border border-zinc-200/80 bg-white/85 p-3 dark:border-zinc-800/80 dark:bg-zinc-950/70">
+    <div className="space-y-3 border-l-4 border-[var(--color-base-70-dark)] py-1 pl-3">
       <DataTable
         title="ゲームソフトマスタ"
         titleActions={
@@ -352,12 +352,12 @@ function ContentGroupChildTable({
       />
       <div className="flex items-center justify-end gap-3 text-sm">
         {selectedVisibleCount > 0 && effectiveReorderEnabled ? (
-          <span className="text-xs text-zinc-500 dark:text-zinc-300">
+          <span className="text-xs text-[var(--color-text-muted)]">
             選択中: {selectedVisibleCount} 件（Shift+クリックで範囲選択、上下移動でまとめて並び替え）
           </span>
         ) : null}
         {!effectiveReorderEnabled && reorderDisabledReason && (
-          <span className="text-xs text-amber-600 dark:text-amber-400">{reorderDisabledReason}</span>
+          <span className="text-xs text-[var(--color-warning)]">{reorderDisabledReason}</span>
         )}
       </div>
     </div>
@@ -441,49 +441,47 @@ export function GameManagementDashboard({
         title={sectionTitle}
         description={sectionDescription}
       >
-        {isTrial && (
-          <TrialBanner />
-        )}
-        {effectiveAuthError ? <CustomMessageArea variant="error">{effectiveAuthError}</CustomMessageArea> : null}
-        {effectiveAuthLoading ? (
-          <PageCard>
-            <p className="text-sm text-zinc-500 dark:text-zinc-300">権限を確認しています...</p>
-          </PageCard>
-        ) : effectiveAuthError ? null : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {displayKeys.map((resourceKey) => {
-              const definition = RESOURCE_DEFINITIONS[resourceKey];
-
-              return (
-                <Link
-                  key={resourceKey}
-                  href={`${basePath}/${resourceKey}`}
-                  className="rounded-[0.35rem] border border-[var(--color-base-70)] bg-[var(--background)] p-5 shadow-[var(--shadow-card)] transition hover:border-[var(--color-accent-25-strong)]"
-                >
-                  <div className="space-y-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-accent-25-strong)]">{definition.shortLabel}</p>
-                    <h2 className="text-lg font-semibold text-[var(--color-text-strong)]">{definition.label}</h2>
-                    <p className="text-sm leading-6 text-[var(--foreground)]">{definition.description}</p>
-                    <p className="text-sm font-semibold text-[var(--color-link)]">一覧を開く</p>
-                  </div>
-                </Link>
-              );
-            })}
-            {extraCards.map((card) => (
-              <Link
-                key={card.href}
-                href={card.href}
-                className="rounded-[0.35rem] border border-[var(--color-base-70)] bg-[var(--background)] p-5 shadow-[var(--shadow-card)] transition hover:border-[var(--color-accent-25-strong)]"
-              >
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-accent-25-strong)]">{card.shortLabel}</p>
-                  <h2 className="text-lg font-semibold text-[var(--color-text-strong)]">{card.title}</h2>
-                  <p className="text-sm leading-6 text-[var(--foreground)]">{card.description}</p>
-                  <p className="text-sm font-semibold text-[var(--color-link)]">{card.actionLabel ?? '画面を開く'}</p>
-                </div>
-              </Link>
-            ))}
+        {isTrial || effectiveAuthError ? (
+          <div className="tool-page__notices">
+            {isTrial ? <TrialBanner /> : null}
+            {effectiveAuthError ? <CustomMessageArea variant="error">{effectiveAuthError}</CustomMessageArea> : null}
           </div>
+        ) : null}
+        {effectiveAuthLoading ? (
+          <p className="tool-muted text-sm" role="status">権限を確認しています...</p>
+        ) : effectiveAuthError ? null : (
+          <>
+            <PageSection title="データ管理" description="各データの一覧を開いて確認・編集します。">
+              <div className="card-grid">
+                {displayKeys.map((resourceKey) => {
+                  const definition = RESOURCE_DEFINITIONS[resourceKey];
+
+                  return (
+                    <Link key={resourceKey} href={`${basePath}/${resourceKey}`} className="admin-card">
+                      <span className="admin-card__eyebrow">{definition.shortLabel}</span>
+                      <h3 className="admin-card__title">{definition.label}</h3>
+                      <span>{definition.description}</span>
+                      <span className="admin-card__action">一覧を開く</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </PageSection>
+            {extraCards.length > 0 ? (
+              <PageSection title="関連画面">
+                <div className="card-grid">
+                  {extraCards.map((card) => (
+                    <Link key={card.href} href={card.href} className="admin-card">
+                      <span className="admin-card__eyebrow">{card.shortLabel}</span>
+                      <h3 className="admin-card__title">{card.title}</h3>
+                      <span>{card.description}</span>
+                      <span className="admin-card__action">{card.actionLabel ?? '画面を開く'}</span>
+                    </Link>
+                  ))}
+                </div>
+              </PageSection>
+            ) : null}
+          </>
         )}
         <ContentTagLinks tagIds={contentTags} tagDefinitions={tagDefinitions} listPath="/apps" />
       </PageFrame>
@@ -1090,7 +1088,7 @@ export function GameManagementDashboard({
                 type="button"
                 onClick={() => openEditorDialog({ recordId: row.id })}
                 title={`セーブデータ #${row.id} を編集`}
-                className="text-sm font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+                className="text-sm font-semibold text-[var(--color-link)] underline-offset-2 hover:underline"
               >
                 {`編集 (#${row.id})`}
               </button>
@@ -1117,7 +1115,7 @@ export function GameManagementDashboard({
                   <button
                     type="button"
                     onClick={() => openEditorDialog({ recordId: row.id })}
-                    className="text-sm font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+                    className="text-sm font-semibold text-[var(--color-link)] underline-offset-2 hover:underline"
                   >
                     分類編集
                   </button>
@@ -1129,7 +1127,7 @@ export function GameManagementDashboard({
                         initialFormState: { contentGroupId: String(row.id) },
                         parentContentGroupId: row.id,
                       })}
-                      className="text-sm font-semibold text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-300"
+                      className="text-sm font-semibold text-[var(--color-success)] underline-offset-2 hover:underline"
                     >
                       ソフト追加
                     </button>
@@ -1156,7 +1154,7 @@ export function GameManagementDashboard({
                 <button
                   type="button"
                   onClick={() => openEditorDialog({ recordId: row.id })}
-                  className="text-sm font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+                  className="text-sm font-semibold text-[var(--color-link)] underline-offset-2 hover:underline"
                 >
                   編集
                 </button>
@@ -1166,7 +1164,7 @@ export function GameManagementDashboard({
                     const account = lookups?.accounts.find((a) => a.id === row.id);
                     if (account) setAccountMoveTarget(account);
                   }}
-                  className="text-sm font-semibold text-amber-700 underline-offset-2 hover:underline dark:text-amber-300"
+                  className="text-sm font-semibold text-[var(--color-warning)] underline-offset-2 hover:underline"
                 >
                   移行
                 </button>
@@ -1190,7 +1188,7 @@ export function GameManagementDashboard({
               <button
                 type="button"
                 onClick={() => openEditorDialog({ recordId: row.id })}
-                className="text-sm font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+                className="text-sm font-semibold text-[var(--color-link)] underline-offset-2 hover:underline"
               >
                 編集
               </button>
@@ -1217,12 +1215,12 @@ export function GameManagementDashboard({
       actions={
         <>
           <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
-            <Link href={basePath} className="text-sm font-medium text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-300">
+            <Link href={basePath} className="button-link button-link--secondary">
               ダッシュボードへ戻る
             </Link>
             <PageModeToggle mode={pageMode} onChange={setPageMode} />
           </ResponsiveActionGroup>
-          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
+          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={definition.canCreate ? 2 : 1} align="end">
             {definition.canCreate ? (
               <CustomButton variant="accent" onClick={() => { setPageMode('edit'); openEditorDialog(); }}>
                 新規作成
@@ -1233,17 +1231,21 @@ export function GameManagementDashboard({
         </>
       }
     >
-      {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
-      {saveError ? <CustomMessageArea variant="error">{saveError}</CustomMessageArea> : null}
-      {isTrial && <TrialBanner />}
-      <PageCard>
+      {error || saveError || isTrial ? (
+        <div className="tool-page__notices">
+          {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
+          {saveError ? <CustomMessageArea variant="error">{saveError}</CustomMessageArea> : null}
+          {isTrial && <TrialBanner />}
+        </div>
+      ) : null}
         {loading || authLoading ? (
-          <p className="text-sm text-zinc-500">{authLoading ? '権限を確認しています...' : '一覧を読み込んでいます...'}</p>
+          <p className="tool-muted text-sm" role="status">{authLoading ? '権限を確認しています...' : '一覧を読み込んでいます...'}</p>
         ) : (
-          <div className="space-y-4">
+          <>
+            {supportsMaintenance(resourceKey) || resourceKey === 'save-datas' ? (
+              <PageSection title="絞り込み">
             {supportsMaintenance(resourceKey) ? (
-              <div className="space-y-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-                <div className="grid gap-3 md:grid-cols-[minmax(0,20rem)_1fr] md:items-end">
+                <div className="tool-filter">
                   <div className="space-y-2">
                     <CustomLabel htmlFor="maintenance-health-filter">保守状態</CustomLabel>
                     <CustomComboBox
@@ -1256,15 +1258,14 @@ export function GameManagementDashboard({
                       ))}
                     </CustomComboBox>
                   </div>
-                  <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-300">
+                  <p className="text-sm leading-6 text-[var(--color-text-muted)]">
                     最新の保守記録に基づいて一覧を絞り込みます。未確認は「起動不調を除外」に含まれ、期限超過は一覧の詳細表示で確認できます。
                   </p>
                 </div>
-              </div>
             ) : null}
             {resourceKey === 'save-datas' ? (
-              <div className="space-y-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-                <div className="grid gap-3 md:grid-cols-[minmax(0,20rem)_1fr] md:items-end">
+              <>
+                <div className="tool-filter">
                   <div className="space-y-2">
                     <CustomLabel htmlFor="save-data-content-group-filter">ゲームソフト分類</CustomLabel>
                     <CustomComboBox
@@ -1278,32 +1279,36 @@ export function GameManagementDashboard({
                       ))}
                     </CustomComboBox>
                   </div>
-                  <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-300">
+                  <p className="text-sm leading-6 text-[var(--color-text-muted)]">
                     {isTrial
                       ? '分類指定による一覧絞り込みは利用できます。セーブデータスキーマ列はログイン済み環境でのみ表示されます。'
                       : '分類を指定すると、その分類のセーブデータのみを表示し、ストーリー進行度の右側にセーブデータスキーマ列を展開します。'}
                   </p>
                 </div>
                 {selectedContentGroupIdNumber != null && saveDataSchemaLoading ? (
-                  <p className="text-sm text-zinc-500">セーブデータスキーマ列を読み込んでいます...</p>
+                  <p className="text-sm text-[var(--color-text-muted)]">セーブデータスキーマ列を読み込んでいます...</p>
                 ) : null}
                 {selectedContentGroupIdNumber != null && saveDataSchemaError ? (
                   <CustomMessageArea variant="error">{saveDataSchemaError}</CustomMessageArea>
                 ) : null}
-              </div>
+              </>
             ) : null}
-            <div className="flex flex-col gap-3 text-sm text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
-              <span>表示件数: {rows.length} 件</span>
-              <div className="space-y-2 sm:flex sm:items-center sm:gap-3 sm:space-y-0">
+              </PageSection>
+            ) : null}
+            <PageSection title="データ一覧">
+            <div className="tool-toolbar">
+              <div className="tool-toolbar__meta">
+                <span>表示件数: {rows.length} 件</span>
                 {selectedVisibleRowCount > 0 && reorderEnabled ? (
-                  <span className="text-xs text-zinc-500 dark:text-zinc-300">
+                  <span className="text-xs text-[var(--color-text-muted)]">
                     選択中: {selectedVisibleRowCount} 件（Shift+クリックで範囲選択、上下移動でまとめて並び替え）
                   </span>
                 ) : null}
                 {!reorderEnabled && reorderDisabledReason && (
-                  <span className="text-xs text-amber-600 dark:text-amber-400">{reorderDisabledReason}</span>
+                  <span className="text-xs text-[var(--color-warning)]">{reorderDisabledReason}</span>
                 )}
-                <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
+              </div>
+                <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={bulkEditAvailable ? 2 : 1} align="end">
                   {bulkEditAvailable ? (
                     <CustomButton
                       disabled={selectedVisibleRowCount < 2}
@@ -1325,7 +1330,6 @@ export function GameManagementDashboard({
                     表示順を保存
                   </CustomButton>
                 </ResponsiveActionGroup>
-              </div>
             </div>
             <DataTable
               key={dataTableKey}
@@ -1369,9 +1373,9 @@ export function GameManagementDashboard({
               onSortChange={setSortState}
               onFilteredDataChange={handleFilteredDataChange}
             />
-          </div>
+            </PageSection>
+          </>
         )}
-      </PageCard>
       {lookups && editorContext && editorDefinition ? (
         <EditorDialog
           open

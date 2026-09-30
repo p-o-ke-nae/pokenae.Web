@@ -23,7 +23,7 @@ function FieldHint({ description, required }: { description: string | null; requ
   }
 
   return (
-    <p className="select-none text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+    <p className="select-none text-xs leading-5 text-[var(--color-text-muted)]">
       {required ? '必須項目です。' : null}
       {required && description ? ' ' : null}
       {description ?? ''}
@@ -33,21 +33,21 @@ function FieldHint({ description, required }: { description: string | null; requ
 
 export default function SaveDataDynamicFields({ schema, values, onChange, loading, error, displayOnly = false }: Props) {
   if (loading) {
-    return <p className="text-sm text-zinc-500">セーブデータスキーマ項目を読み込んでいます...</p>;
+    return <p className="text-sm text-[var(--color-text-muted)]">セーブデータスキーマ項目を読み込んでいます...</p>;
   }
 
   if (error) {
-    return <p className="text-sm text-rose-600 dark:text-rose-300">{error}</p>;
+    return <p className="text-sm text-[var(--color-danger)]">{error}</p>;
   }
 
   if (!schema) {
-    return <p className="text-sm text-zinc-500">ゲームソフトを選択するとセーブデータスキーマ項目を表示します。</p>;
+    return <p className="text-sm text-[var(--color-text-muted)]">ゲームソフトを選択するとセーブデータスキーマ項目を表示します。</p>;
   }
 
   const visibleFields = schema.fields.filter((field) => !field.isDisabled);
 
   if (visibleFields.length === 0) {
-    return <p className="text-sm text-zinc-500">このゲームソフトに追加のセーブデータスキーマ項目はありません。</p>;
+    return <p className="text-sm text-[var(--color-text-muted)]">このゲームソフトに追加のセーブデータスキーマ項目はありません。</p>;
   }
 
   return (
@@ -108,7 +108,7 @@ export default function SaveDataDynamicFields({ schema, values, onChange, loadin
                   onChange={(event) => onChange(field.fieldKey, event.target.checked ? 'true' : 'false')}
                   displayOnly={displayOnly}
                 />
-                <span className="text-sm text-zinc-700 dark:text-zinc-300">{value === 'true' ? 'はい' : 'いいえ'}</span>
+                <span className="text-sm text-[var(--foreground)]">{value === 'true' ? 'はい' : 'いいえ'}</span>
               </label>
             ) : null}
             {field.fieldType === 5 ? (

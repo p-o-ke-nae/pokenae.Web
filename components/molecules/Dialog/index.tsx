@@ -203,7 +203,8 @@ const Dialog = ({
 						margin-inline-end: 0;
 					}
 
-					.dialog__footer :global(.custom-button) {
+					/* 直下に置かれたボタンのみ全幅にする。DialogFooterLayout 内の配置はレイアウト側で制御する */
+					.dialog__footer > :global(.custom-button) {
 						width: 100%;
 					}
 				}

@@ -38,7 +38,7 @@ import {
   getMemoryCardEditionMasterName,
 } from './helpers';
 import MaintenanceRecordsSection, { type MaintenanceResourceKey } from './MaintenanceRecordsSection';
-import { PageCard, PageFrame, TrialBanner } from './shared';
+import { PageFrame, PageSection, TrialBanner } from './shared';
 
 type MaintenanceTargetRow = {
   tableRowKey: string;
@@ -231,7 +231,7 @@ export default function MaintenanceDashboardPage() {
         <button
           type="button"
           onClick={() => setDialogState({ targets: [row], index: 0, autoAdvance: false })}
-          className="text-sm font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+          className="tool-inline-link"
         >
           履歴を見る
         </button>
@@ -248,7 +248,7 @@ export default function MaintenanceDashboardPage() {
       actions={(
         <>
           <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
-            <Link href="/game-library" className="text-sm font-medium text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-300">
+            <Link href="/game-library" className="button-link button-link--secondary">
               ダッシュボードへ戻る
             </Link>
           </ResponsiveActionGroup>
@@ -267,15 +267,19 @@ export default function MaintenanceDashboardPage() {
         </>
       )}
     >
-      {isTrial ? <TrialBanner /> : null}
-      {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
-      {queueMessage ? <CustomMessageArea variant="success">{queueMessage}</CustomMessageArea> : null}
-      <PageCard>
-        {loading ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-300">保守対象を読み込んでいます...</p>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60 md:grid-cols-[minmax(0,20rem)_1fr] md:items-end">
+      {isTrial || error || queueMessage ? (
+        <div className="tool-page__notices">
+          {isTrial ? <TrialBanner /> : null}
+          {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
+          {queueMessage ? <CustomMessageArea variant="success">{queueMessage}</CustomMessageArea> : null}
+        </div>
+      ) : null}
+      {loading ? (
+        <p className="tool-muted text-sm" role="status">保守対象を読み込んでいます...</p>
+      ) : (
+        <>
+          <PageSection title="絞り込み">
+            <div className="tool-filter">
               <div className="space-y-2">
                 <CustomLabel htmlFor="maintenance-dashboard-filter">保守状態</CustomLabel>
                 <CustomComboBox
@@ -288,13 +292,17 @@ export default function MaintenanceDashboardPage() {
                   ))}
                 </CustomComboBox>
               </div>
-              <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-300">
+              <p className="m-0 text-sm leading-6 text-[var(--color-text-muted)]">
                 一覧から対象を複数選択すると、保守記録ダイアログを順番に開いて記録できます。
               </p>
             </div>
-            <div className="flex flex-col gap-2 text-sm text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
-              <span>表示件数: {rows.length} 件</span>
-              <span>選択中: {queueTargets.length} 件</span>
+          </PageSection>
+          <PageSection title="保守対象">
+            <div className="tool-toolbar">
+              <div className="tool-toolbar__meta">
+                <span>表示件数: {rows.length} 件</span>
+                <span>選択中: {queueTargets.length} 件</span>
+              </div>
             </div>
             <DataTable
               title="保守対象一覧"
@@ -310,9 +318,9 @@ export default function MaintenanceDashboardPage() {
               resizable
               emptyMessage="保守対象がありません。"
             />
-          </div>
-        )}
-      </PageCard>
+          </PageSection>
+        </>
+      )}
       <Dialog
         open={activeTarget != null}
         onClose={() => setDialogState(null)}
@@ -322,7 +330,7 @@ export default function MaintenanceDashboardPage() {
           <DialogFooterLayout
             layoutMode={layoutMode}
             status={dialogState?.autoAdvance && activeTarget ? (
-              <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">
+              <span role="status" aria-live="polite" className="text-xs text-[var(--color-text-muted)]">
                 {dialogState.index + 1} / {dialogTargets.length} 件目
               </span>
             ) : null}
@@ -336,10 +344,10 @@ export default function MaintenanceDashboardPage() {
       >
         {activeTarget ? (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-300">
-              <p className="font-semibold text-zinc-800 dark:text-zinc-100">{activeTarget.name}</p>
-              <p>{activeTarget.detail}</p>
-              <p className="mt-2">{activeTarget.summary}</p>
+            <div className="notice text-sm text-[var(--color-text-muted)]">
+              <p className="m-0 font-semibold text-[var(--color-text-strong)]">{activeTarget.name}</p>
+              <p className="m-0">{activeTarget.detail}</p>
+              <p className="mt-2 mb-0">{activeTarget.summary}</p>
             </div>
             <MaintenanceRecordsSection
               key={`${activeTarget.tableRowKey}:${dialogState?.index ?? 0}`}

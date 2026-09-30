@@ -109,7 +109,7 @@ export function FormFields({
               {lookups.gameConsoleCategories.map((item) => {
                 const checked = formState.gameConsoleCategoryIds.includes(String(item.id));
                 return (
-                  <label key={item.id} className="flex items-start gap-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+                  <label key={item.id} className="flex items-start gap-3 rounded-[0.35rem] border border-[var(--color-base-70)] p-3">
                     <CustomCheckBox
                       checked={checked}
                       onChange={(event) => {
@@ -121,7 +121,7 @@ export function FormFields({
                       }}
                       displayOnly={displayOnly}
                     />
-                    <span className="text-sm text-zinc-700 dark:text-zinc-200">{item.name}</span>
+                    <span className="text-sm text-[var(--foreground)]">{item.name}</span>
                   </label>
                 );
               })}
@@ -158,9 +158,9 @@ export function FormFields({
           ) : (
             <div className="space-y-2">
               <CustomLabel>アカウント種類</CustomLabel>
-              <p className="text-sm text-zinc-600 dark:text-zinc-300">
+              <p className="text-sm text-[var(--color-text-muted)]">
                 {getAccountTypeMasterName(Number(formState.accountTypeMasterId) || null, lookups)}
-                <span className="ml-2 text-xs text-zinc-400">（作成後の変更不可）</span>
+                <span className="ml-2 text-xs text-[var(--color-text-muted)]">（作成後の変更不可）</span>
               </p>
             </div>
           )}
@@ -174,7 +174,7 @@ export function FormFields({
           </div>
           <div className="space-y-3">
             <CustomLabel>紐づけるゲーム機</CustomLabel>
-            <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+            <p className="text-sm leading-6 text-[var(--color-text-muted)]">
               このアカウントに紐づけるゲーム機を選択してください。ダウンロード版ゲームソフトやアカウント＋本体保存のセーブデータで利用します。互換カテゴリのゲーム機も紐づけ可能です。
               {selectedAccountType && ` (${selectedAccountType.name} で利用可能な分類のゲーム機のみ表示)`}
             </p>
@@ -182,7 +182,7 @@ export function FormFields({
               {eligibleConsoles.map((item) => {
                 const checked = formState.linkedGameConsoleIds.includes(String(item.id));
                 return (
-                  <label key={item.id} className="flex items-start gap-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+                  <label key={item.id} className="flex items-start gap-3 rounded-[0.35rem] border border-[var(--color-base-70)] p-3">
                     <CustomCheckBox
                       checked={checked}
                       onChange={(event) => {
@@ -194,12 +194,12 @@ export function FormFields({
                       }}
                       displayOnly={displayOnly}
                     />
-                    <span className="text-sm text-zinc-700 dark:text-zinc-200">{getGameConsoleDisplay(item, lookups)}</span>
+                    <span className="text-sm text-[var(--foreground)]">{getGameConsoleDisplay(item, lookups)}</span>
                   </label>
                 );
               })}
               {eligibleConsoles.length === 0 && (
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                <p className="text-sm text-[var(--color-text-muted)]">
                   {selectedAccountType ? '対象ゲーム機分類に紐づくゲーム機が登録されていません。' : 'アカウント種類を選択してください。'}
                 </p>
               )}
@@ -411,7 +411,7 @@ export function FormFields({
                 displayOnly={displayOnly}
               />
               {formState.accountId && linkedConsoleOptions.length === 0 && (
-                <p className="text-sm text-amber-600 dark:text-amber-400">
+                <p className="text-sm text-[var(--color-warning)]">
                   選択したアカウントに、このゲームソフトをインストール可能な紐づけ済みゲーム機がありません。アカウント管理から紐づけを設定してください。
                 </p>
               )}
@@ -502,7 +502,7 @@ export function FormFields({
               displayOnly={displayOnly}
             />
           ) : null}
-          <div className="select-none rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200">
+          <div className="select-none rounded-[0.35rem] border border-[var(--color-base-70)] bg-[var(--color-base-70-light)] p-4 text-sm text-[var(--foreground)]">
             保存方式: {formatSaveStorageType(derivedSaveStorageType)}
           </div>
           {derivedSaveStorageType === 1 ? (
@@ -537,7 +537,7 @@ export function FormFields({
                 displayOnly={displayOnly}
               />
               {selectedSaveDataAccount && linkedConsoleCandidates.length === 0 && (
-                <p className="text-sm text-amber-600 dark:text-amber-400">
+                <p className="text-sm text-[var(--color-warning)]">
                   選択したアカウントに紐づけられたゲーム機がありません。アカウント管理から紐づけを設定してください。
                 </p>
               )}
@@ -560,9 +560,9 @@ export function FormFields({
           </div>
           {displayOrderField}
           {!formState.gameSoftwareMasterId ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">ゲームソフトマスタを選択するとストーリー進行度候補が表示されます。</p>
+            <p className="text-sm text-[var(--color-text-muted)]">ゲームソフトマスタを選択するとストーリー進行度候補が表示されます。</p>
           ) : storyProgressSchemaLoading ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">ストーリー進行度候補を読み込み中です...</p>
+            <p className="text-sm text-[var(--color-text-muted)]">ストーリー進行度候補を読み込み中です...</p>
           ) : storyProgressSchemaError ? (
             <CustomMessageArea variant="error">{storyProgressSchemaError}</CustomMessageArea>
           ) : (

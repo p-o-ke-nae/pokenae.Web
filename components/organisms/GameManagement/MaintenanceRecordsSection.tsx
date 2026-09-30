@@ -130,7 +130,7 @@ function FieldError({ messages }: { messages?: string[] }) {
   }
 
   return (
-    <p className="text-sm text-red-600 dark:text-red-400">
+    <p className="text-sm text-[var(--color-danger)]">
       {messages.join(' ')}
     </p>
   );
@@ -301,11 +301,11 @@ export default function MaintenanceRecordsSection({
 
   return (
     <>
-      <section className="space-y-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+      <section className="space-y-4 border-t-4 border-[var(--color-accent-25)] pt-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="space-y-2">
-            <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">保守記録</h3>
-            <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-300">{maintenanceSummaryText}</p>
+            <h3 className="text-base font-semibold text-[var(--color-text-strong)]">保守記録</h3>
+            <p className="text-sm leading-6 text-[var(--color-text-muted)]">{maintenanceSummaryText}</p>
           </div>
           {!readOnly ? (
             <CustomButton onClick={openCreateDialog} disabled={trialMode}>
@@ -322,25 +322,25 @@ export default function MaintenanceRecordsSection({
         {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
 
         {loading ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-300">保守記録を読み込んでいます...</p>
+          <p className="text-sm text-[var(--color-text-muted)]">保守記録を読み込んでいます...</p>
         ) : trialMode ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-300">トライアルモードでは保守記録はまだ表示されません。</p>
+          <p className="text-sm text-[var(--color-text-muted)]">トライアルモードでは保守記録はまだ表示されません。</p>
         ) : records.length === 0 ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-300">保守記録はまだありません。</p>
+          <p className="text-sm text-[var(--color-text-muted)]">保守記録はまだありません。</p>
         ) : (
           <div className="space-y-3">
             {records.map((record) => (
-              <article key={record.id} className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+              <article key={record.id} className="space-y-3 rounded-[0.35rem] border border-[var(--color-base-70)] bg-white p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                    <p className="text-sm font-semibold text-[var(--color-text-strong)]">
                       {formatMaintenanceDate(record.maintenanceDate)} / {getRecordStatusLabel(record)}
                     </p>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-300">
+                    <p className="text-sm text-[var(--color-text-muted)]">
                       通電: {record.isPowerOnPerformed ? '実施' : '未実施'} / 起動確認: {record.isStartupConfirmed ? '成功' : '未確認'}
                     </p>
                     {record.memo ? (
-                      <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-200">{record.memo}</p>
+                      <p className="text-sm leading-6 text-[var(--color-text-muted)]">{record.memo}</p>
                     ) : null}
                   </div>
                   {!readOnly ? (
@@ -374,7 +374,7 @@ export default function MaintenanceRecordsSection({
                 <CustomButton variant="neutral" onClick={closeEditorDialog}>
                   キャンセル
                 </CustomButton>
-                <CustomButton onClick={() => void handleSave()}>
+                <CustomButton variant="accent" onClick={() => void handleSave()}>
                   {submitLabel}
                 </CustomButton>
               </>
@@ -398,26 +398,26 @@ export default function MaintenanceRecordsSection({
 
           <div className="space-y-3">
             <CustomLabel>実施内容</CustomLabel>
-            <label className="flex items-start gap-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+            <label className="flex items-start gap-3 rounded-[0.35rem] border border-[var(--color-base-70)] p-3">
               <CustomCheckBox
                 checked={formState.isPowerOnPerformed}
                 onChange={(event) => setFormState((current) => ({ ...current, isPowerOnPerformed: event.target.checked }))}
               />
-              <span className="space-y-1 text-sm text-zinc-700 dark:text-zinc-200">
+              <span className="space-y-1 text-sm text-[var(--foreground)]">
                 <span className="block font-medium">通電を実施</span>
-                <span className="block text-zinc-500 dark:text-zinc-300">電源投入まで行った場合はチェックしてください。</span>
+                <span className="block text-[var(--color-text-muted)]">電源投入まで行った場合はチェックしてください。</span>
               </span>
             </label>
             <FieldError messages={formErrors.isPowerOnPerformed} />
 
-            <label className="flex items-start gap-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+            <label className="flex items-start gap-3 rounded-[0.35rem] border border-[var(--color-base-70)] p-3">
               <CustomCheckBox
                 checked={formState.isStartupConfirmed}
                 onChange={(event) => setFormState((current) => ({ ...current, isStartupConfirmed: event.target.checked }))}
               />
-              <span className="space-y-1 text-sm text-zinc-700 dark:text-zinc-200">
+              <span className="space-y-1 text-sm text-[var(--foreground)]">
                 <span className="block font-medium">起動確認に成功</span>
-                <span className="block text-zinc-500 dark:text-zinc-300">タイトル画面到達など、正常起動を確認できた場合にチェックしてください。</span>
+                <span className="block text-[var(--color-text-muted)]">タイトル画面到達など、正常起動を確認できた場合にチェックしてください。</span>
               </span>
             </label>
             <FieldError messages={formErrors.isStartupConfirmed} />
@@ -457,7 +457,7 @@ export default function MaintenanceRecordsSection({
           />
         )}
       >
-        <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+        <p className="text-sm leading-6 text-[var(--color-text-muted)]">
           {deleteTarget
             ? `${formatMaintenanceDate(deleteTarget.maintenanceDate)} の保守記録を削除します。`
             : '保守記録を削除します。'}

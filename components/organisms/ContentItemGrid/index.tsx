@@ -4,6 +4,8 @@ import { type ReactNode, useState } from "react";
 import CustomButton from "@/components/atoms/CustomButton";
 import DataTable, { type DataTableColumn } from "@/components/molecules/DataTable";
 import Dialog, { DialogFooterLayout } from "@/components/molecules/Dialog";
+import ResponsiveActionGroup from "@/components/molecules/ResponsiveActionGroup";
+import { useResponsiveLayoutMode } from "@/lib/hooks/useResponsiveLayoutMode";
 
 export type ContentItemGridRow = Record<string, unknown> & { key: string };
 
@@ -50,6 +52,7 @@ export default function ContentItemGrid({
   getDialogTitle,
 }: ContentItemGridProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const layoutMode = useResponsiveLayoutMode();
   const openIndex = editingIndex !== null && editingIndex < rows.length ? editingIndex : null;
 
   const gridRows: GridRow[] = rows.map((row, index) => ({
@@ -117,11 +120,14 @@ export default function ContentItemGrid({
         size="lg"
         footer={openIndex === null ? null : (
           <DialogFooterLayout
+            layoutMode={layoutMode}
             leading={<>
-              {onMove ? <>
-                <CustomButton type="button" variant="neutral" disabled={disabled || openIndex === 0} onClick={() => move(-1)}>上へ</CustomButton>
-                <CustomButton type="button" variant="neutral" disabled={disabled || openIndex === rows.length - 1} onClick={() => move(1)}>下へ</CustomButton>
-              </> : null}
+              {onMove ? (
+                <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} aria-label="並び順">
+                  <CustomButton type="button" variant="neutral" disabled={disabled || openIndex === 0} onClick={() => move(-1)}>上へ</CustomButton>
+                  <CustomButton type="button" variant="neutral" disabled={disabled || openIndex === rows.length - 1} onClick={() => move(1)}>下へ</CustomButton>
+                </ResponsiveActionGroup>
+              ) : null}
               <CustomButton type="button" variant="ghost" disabled={disabled} onClick={remove}>削除</CustomButton>
             </>}
             trailing={<CustomButton type="button" variant="accent" onClick={() => setEditingIndex(null)}>完了</CustomButton>}
