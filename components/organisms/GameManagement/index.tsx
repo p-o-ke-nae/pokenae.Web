@@ -458,13 +458,13 @@ export function GameManagementDashboard({
                 <Link
                   key={resourceKey}
                   href={`${basePath}/${resourceKey}`}
-                  className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
+                  className="rounded-[.35rem] border border-[var(--color-base-70)] bg-white p-5 shadow-[var(--shadow-card)] transition hover:border-[var(--color-accent-25-strong)]"
                 >
                   <div className="space-y-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{definition.shortLabel}</p>
-                    <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">{definition.label}</h2>
-                    <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">{definition.description}</p>
-                    <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">一覧を開く</p>
+                    <h2 className="text-lg font-semibold text-[var(--color-accent-25-strong)]">{definition.label}</h2>
+                    <p className="text-sm leading-6 text-[#605966]">{definition.description}</p>
+                    <p className="text-sm font-semibold text-[var(--color-link)]">一覧を開く</p>
                   </div>
                 </Link>
               );
@@ -473,13 +473,13 @@ export function GameManagementDashboard({
               <Link
                 key={card.href}
                 href={card.href}
-                className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
+                className="rounded-[.35rem] border border-[var(--color-base-70)] bg-white p-5 shadow-[var(--shadow-card)] transition hover:border-[var(--color-accent-25-strong)]"
               >
                 <div className="space-y-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{card.shortLabel}</p>
-                  <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">{card.title}</h2>
-                  <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">{card.description}</p>
-                  <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">{card.actionLabel ?? '画面を開く'}</p>
+                  <h2 className="text-lg font-semibold text-[var(--color-accent-25-strong)]">{card.title}</h2>
+                  <p className="text-sm leading-6 text-[#605966]">{card.description}</p>
+                  <p className="text-sm font-semibold text-[var(--color-link)]">{card.actionLabel ?? '画面を開く'}</p>
                 </div>
               </Link>
             ))}

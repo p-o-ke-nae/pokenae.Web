@@ -352,7 +352,7 @@ export default function SaveDataSearchPage() {
     <PageFrame
       eyebrowLabel="Game Library"
       title="横断セーブデータ検索"
-      description="共通 variant と複数の schema 条件グループを組み合わせ、セーブデータを作品横断で検索します。"
+      description="複数の条件を組み合わせてセーブデータを検索します。"
       layoutMode={layoutMode}
       actions={(
         <>
@@ -394,7 +394,7 @@ export default function SaveDataSearchPage() {
                 </CustomComboBox>
               </div>
               <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-300">
-                variant は全条件グループへ AND で適用されます。条件グループ同士は OR、各グループ内はゲームソフトマスタ / 進行度 / schema 項目を AND で評価します。
+                variant は全グループに適用されます。グループ間は OR、グループ内は AND で検索します。
               </p>
             </section>
 
@@ -402,7 +402,7 @@ export default function SaveDataSearchPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">条件グループ</h2>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-300">異なるゲームソフトマスタをまたいだ OR 検索を定義できます。</p>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-300">グループ間は OR 検索です。</p>
                 </div>
                 <CustomButton onClick={() => setGroups((current) => [...current, createSearchGroup()])}>
                   条件グループを追加
@@ -421,7 +421,7 @@ export default function SaveDataSearchPage() {
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">条件グループ {index + 1}</h3>
-                        <p className="text-sm text-zinc-500 dark:text-zinc-300">このグループ内の条件はすべて AND で評価されます。</p>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-300">グループ内の条件は AND 検索です。</p>
                       </div>
                       {groups.length > 1 ? (
                         <CustomButton
