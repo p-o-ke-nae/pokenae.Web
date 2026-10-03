@@ -185,7 +185,7 @@ export default function TrialImportDialog() {
         }
       >
         <div className="space-y-4 max-h-[45dvh] overflow-y-auto sm:max-h-[50vh]">
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+          <p className="text-sm text-[var(--foreground)]">
             ブラウザに保存されているトライアルデータが見つかりました。サーバへ反映するデータを選択してください。
           </p>
 
@@ -199,12 +199,12 @@ export default function TrialImportDialog() {
 
             return (
               <details key={resourceKey} open>
-                <summary className="cursor-pointer select-none text-sm font-semibold text-zinc-800 dark:text-zinc-200 py-1">
+                <summary className="cursor-pointer select-none text-sm font-semibold text-[var(--color-text-strong)] py-1">
                   {RESOURCE_LABELS[resourceKey]} ({items.length}件)
                 </summary>
                 <div className="pl-2 pt-1 space-y-1">
                   {activeItems.length > 1 && (
-                    <label className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 cursor-pointer pb-1">
+                    <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)] cursor-pointer pb-1">
                       <CustomCheckBox
                         checked={allActive}
                         onChange={() => toggleAllInResource(resourceKey, items)}
@@ -215,7 +215,7 @@ export default function TrialImportDialog() {
                   {items.map((item) => (
                     <label
                       key={item.trialId}
-                      className={`flex items-center gap-2 text-sm ${item.isDeleted ? 'text-zinc-400 line-through' : 'text-zinc-700 dark:text-zinc-300'}`}
+                      className={`flex items-center gap-2 text-sm ${item.isDeleted ? 'text-[var(--color-text-muted)] line-through' : 'text-[var(--foreground)]'}`}
                     >
                       <CustomCheckBox
                         checked={resourceSelected.has(item.trialId)}
@@ -248,9 +248,9 @@ export default function TrialImportDialog() {
       >
         <div className="space-y-3">
           <div className="flex gap-4 text-sm">
-            <span className="text-green-600 dark:text-green-400">成功: {importResult.successCount}件</span>
-            <span className="text-yellow-600 dark:text-yellow-400">スキップ: {importResult.skipCount}件</span>
-            <span className="text-red-600 dark:text-red-400">失敗: {importResult.errorCount}件</span>
+            <span className="text-[var(--color-success)]">成功: {importResult.successCount}件</span>
+            <span className="text-[var(--color-warning)]">スキップ: {importResult.skipCount}件</span>
+            <span className="text-[var(--color-danger)]">失敗: {importResult.errorCount}件</span>
           </div>
 
           {importResult.items.filter((i) => i.status !== 'success').length > 0 && (
@@ -258,8 +258,8 @@ export default function TrialImportDialog() {
               {importResult.items
                 .filter((i) => i.status !== 'success')
                 .map((item) => (
-                  <p key={`${item.resourceKey}-${item.trialId}`} className="text-xs text-zinc-600 dark:text-zinc-400">
-                    <span className={item.status === 'skipped' ? 'text-yellow-600' : 'text-red-600'}>
+                  <p key={`${item.resourceKey}-${item.trialId}`} className="text-xs text-[var(--color-text-muted)]">
+                    <span className={item.status === 'skipped' ? 'text-[var(--color-warning)]' : 'text-[var(--color-danger)]'}>
                       [{item.status === 'skipped' ? 'スキップ' : '失敗'}]
                     </span>{' '}
                     {RESOURCE_LABELS[item.resourceKey]} #{item.trialId}
@@ -270,7 +270,7 @@ export default function TrialImportDialog() {
           )}
 
           {importResult.errorCount > 0 && (
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-[var(--color-text-muted)]">
               失敗したデータはブラウザに残っています。次回ログイン時に再度反映を試みることができます。
             </p>
           )}
@@ -293,7 +293,7 @@ export default function TrialImportDialog() {
           </>
         }
       >
-        <p className="text-sm text-zinc-700 dark:text-zinc-300">
+        <p className="text-sm text-[var(--foreground)]">
           ブラウザに保存されているトライアルデータを破棄しますか？この操作は元に戻せません。
         </p>
       </Dialog>

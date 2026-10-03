@@ -41,7 +41,7 @@ import {
   getGameSoftwareMasterName,
   getMemoryCardDisplay,
 } from './helpers';
-import { PageCard, PageFrame, TrialBanner } from './shared';
+import { PageFrame, PageSection, TrialBanner } from './shared';
 
 type SearchGroupFormState = {
   id: string;
@@ -350,14 +350,14 @@ export default function SaveDataSearchPage() {
 
   return (
     <PageFrame
-      eyebrowLabel="Game Library"
+      eyebrowLabel=""
       title="横断セーブデータ検索"
-      description="複数の条件を組み合わせてセーブデータを検索します。"
+      description="共通 variant と複数の schema 条件グループを組み合わせ、セーブデータを作品横断で検索します。"
       layoutMode={layoutMode}
       actions={(
         <>
           <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
-            <Link href="/game-library" className="text-sm font-medium text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-300">
+            <Link href="/game-library" className="button-link button-link--secondary">
               ダッシュボードへ戻る
             </Link>
           </ResponsiveActionGroup>
@@ -372,15 +372,19 @@ export default function SaveDataSearchPage() {
         </>
       )}
     >
-      {isTrial ? <TrialBanner /> : null}
-      {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
-      {searchError ? <CustomMessageArea variant="error" className="whitespace-pre-line">{searchError}</CustomMessageArea> : null}
-      <PageCard>
-        {loading ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-300">検索対象を読み込んでいます...</p>
-        ) : !lookups ? null : (
-          <div className="space-y-6">
-            <section className="space-y-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+      {isTrial || error || searchError ? (
+        <div className="tool-page__notices">
+          {isTrial ? <TrialBanner /> : null}
+          {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
+          {searchError ? <CustomMessageArea variant="error" className="whitespace-pre-line">{searchError}</CustomMessageArea> : null}
+        </div>
+      ) : null}
+      {loading ? (
+        <p className="tool-muted text-sm" role="status">検索対象を読み込んでいます...</p>
+      ) : !lookups ? null : (
+          <>
+            <PageSection title="共通フィルタ">
+            <div className="tool-filter">
               <div className="space-y-2">
                 <CustomLabel htmlFor="save-data-search-variant">共通フィルタ: variant</CustomLabel>
                 <CustomComboBox
@@ -393,21 +397,21 @@ export default function SaveDataSearchPage() {
                   ))}
                 </CustomComboBox>
               </div>
-              <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-300">
-                variant は全グループに適用されます。グループ間は OR、グループ内は AND で検索します。
+              <p className="m-0 text-sm leading-6 text-[var(--color-text-muted)]">
+                variant は全条件グループへ AND で適用されます。条件グループ同士は OR、各グループ内はゲームソフトマスタ / 進行度 / schema 項目を AND で評価します。
               </p>
-            </section>
+            </div>
+            </PageSection>
 
-            <section className="space-y-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">条件グループ</h2>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-300">グループ間は OR 検索です。</p>
-                </div>
+            <PageSection
+              title="条件グループ"
+              description="異なるゲームソフトマスタをまたいだ OR 検索を定義できます。"
+              actions={(
                 <CustomButton onClick={() => setGroups((current) => [...current, createSearchGroup()])}>
                   条件グループを追加
                 </CustomButton>
-              </div>
+              )}
+            >
 
               {groups.map((group, index) => {
                 const selectedMasterId = Number(group.gameSoftwareMasterId);
@@ -417,11 +421,11 @@ export default function SaveDataSearchPage() {
                 const schemaLoading = Number.isInteger(selectedMasterId) && selectedMasterId > 0 ? schemaLoadingIds.includes(selectedMasterId) : false;
 
                 return (
-                  <article key={group.id} className="space-y-4 rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
+                  <article key={group.id} className="space-y-4 border-l-4 border-[var(--color-accent-25)] py-1 pl-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">条件グループ {index + 1}</h3>
-                        <p className="text-sm text-zinc-500 dark:text-zinc-300">グループ内の条件は AND 検索です。</p>
+                        <h3 className="text-base font-semibold text-[var(--color-text-strong)]">条件グループ {index + 1}</h3>
+                        <p className="text-sm text-[var(--color-text-muted)]">このグループ内の条件はすべて AND で評価されます。</p>
                       </div>
                       {groups.length > 1 ? (
                         <CustomButton
@@ -490,8 +494,8 @@ export default function SaveDataSearchPage() {
                     <div className="space-y-3">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">schema 条件</p>
-                          <p className="text-sm text-zinc-500 dark:text-zinc-300">0 件以上追加できます。</p>
+                          <p className="text-sm font-semibold text-[var(--color-text-strong)]">schema 条件</p>
+                          <p className="text-sm text-[var(--color-text-muted)]">0 件以上追加できます。</p>
                         </div>
                         <CustomButton
                           disabled={!schema || schema.fields.filter((field) => !field.isDisabled).length === 0}
@@ -505,12 +509,12 @@ export default function SaveDataSearchPage() {
                       </div>
 
                       {group.fieldConditions.length === 0 ? (
-                        <p className="text-sm text-zinc-500 dark:text-zinc-300">schema 条件なしでも検索できます。</p>
+                        <p className="text-sm text-[var(--color-text-muted)]">schema 条件なしでも検索できます。</p>
                       ) : group.fieldConditions.map((condition) => {
                         const selectedField = schema?.fields.find((field) => field.fieldKey === condition.fieldKey && !field.isDisabled);
 
                         return (
-                          <div key={condition.id} className="grid gap-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_auto] lg:items-end">
+                          <div key={condition.id} className="grid gap-3 border-t border-[var(--color-base-70)] pt-3 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_auto] lg:items-end">
                             <div className="space-y-2">
                               <CustomLabel htmlFor={`${condition.id}-field`}>項目</CustomLabel>
                               <CustomComboBox
@@ -534,7 +538,7 @@ export default function SaveDataSearchPage() {
                             <div className="space-y-2">
                               <CustomLabel htmlFor={`${condition.id}-value`}>値</CustomLabel>
                               {selectedField?.fieldType === 4 ? (
-                                <div className="flex items-center gap-3 rounded-xl border border-zinc-200 px-3 py-2 dark:border-zinc-800">
+                                <div className="flex items-center gap-3 rounded-[0.35rem] border border-[var(--color-base-70)] px-3 py-2">
                                   <CustomCheckBox
                                     checked={condition.value === 'true'}
                                     onChange={(event) => updateGroup(group.id, (current) => ({
@@ -546,7 +550,7 @@ export default function SaveDataSearchPage() {
                                       )),
                                     }))}
                                   />
-                                  <span className="text-sm text-zinc-700 dark:text-zinc-200">はい</span>
+                                  <span className="text-sm text-[var(--foreground)]">はい</span>
                                 </div>
                               ) : selectedField?.fieldType === 6 ? (
                                 <CustomComboBox
@@ -600,25 +604,20 @@ export default function SaveDataSearchPage() {
                   </article>
                 );
               })}
-            </section>
+            </PageSection>
 
-            <section className="space-y-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">検索結果</h2>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-300">
-                    {submittedSearch ? `${results.length} 件ヒットしました。` : '条件を入力して検索してください。'}
-                  </p>
-                </div>
-                {submittedSearch ? (
-                  <span className="text-sm text-zinc-500 dark:text-zinc-300">
-                    共通 variant: {GAME_SOFTWARE_VARIANT_OPTIONS.find((option) => option.value === submittedSearch.variant)?.label ?? 'すべて'}
-                  </span>
-                ) : null}
-              </div>
+            <PageSection
+              title="検索結果"
+              description={submittedSearch ? `${results.length} 件ヒットしました。` : '条件を入力して検索してください。'}
+              actions={submittedSearch ? (
+                <span className="text-sm text-[var(--color-text-muted)]">
+                  共通 variant: {GAME_SOFTWARE_VARIANT_OPTIONS.find((option) => option.value === submittedSearch.variant)?.label ?? 'すべて'}
+                </span>
+              ) : null}
+            >
 
               {submittedSearch && results.length === 0 ? (
-                <p className="text-sm text-zinc-500 dark:text-zinc-300">一致するセーブデータはありませんでした。</p>
+                <p className="text-sm text-[var(--color-text-muted)]">一致するセーブデータはありませんでした。</p>
               ) : null}
 
               <div className="space-y-3">
@@ -633,22 +632,22 @@ export default function SaveDataSearchPage() {
                   ));
 
                   return (
-                    <article key={result.saveData.id} className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+                    <article key={result.saveData.id} className="space-y-3 rounded-[0.35rem] border border-[var(--color-base-70)] bg-white p-4">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div className="space-y-2">
-                          <p className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                          <p className="text-base font-semibold text-[var(--color-text-strong)]">
                             SaveData #{result.saveData.id} / {getGameSoftwareMasterName(result.saveData.gameSoftwareMasterId, lookups)}
                           </p>
-                          <p className="text-sm text-zinc-500 dark:text-zinc-300">
+                          <p className="text-sm text-[var(--color-text-muted)]">
                             保存方式: {formatSaveStorageType(result.saveData.saveStorageType)} / 保存先: {getStorageSummary(result.saveData, lookups) || '未設定'}
                           </p>
-                          <p className="text-sm text-zinc-500 dark:text-zinc-300">
+                          <p className="text-sm text-[var(--color-text-muted)]">
                             進行度: {result.saveData.storyProgressDefinitionId
                               ? storyProgressSchema?.choices.find((choice) => choice.storyProgressDefinitionId === result.saveData.storyProgressDefinitionId)?.label ?? `#${result.saveData.storyProgressDefinitionId}`
                               : '未設定'}
                           </p>
                           {result.saveData.memo ? (
-                            <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-200">{result.saveData.memo}</p>
+                            <p className="text-sm leading-6 text-[var(--color-text-muted)]">{result.saveData.memo}</p>
                           ) : null}
                         </div>
                         <CustomButton
@@ -661,8 +660,8 @@ export default function SaveDataSearchPage() {
                           詳細を見る
                         </CustomButton>
                       </div>
-                      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-300">
-                        <p className="font-semibold text-zinc-800 dark:text-zinc-100">一致条件</p>
+                      <div className="border-t border-[var(--color-base-70)] pt-3 text-sm text-[var(--color-text-muted)]">
+                        <p className="m-0 font-semibold text-[var(--color-text-strong)]">一致条件</p>
                         <ul className="mt-2 space-y-1">
                           {matchedSummary.map((summary, index) => (
                             <li key={`${result.saveData.id}-${index}`}>- {summary}</li>
@@ -673,10 +672,9 @@ export default function SaveDataSearchPage() {
                   );
                 }) : null}
               </div>
-            </section>
-          </div>
-        )}
-      </PageCard>
+            </PageSection>
+          </>
+      )}
       {lookups && editorRecordId != null ? (
         <EditorDialog
           open

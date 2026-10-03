@@ -407,14 +407,14 @@ export default function EditorDialog({
           <DialogFooterLayout
             layoutMode={layoutMode}
             status={isPending ? (
-              <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">
+              <span role="status" aria-live="polite" className="text-xs text-[var(--color-text-muted)]">
                 保存中はダイアログを閉じられません。
               </span>
             ) : null}
             leading={
               !isNew ? (
-                <div className="space-y-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3 sm:space-y-0">
-                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2}>
+                <>
+                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} aria-label="レコード移動">
                     <CustomButton
                       disabled={!canGoPrev || loading}
                       onClick={() => navigate('prev')}
@@ -429,11 +429,11 @@ export default function EditorDialog({
                     </CustomButton>
                   </ResponsiveActionGroup>
                   {currentIndex >= 0 ? (
-                    <span className="text-xs text-zinc-500">
+                    <span className="text-xs text-[var(--color-text-muted)]">
                       {currentIndex + 1} / {rowIds.length}
                     </span>
                   ) : null}
-                </div>
+                </>
               ) : null
             }
             trailing={
@@ -487,7 +487,7 @@ export default function EditorDialog({
           {error ? <CustomMessageArea variant="error" className="whitespace-pre-line">{error}</CustomMessageArea> : null}
           {success ? <CustomMessageArea variant="success">{success}</CustomMessageArea> : null}
           {loading ? (
-            <p className="text-sm text-zinc-500">読み込んでいます...</p>
+            <p className="text-sm text-[var(--color-text-muted)]">読み込んでいます...</p>
           ) : (
             <>
               <FormFields
@@ -505,19 +505,19 @@ export default function EditorDialog({
                 displayOnly={isViewMode}
               />
               {!isNew && recordId != null && (
-                <div className="select-none space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-                  <p className="font-semibold text-zinc-800 dark:text-zinc-100">レコード情報</p>
+                <div className="select-none space-y-2 rounded-[0.35rem] border border-[var(--color-base-70)] bg-[var(--color-base-70-light)] p-4 text-sm text-[var(--color-text-muted)]">
+                  <p className="font-semibold text-[var(--color-text-strong)]">レコード情報</p>
                   <p>ID: {recordId}</p>
                   {record ? <ResourceSummary resourceKey={resourceKey} record={record} lookups={lookups} storyProgressLabel={selectedStoryProgressLabel} /> : null}
                 </div>
               )}
                {!isNew && recordId != null && supportsMaintenance(resourceKey) ? (
                  <>
-                   <section className="space-y-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+                   <section className="space-y-4 border-t-4 border-[var(--color-accent-25)] pt-4">
                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                        <div className="space-y-2">
-                         <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">保守履歴</h3>
-                         <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-300">
+                         <h3 className="text-base font-semibold text-[var(--color-text-strong)]">保守履歴</h3>
+                         <p className="text-sm leading-6 text-[var(--color-text-muted)]">
                            {buildMaintenanceSummaryText(maintenanceSummary)}
                          </p>
                        </div>
@@ -565,12 +565,12 @@ export default function EditorDialog({
                 const mergedFields = mergeSchemaWithSaveData(saveDataSchema, saveData);
                 if (mergedFields.length > 0) {
                   return (
-                    <div className="select-none space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-                      <p className="font-semibold text-zinc-800 dark:text-zinc-100">セーブデータスキーマ項目の現在値</p>
+                    <div className="select-none space-y-2 rounded-[0.35rem] border border-[var(--color-base-70)] bg-[var(--color-base-70-light)] p-4 text-sm text-[var(--color-text-muted)]">
+                      <p className="font-semibold text-[var(--color-text-strong)]">セーブデータスキーマ項目の現在値</p>
                       <div className="space-y-2">
                         {mergedFields.filter((field) => !field.isDisabled).map((field) => (
                           <p key={field.fieldKey}>
-                            <span className="font-medium text-zinc-800 dark:text-zinc-100">{field.label}</span>: {formatMergedFieldValue(field)}
+                            <span className="font-medium text-[var(--color-text-strong)]">{field.label}</span>: {formatMergedFieldValue(field)}
                           </p>
                         ))}
                       </div>
@@ -579,12 +579,12 @@ export default function EditorDialog({
                 }
                 if (saveData.extendedFields.length > 0) {
                   return (
-                    <div className="select-none space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-                      <p className="font-semibold text-zinc-800 dark:text-zinc-100">セーブデータスキーマ項目の現在値</p>
+                    <div className="select-none space-y-2 rounded-[0.35rem] border border-[var(--color-base-70)] bg-[var(--color-base-70-light)] p-4 text-sm text-[var(--color-text-muted)]">
+                      <p className="font-semibold text-[var(--color-text-strong)]">セーブデータスキーマ項目の現在値</p>
                       <div className="space-y-2">
                         {saveData.extendedFields.map((field) => (
                           <p key={field.fieldKey}>
-                            <span className="font-medium text-zinc-800 dark:text-zinc-100">{field.label}</span>: {formatSaveDataFieldValueForList(field)}
+                            <span className="font-medium text-[var(--color-text-strong)]">{field.label}</span>: {formatSaveDataFieldValueForList(field)}
                           </p>
                         ))}
                       </div>
@@ -619,7 +619,7 @@ export default function EditorDialog({
         }
       >
         <div className="space-y-4">
-          <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">このレコードを削除します。操作は元に戻せない場合があります。</p>
+          <p className="text-sm leading-6 text-[var(--color-text-muted)]">このレコードを削除します。操作は元に戻せない場合があります。</p>
           {resourceKey === 'save-datas' ? (
             <div className="space-y-4">
               <SelectField

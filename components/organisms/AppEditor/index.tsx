@@ -8,6 +8,7 @@ import ContentItemGrid from "../ContentItemGrid";
 import { collectInvalidIndexes } from "../../../lib/content/admin-grid";
 import type { TagDefinition } from "../../../lib/content/types";
 import { appListSchema } from "../../../lib/content/schemas";
+import { buildContentChangeNote } from "../../../lib/content/change-note";
 import type { AppContent } from "../../../lib/content/admin-config";
 import type { ValidationIssue } from "../../../lib/content/canonical-validation";
 
@@ -42,6 +43,7 @@ type ApiResponse = {
   pullRequest?: PullRequest;
   pullRequests?: PullRequest[];
   value?: unknown;
+  update?: unknown;
   pullRequestUrl?: string;
   headRevision?: string;
 };
@@ -119,6 +121,7 @@ const statusLabels: Record<AppStatus, string> = {
 export default function AppEditor({ initial, baseRevision, tagDefinitions = [] }: { initial: unknown; baseRevision: string; tagDefinitions?: TagDefinition[] }) {
   const initialApps = useMemo(() => normalizeApps(initial), [initial]);
   const [apps, setApps] = useState(initialApps);
+  const [baselineApps, setBaselineApps] = useState(initialApps);
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
   const [selected, setSelected] = useState<PullRequest | null>(null);
   const [revision, setRevision] = useState(baseRevision);
@@ -128,6 +131,7 @@ export default function AppEditor({ initial, baseRevision, tagDefinitions = [] }
   const [saving, setSaving] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingPullRequest, setLoadingPullRequest] = useState(false);
+  const [skipInfo, setSkipInfo] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -185,6 +189,8 @@ export default function AppEditor({ initial, baseRevision, tagDefinitions = [] }
     setSelected(null);
     setRevision(baseRevision);
     setApps(initialApps);
+    setBaselineApps(initialApps);
+    setSkipInfo(false);
     clearFeedback();
   }
 
@@ -200,7 +206,10 @@ export default function AppEditor({ initial, baseRevision, tagDefinitions = [] }
       }
       setSelected(data.pullRequest);
       setRevision(data.pullRequest.headRevision);
-      setApps(normalizeApps(data.value));
+      const loadedApps = normalizeApps(data.value);
+      setApps(loadedApps);
+      setBaselineApps(loadedApps);
+      setSkipInfo(record(data.update).visible === false);
       setIssues(data.issues ?? []);
       setMessage(data.issues?.length ? "既存の検証エラーを修正してください。" : "Pull Request を読み込みました。");
       setMessageIsError(Boolean(data.issues?.length));
@@ -229,9 +238,10 @@ export default function AppEditor({ initial, baseRevision, tagDefinitions = [] }
       return;
     }
 
+    const changeNote = buildContentChangeNote("Webアプリ", serializeApps(baselineApps), parsed.data);
     const payload = selected
-      ? { kind: "apps", value: parsed.data, expectedRevision: revision, changeNote: "Webアプリを管理画面から更新" }
-      : { kind: "apps", value: parsed.data, baseRevision: revision, changeNote: "Webアプリを管理画面から更新" };
+      ? { kind: "apps", value: parsed.data, expectedRevision: revision, changeNote, skipInfo }
+      : { kind: "apps", value: parsed.data, baseRevision: revision, changeNote, skipInfo };
     try {
       const response = await fetch(
         selected ? `/api/content/config/pull-requests/${selected.number}?kind=apps` : "/api/content/config",
@@ -354,6 +364,10 @@ export default function AppEditor({ initial, baseRevision, tagDefinitions = [] }
       />
 
       <form className="stack" aria-busy={busy} noValidate onSubmit={submit}>
+        <label className="app-editor__check">
+          <input type="checkbox" checked={skipInfo} disabled={busy} onChange={(event) => { setSkipInfo(event.target.checked); clearFeedback(); }} />
+          INFOに表示しない
+        </label>
         <button type="submit" className="button-link" disabled={busy}>
           {saving ? "保存中…" : loadingPullRequest ? "読込中…" : selected ? "同じ Pull Request を更新" : "Pull Request を作成"}
         </button>
@@ -364,8 +378,10 @@ export default function AppEditor({ initial, baseRevision, tagDefinitions = [] }
         .app-editor__source { display:flex; flex-wrap:wrap; gap:1rem; align-items:end; }
         .app-editor__source label { display:grid; gap:.35rem; flex:1 1 320px; font-weight:700; }
         .app-editor input,.app-editor select,.app-editor textarea { width:100%; min-height:44px; padding:.55rem; border:1px solid var(--color-base-70-dark); border-radius:.25rem; background:#fff; color:var(--foreground); }
+        .app-editor .app-editor__check { display:flex; align-items:center; gap:.5rem; font-weight:700; }
+        .app-editor .app-editor__check input { width:auto; min-height:0; }
         .app-editor textarea { resize:vertical; }
-        .app-editor__card { display:grid; gap:1rem; padding:1rem; border:1px solid var(--color-base-70); border-radius:.35rem; background:#fff; }
+        .app-editor__card { display:grid; gap:1rem; min-width:0; margin:0; padding:0; border:0; }
         .app-editor__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
         .app-editor__field { display:grid; align-content:start; gap:.3rem; font-weight:700; }
         .app-editor__wide { grid-column:1/-1; }

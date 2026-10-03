@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import CustomButton from '@/components/atoms/CustomButton';
 import PageModeToggle from '@/components/atoms/PageModeToggle';
 import CustomCheckBox from '@/components/atoms/CustomCheckBox';
@@ -15,6 +16,7 @@ import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup'
 import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
 import { moveSelectedItemsByOne, moveSelectedItemsToTarget } from '@/components/molecules/DataTable/selection-utils';
 import RowMoveButtons from '@/components/organisms/GameManagement/RowMoveButtons';
+import { PageFrame } from '@/components/organisms/GameManagement/shared';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import {
   fetchMasterLookups,
@@ -243,14 +245,14 @@ function SelectField({
 }
 
 function SectionCard({ title, description, actions, layoutMode, children }: { title: string; description: string; actions?: React.ReactNode; layoutMode: LayoutMode; children: React.ReactNode }) {
-  const headerLayoutClasses = 'mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between';
+  const headerLayoutClasses = 'tool-section__header';
 
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+    <section className="tool-section">
       <div className={headerLayoutClasses}>
         <div className="space-y-2">
           <CustomHeader level={2}>{title}</CustomHeader>
-          <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">{description}</p>
+          <p className="tool-section__lead">{description}</p>
         </div>
         {actions ? (
           <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end" className="w-full sm:w-auto">
@@ -704,32 +706,34 @@ export default function StoryProgressManager() {
 
   if (pageLoading) {
     return (
-      <main className="min-h-screen bg-zinc-50 px-4 py-8 dark:bg-black sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6">
-          <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-            <p className="text-sm text-zinc-500">管理画面を読み込んでいます...</p>
-          </section>
-        </div>
-      </main>
+      <PageFrame
+        eyebrowLabel="Story Progress Management"
+        title="ストーリー進行度管理"
+        description="StoryProgressDefinitions、StoryProgressOverrides、公開 story-progress-schema の resolved 結果を 1 画面で管理します。"
+        layoutMode={layoutMode}
+      >
+        <p className="tool-muted text-sm" role="status">管理画面を読み込んでいます...</p>
+      </PageFrame>
     );
   }
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-4 py-8 dark:bg-black sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
-        <div className="rounded-3xl bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(241,245,249,0.95))] p-6 shadow-sm ring-1 ring-zinc-200 dark:bg-[linear-gradient(135deg,rgba(24,24,27,0.95),rgba(9,9,11,0.95))] dark:ring-zinc-800">
-          <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">Story Progress Management</p>
-            <CustomHeader level={1}>ストーリー進行度管理</CustomHeader>
-            <p className="max-w-4xl text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-              StoryProgressDefinitions、StoryProgressOverrides、公開 story-progress-schema の resolved 結果を 1 画面で管理します。
-            </p>
-          </div>
-          <div className="mt-3 flex items-center gap-2">
-            <PageModeToggle mode={pageMode} onChange={setPageMode} />
-          </div>
-        </div>
-
+    <PageFrame
+      eyebrowLabel="Story Progress Management"
+      title="ストーリー進行度管理"
+      description="StoryProgressDefinitions、StoryProgressOverrides、公開 story-progress-schema の resolved 結果を 1 画面で管理します。"
+      layoutMode={layoutMode}
+      actions={(
+        <>
+          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
+            <Link href="/game-management" className="button-link button-link--secondary">
+              ダッシュボードへ戻る
+            </Link>
+          </ResponsiveActionGroup>
+          <PageModeToggle mode={pageMode} onChange={setPageMode} />
+        </>
+      )}
+    >
         {error && !inlineDialogMessageVisible && <CustomMessageArea variant="error">{error}</CustomMessageArea>}
         {success && !inlineDialogMessageVisible && <CustomMessageArea variant="success">{success}</CustomMessageArea>}
 
@@ -760,12 +764,12 @@ export default function StoryProgressManager() {
           <div className="space-y-4">
             <div className="flex items-center justify-end gap-3 text-sm">
               {selectedVisibleDefinitions.length > 0 && effectiveDefReorderEnabled ? (
-                <span className="text-xs text-zinc-500 dark:text-zinc-300">
+                <span className="text-xs text-[var(--color-text-muted)]">
                   選択中: {selectedVisibleDefinitions.length} 件（Shift+クリックで範囲選択、上下移動でまとめて並び替え）
                 </span>
               ) : null}
               {!effectiveDefReorderEnabled && defReorderDisabledReason && (
-                <span className="text-xs text-amber-600 dark:text-amber-400">{defReorderDisabledReason}</span>
+                <span className="text-xs text-[var(--color-warning)]">{defReorderDisabledReason}</span>
               )}
             </div>
             <DataTable<DefinitionRow>
@@ -872,7 +876,7 @@ export default function StoryProgressManager() {
           {resolvedSchema ? (
             <DataTable<PreviewRow> columns={previewColumns} data={previewRows} height={DATA_TABLE_DEFAULT_PAGE_HEIGHT} rowKey="id" emptyMessage="候補がありません。" />
           ) : (
-            <p className="text-sm text-zinc-500">ゲームソフトマスタを選択するとプレビューが表示されます。</p>
+            <p className="text-sm text-[var(--color-text-muted)]">ゲームソフトマスタを選択するとプレビューが表示されます。</p>
           )}
         </SectionCard>
 
@@ -898,7 +902,7 @@ export default function StoryProgressManager() {
           ) : (
             <DialogFooterLayout
               layoutMode={layoutMode}
-              status={isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">保存中はダイアログを閉じられません。</span> : null}
+              status={isPending ? <span role="status" aria-live="polite" className="text-xs text-[var(--color-text-muted)]">保存中はダイアログを閉じられません。</span> : null}
               trailing={
                 <>
                   {editingDefinition ? (
@@ -969,7 +973,7 @@ export default function StoryProgressManager() {
           ) : (
             <DialogFooterLayout
               layoutMode={layoutMode}
-              status={isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">保存中はダイアログを閉じられません。</span> : null}
+              status={isPending ? <span role="status" aria-live="polite" className="text-xs text-[var(--color-text-muted)]">保存中はダイアログを閉じられません。</span> : null}
               trailing={
                 <>
                   <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
@@ -989,7 +993,7 @@ export default function StoryProgressManager() {
           {overrideDialogError ? <CustomMessageArea variant="error">{overrideDialogError}</CustomMessageArea> : null}
           {overrideDialogSuccess ? <CustomMessageArea variant="success">{overrideDialogSuccess}</CustomMessageArea> : null}
           {overrideTargetDefinition ? (
-            <div className="select-none rounded bg-zinc-50 p-3 text-sm dark:bg-zinc-800">
+            <div className="select-none rounded bg-[var(--color-base-70-light)] p-3 text-sm">
               <p>progressKey: {overrideTargetDefinition.progressKey}</p>
               <p>基本ラベル: {overrideTargetDefinition.label}</p>
             </div>
@@ -1002,13 +1006,12 @@ export default function StoryProgressManager() {
             <CustomLabel htmlFor="ovr-description">override 説明</CustomLabel>
             <CustomTextArea id="ovr-description" value={overrideFormState.overrideDescription} onChange={(event) => setOverrideFormState((current) => ({ ...current, overrideDescription: event.target.value }))} displayOnly={pageMode === 'view'} />
           </div>
-          <label className="flex items-center gap-3 text-sm text-zinc-700 dark:text-zinc-200">
+          <label className="flex items-center gap-3 text-sm text-[var(--foreground)]">
             <CustomCheckBox checked={overrideFormState.isDisabled} onChange={(event) => setOverrideFormState((current) => ({ ...current, isDisabled: event.target.checked }))} displayOnly={pageMode === 'view'} />
             この作品では項目を無効化する
           </label>
         </div>
       </Dialog>
-      </div>
-    </main>
+    </PageFrame>
   );
 }

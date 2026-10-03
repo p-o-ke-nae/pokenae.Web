@@ -459,7 +459,7 @@ export default function AnnouncementEditor({ initial, baseRevision }: Announceme
       .announcement-editor__source { display:flex; flex-wrap:wrap; gap:1rem; align-items:end; }
       .announcement-editor__source label { display:grid; gap:.35rem; flex:1 1 320px; font-weight:700; }
       .announcement-editor select,.announcement-editor input { width:100%; min-height:44px; padding:.55rem; border:1px solid var(--color-base-70-dark); border-radius:.25rem; background:#fff; color:var(--foreground); }
-      .announcement-editor__card { display:grid; gap:1rem; padding:1rem; border:1px solid var(--color-base-70); border-radius:.35rem; background:#fff; }
+      .announcement-editor__card { display:grid; gap:1rem; min-width:0; margin:0; padding:0; border:0; }
       .announcement-editor__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
       .announcement-editor__grid label { display:grid; align-content:start; gap:.3rem; font-weight:700; }
       .announcement-editor__wide { grid-column:1/-1; }

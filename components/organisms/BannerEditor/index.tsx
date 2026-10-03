@@ -319,7 +319,7 @@ export default function BannerEditor({ initial, baseRevision }: BannerEditorProp
       .banner-editor__source { display:flex; flex-wrap:wrap; gap:1rem; align-items:end; }
       .banner-editor__source label { display:grid; gap:.35rem; flex:1 1 320px; font-weight:700; }
       .banner-editor select,.banner-editor input { width:100%; min-height:44px; padding:.55rem; border:1px solid var(--color-base-70-dark); border-radius:.25rem; background:#fff; color:var(--foreground); }
-      .banner-editor__card { display:grid; gap:1rem; padding:1rem; border:1px solid var(--color-base-70); border-radius:.35rem; background:#fff; }
+      .banner-editor__card { display:grid; gap:1rem; min-width:0; }
       .banner-editor__upload { font-weight:400; font-size:.9rem; }
       .banner-editor__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
       .banner-editor__grid label { display:grid; align-content:start; gap:.3rem; font-weight:700; }
