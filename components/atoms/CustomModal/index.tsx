@@ -100,12 +100,20 @@ const CustomModal = forwardRef<HTMLDialogElement, CustomModalProps>(
 		}, [restoreFocus]);
 
 		const handleCancel = useCallback((event: React.SyntheticEvent<HTMLDialogElement, Event>) => {
+			if (event.target !== event.currentTarget) {
+				return;
+			}
+
 			if (closeDisabled) {
 				event.preventDefault();
 			}
 		}, [closeDisabled]);
 
-		const handleClose = useCallback(() => {
+		const handleClose = useCallback((event: React.SyntheticEvent<HTMLDialogElement, Event>) => {
+			if (event.target !== event.currentTarget) {
+				return;
+			}
+
 			if (closeDisabled) {
 				const dialog = localRef.current;
 				if (dialog && open && !dialog.open) {

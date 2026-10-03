@@ -440,6 +440,7 @@ export function GameManagementDashboard({
         eyebrowLabel={sectionLabel}
         title={sectionTitle}
         description={sectionDescription}
+        navigationActiveHref={basePath === '/game-library' ? basePath : undefined}
       >
         {isTrial || effectiveAuthError ? (
           <div className="tool-page__notices">
@@ -1022,7 +1023,7 @@ export function GameManagementDashboard({
           await reorderResource(resourceKey, reorderItems);
         }
 
-        // 保存成功: 再読み込み
+        // 保存成功: 再読込
         setIsDirty(false);
         setLocalRowOrder(null);
         await load();
@@ -1213,20 +1214,24 @@ export function GameManagementDashboard({
       title={definition.label}
       description={definition.description}
       layoutMode={layoutMode}
+      navigationActiveHref={basePath === '/game-library' ? `${basePath}/${resourceKey}` : undefined}
+      stickyActions={isDirty && pageMode === 'edit' ? (
+        <CustomButton variant="accent" onClick={() => void handleSaveDisplayOrder()} disabled={saving}>
+          保存
+        </CustomButton>
+      ) : null}
       actions={
         <>
-          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
+          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={definition.canCreate ? 3 : 2} align="end">
             <Link href={basePath} className="button-link button-link--secondary">
-              ダッシュボードへ戻る
+              戻る
             </Link>
-          </ResponsiveActionGroup>
-          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={definition.canCreate ? 2 : 1} align="end">
             {definition.canCreate ? (
               <CustomButton variant="accent" onClick={() => { setPageMode('edit'); openEditorDialog(); }}>
                 新規作成
               </CustomButton>
             ) : null}
-            <CustomButton onClick={() => void load()}>再読み込み</CustomButton>
+            <CustomButton onClick={() => void load()}>再読込</CustomButton>
           </ResponsiveActionGroup>
         </>
       }
@@ -1247,7 +1252,7 @@ export function GameManagementDashboard({
             {supportsMaintenance(resourceKey) ? (
                 <div className="tool-filter">
                   <div className="space-y-2">
-                    <CustomLabel htmlFor="maintenance-health-filter">保守状態</CustomLabel>
+                    <CustomLabel htmlFor="maintenance-health-filter">メンテナンス状態</CustomLabel>
                     <CustomComboBox
                       id="maintenance-health-filter"
                       value={maintenanceHealthFilter}
@@ -1259,7 +1264,7 @@ export function GameManagementDashboard({
                     </CustomComboBox>
                   </div>
                   <p className="text-sm leading-6 text-[var(--color-text-muted)]">
-                    最新の保守記録に基づいて一覧を絞り込みます。未確認は「起動不調を除外」に含まれ、期限超過は一覧の詳細表示で確認できます。
+                    最新のメンテナンス記録に基づいて一覧を絞り込みます。未確認は「起動不調を除外」に含まれ、期限超過は一覧の詳細表示で確認できます。
                   </p>
                 </div>
             ) : null}

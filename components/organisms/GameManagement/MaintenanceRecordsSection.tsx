@@ -5,11 +5,14 @@ import CustomButton from '@/components/atoms/CustomButton';
 import CustomCheckBox from '@/components/atoms/CustomCheckBox';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
+import PageModeToggle from '@/components/atoms/PageModeToggle';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
 import CustomTextBox from '@/components/atoms/CustomTextBox';
 import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
+import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import type { LayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
+import type { PageMode } from '@/lib/game-management/resources';
 import {
   createMaintenanceRecord,
   deleteMaintenanceRecord,
@@ -21,6 +24,7 @@ import { extractProblemFieldErrors } from '@/lib/game-management/api/core';
 import {
   buildMaintenanceSummaryText,
   formatMaintenanceDate,
+  isMaintenanceDateInFuture,
 } from '@/lib/game-management/maintenance';
 import type {
   CreateGameConsoleMaintenanceRequest,
@@ -48,7 +52,7 @@ type MaintenancePayload =
   | UpdateGameSoftwareMaintenanceRequest
   | UpdateMemoryCardMaintenanceRequest;
 
-type MaintenanceFormState = {
+export type MaintenanceFormState = {
   maintenanceDate: string;
   isPowerOnPerformed: boolean;
   isStartupConfirmed: boolean;
@@ -96,7 +100,7 @@ function validateFormState(formState: MaintenanceFormState): Record<string, stri
 
   if (!formState.maintenanceDate) {
     appendError('maintenanceDate', '実施日を入力してください。');
-  } else if (formState.maintenanceDate > getTodayDateString()) {
+  } else if (isMaintenanceDateInFuture(formState.maintenanceDate, getTodayDateString())) {
     appendError('maintenanceDate', '未来日は指定できません。');
   }
 
@@ -144,6 +148,9 @@ export default function MaintenanceRecordsSection({
   trialMode = false,
   autoOpenCreateOnMount = false,
   layoutMode = 'desktop',
+  initialFormState,
+  pageMode,
+  onPageModeChange,
   onChanged,
   onSaved,
 }: {
@@ -154,10 +161,13 @@ export default function MaintenanceRecordsSection({
   trialMode?: boolean;
   autoOpenCreateOnMount?: boolean;
   layoutMode?: LayoutMode;
+  initialFormState?: MaintenanceFormState;
+  pageMode?: PageMode;
+  onPageModeChange?: (mode: PageMode) => void;
   onChanged: () => void;
-  onSaved?: (mode: 'create' | 'update') => void;
+  onSaved?: (mode: 'create' | 'update', values: MaintenanceFormState) => void;
 }) {
-  const { startLoading } = useLoadingOverlay();
+  const { isPending, startLoading } = useLoadingOverlay();
   const autoOpenedRef = useRef(false);
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
   const [loading, setLoading] = useState(!trialMode);
@@ -199,12 +209,12 @@ export default function MaintenanceRecordsSection({
 
   const openCreateDialog = useCallback(() => {
     setEditingRecord(null);
-    setFormState(createEmptyFormState());
+    setFormState(initialFormState ?? createEmptyFormState());
     setFormErrors({});
     setSubmitError(null);
     setSubmitSuccess(null);
     setEditorOpen(true);
-  }, []);
+  }, [initialFormState]);
 
   const openEditDialog = useCallback((record: MaintenanceRecord) => {
     setEditingRecord(record);
@@ -232,7 +242,7 @@ export default function MaintenanceRecordsSection({
     openCreateDialog();
   }, [autoOpenCreateOnMount, openCreateDialog, readOnly, trialMode]);
 
-  const submitLabel = editingRecord ? '更新する' : '記録を追加';
+  const submitLabel = '保存';
 
   const maintenanceSummaryText = useMemo(
     () => buildMaintenanceSummaryText(summary),
@@ -259,12 +269,12 @@ export default function MaintenanceRecordsSection({
         } else {
           await createMaintenanceRecord(resourceKey, parentId, payload);
         }
-      }, editingRecord ? '保守記録を更新中...' : '保守記録を保存中...');
+      }, 'メンテナンスを保存中...');
 
-      setSubmitSuccess(editingRecord ? '保守記録を更新しました。' : '保守記録を追加しました。');
+      setSubmitSuccess('メンテナンスを保存しました。');
       await loadRecords();
       onChanged();
-      onSaved?.(editingRecord ? 'update' : 'create');
+      onSaved?.(editingRecord ? 'update' : 'create', formState);
       closeEditorDialog();
     } catch (saveError) {
       const details = saveError instanceof Error && 'details' in saveError
@@ -286,7 +296,7 @@ export default function MaintenanceRecordsSection({
     try {
       await startLoading(async () => {
         await deleteMaintenanceRecord(resourceKey, parentId, deleteTarget.id);
-      }, '保守記録を削除中...');
+      }, 'メンテナンスを削除中...');
 
       setDeleteTarget(null);
       await loadRecords();
@@ -303,30 +313,33 @@ export default function MaintenanceRecordsSection({
     <>
       <section className="space-y-4 border-t-4 border-[var(--color-accent-25)] pt-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-2">
-            <h3 className="text-base font-semibold text-[var(--color-text-strong)]">保守記録</h3>
-            <p className="text-sm leading-6 text-[var(--color-text-muted)]">{maintenanceSummaryText}</p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold text-[var(--color-text-strong)]">メンテナンス記録</h3>
+              <p className="text-sm leading-6 text-[var(--color-text-muted)]">{maintenanceSummaryText}</p>
+            </div>
+            {pageMode && onPageModeChange ? <PageModeToggle mode={pageMode} onChange={onPageModeChange} /> : null}
           </div>
           {!readOnly ? (
             <CustomButton onClick={openCreateDialog} disabled={trialMode}>
-              記録を追加
+              保存
             </CustomButton>
           ) : null}
         </div>
 
         {trialMode ? (
           <CustomMessageArea variant="info">
-            トライアルモードでは保守履歴の閲覧と保存は利用できません。ログイン後に保守記録を管理してください。
+            トライアルモードではメンテナンス記録の閲覧と保存は利用できません。ログイン後に管理してください。
           </CustomMessageArea>
         ) : null}
         {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
 
         {loading ? (
-          <p className="text-sm text-[var(--color-text-muted)]">保守記録を読み込んでいます...</p>
+          <p className="text-sm text-[var(--color-text-muted)]">メンテナンス記録を読み込んでいます...</p>
         ) : trialMode ? (
-          <p className="text-sm text-[var(--color-text-muted)]">トライアルモードでは保守記録はまだ表示されません。</p>
+          <p className="text-sm text-[var(--color-text-muted)]">トライアルモードではメンテナンス記録は表示されません。</p>
         ) : records.length === 0 ? (
-          <p className="text-sm text-[var(--color-text-muted)]">保守記録はまだありません。</p>
+          <p className="text-sm text-[var(--color-text-muted)]">メンテナンス記録はまだありません。</p>
         ) : (
           <div className="space-y-3">
             {records.map((record) => (
@@ -363,21 +376,22 @@ export default function MaintenanceRecordsSection({
       <Dialog
         open={editorOpen}
         onClose={closeEditorDialog}
-        title={editingRecord ? '保守記録を編集' : '保守記録を追加'}
+        title={editingRecord ? 'メンテナンスを編集' : 'メンテナンスを追加'}
         size="md"
         footer={(
           <DialogFooterLayout
             layoutMode={layoutMode}
+            separatePrimary={false}
             status={submitSuccess ? <CustomMessageArea variant="success">{submitSuccess}</CustomMessageArea> : null}
             trailing={(
-              <>
-                <CustomButton variant="neutral" onClick={closeEditorDialog}>
+              <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
+                <CustomButton variant="neutral" onClick={closeEditorDialog} disabled={isPending}>
                   キャンセル
                 </CustomButton>
-                <CustomButton variant="accent" onClick={() => void handleSave()}>
+                <CustomButton variant="accent" onClick={() => void handleSave()} disabled={isPending}>
                   {submitLabel}
                 </CustomButton>
-              </>
+              </ResponsiveActionGroup>
             )}
           />
         )}
@@ -389,6 +403,7 @@ export default function MaintenanceRecordsSection({
             <CustomTextBox
               id="maintenanceDate"
               type="date"
+              max={getTodayDateString()}
               value={formState.maintenanceDate}
               onChange={(event) => setFormState((current) => ({ ...current, maintenanceDate: event.target.value }))}
               isError={Boolean(formErrors.maintenanceDate?.length)}
@@ -439,28 +454,29 @@ export default function MaintenanceRecordsSection({
       <Dialog
         open={deleteTarget != null}
         onClose={() => setDeleteTarget(null)}
-        title="保守記録を削除"
+        title="メンテナンスを削除"
         size="sm"
         footer={(
           <DialogFooterLayout
             layoutMode={layoutMode}
+            separatePrimary={false}
             trailing={(
-              <>
-                <CustomButton variant="neutral" onClick={() => setDeleteTarget(null)}>
+              <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
+                <CustomButton variant="neutral" onClick={() => setDeleteTarget(null)} disabled={isPending}>
                   キャンセル
                 </CustomButton>
-                <CustomButton variant="ghost" onClick={() => void handleDelete()}>
-                  削除する
+                <CustomButton variant="ghost" onClick={() => void handleDelete()} disabled={isPending}>
+                  削除
                 </CustomButton>
-              </>
+              </ResponsiveActionGroup>
             )}
           />
         )}
       >
         <p className="text-sm leading-6 text-[var(--color-text-muted)]">
           {deleteTarget
-            ? `${formatMaintenanceDate(deleteTarget.maintenanceDate)} の保守記録を削除します。`
-            : '保守記録を削除します。'}
+            ? `${formatMaintenanceDate(deleteTarget.maintenanceDate)} のメンテナンス記録を削除します。`
+            : 'メンテナンス記録を削除します。'}
         </p>
       </Dialog>
     </>

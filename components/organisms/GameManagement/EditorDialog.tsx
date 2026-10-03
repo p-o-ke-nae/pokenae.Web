@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CustomButton from '@/components/atoms/CustomButton';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
+import PageModeToggle from '@/components/atoms/PageModeToggle';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
 import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
 import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
@@ -406,6 +407,7 @@ export default function EditorDialog({
         footer={
           <DialogFooterLayout
             layoutMode={layoutMode}
+            separatePrimary={false}
             status={isPending ? (
               <span role="status" aria-live="polite" className="text-xs text-[var(--color-text-muted)]">
                 保存中はダイアログを閉じられません。
@@ -436,54 +438,49 @@ export default function EditorDialog({
                 </>
               ) : null
             }
-            trailing={
-              isViewMode && onPageModeChange ? (
-                <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
-                  <CustomButton onClick={onClose} disabled={isPending}>閉じる</CustomButton>
-                  <CustomButton variant="accent" disabled={isPending} onClick={() => onPageModeChange('edit')}>
-                    編集を有効化
+            trailing={(
+              <ResponsiveActionGroup
+                layoutMode={layoutMode}
+                mobileColumns={3}
+                align="end"
+              >
+                {!isNew && !isViewMode && definition.canDelete ? (
+                  <CustomButton variant="ghost" onClick={() => setDeleteDialogOpen(true)}>
+                    削除
                   </CustomButton>
-                </ResponsiveActionGroup>
-              ) : (
-                <>
-                  {!isNew && (definition.canDelete || (!isViewMode && onPageModeChange)) ? (
-                    <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
-                      {definition.canDelete ? (
-                        <CustomButton variant="ghost" onClick={() => setDeleteDialogOpen(true)}>
-                          削除
-                        </CustomButton>
-                      ) : null}
-                      {!isViewMode && onPageModeChange ? (
-                        <CustomButton onClick={() => onPageModeChange('view')}>
-                          読み取り専用に戻す
-                        </CustomButton>
-                      ) : null}
-                    </ResponsiveActionGroup>
-                  ) : null}
-                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
-                    <CustomButton onClick={onClose} disabled={isPending}>キャンセル</CustomButton>
-                    {isNew ? (
-                      <>
-                        <CustomButton onClick={() => void handleSave('continue')} disabled={isPending || loading}>
-                          作成して続ける
-                        </CustomButton>
-                        <CustomButton variant="accent" onClick={() => void handleSave('close')} disabled={isPending || loading}>
-                          作成して閉じる
-                        </CustomButton>
-                      </>
-                    ) : definition.canEdit ? (
-                      <CustomButton variant="accent" onClick={() => void handleSave('close')} disabled={isPending || loading}>
-                        保存する
-                      </CustomButton>
-                    ) : null}
-                  </ResponsiveActionGroup>
-                </>
-              )
-            }
+                ) : null}
+                <CustomButton onClick={onClose} disabled={isPending}>
+                  {isViewMode ? '閉じる' : 'キャンセル'}
+                </CustomButton>
+                {isNew ? (
+                  <>
+                    <CustomButton onClick={() => void handleSave('continue')} disabled={isPending || loading}>
+                      続けて保存
+                    </CustomButton>
+                    <CustomButton variant="accent" onClick={() => void handleSave('close')} disabled={isPending || loading}>
+                      保存
+                    </CustomButton>
+                  </>
+                ) : !isViewMode && definition.canEdit ? (
+                  <CustomButton variant="accent" onClick={() => void handleSave('close')} disabled={isPending || loading}>
+                    保存
+                  </CustomButton>
+                ) : null}
+              </ResponsiveActionGroup>
+            )}
           />
         }
       >
         <div ref={bodyRef} className="space-y-4">
+          {!isNew && onPageModeChange ? (
+            <div className="flex justify-end">
+              <PageModeToggle
+                mode={pageMode}
+                onChange={onPageModeChange}
+                disabled={isPending}
+              />
+            </div>
+          ) : null}
           {error ? <CustomMessageArea variant="error" className="whitespace-pre-line">{error}</CustomMessageArea> : null}
           {success ? <CustomMessageArea variant="success">{success}</CustomMessageArea> : null}
           {loading ? (
@@ -516,25 +513,25 @@ export default function EditorDialog({
                    <section className="space-y-4 border-t-4 border-[var(--color-accent-25)] pt-4">
                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                        <div className="space-y-2">
-                         <h3 className="text-base font-semibold text-[var(--color-text-strong)]">保守履歴</h3>
+                         <h3 className="text-base font-semibold text-[var(--color-text-strong)]">メンテナンス</h3>
                          <p className="text-sm leading-6 text-[var(--color-text-muted)]">
                            {buildMaintenanceSummaryText(maintenanceSummary)}
                          </p>
                        </div>
                        <CustomButton variant="neutral" onClick={() => setMaintenanceDialogOpen(true)}>
-                         履歴を見る
+                         メンテナンス
                        </CustomButton>
                      </div>
                      {isTrial ? (
                        <CustomMessageArea variant="info">
-                         トライアルモードでは保守履歴ダイアログは確認できますが、保存操作は利用できません。
+                         トライアルモードではメンテナンスは確認できますが、保存操作は利用できません。
                        </CustomMessageArea>
                      ) : null}
                    </section>
                    <Dialog
                      open={maintenanceDialogOpen}
                      onClose={() => setMaintenanceDialogOpen(false)}
-                     title={`${definition.shortLabel}の保守履歴`}
+                     title={`${definition.shortLabel}のメンテナンス`}
                      size="lg"
                      footer={(
                        <DialogFooterLayout
@@ -555,6 +552,8 @@ export default function EditorDialog({
                        readOnly={isViewMode}
                        trialMode={isTrial}
                        layoutMode={layoutMode}
+                       pageMode={pageMode}
+                       onPageModeChange={onPageModeChange}
                        onChanged={() => { void handleMaintenanceChanged(); }}
                      />
                    </Dialog>
@@ -611,7 +610,7 @@ export default function EditorDialog({
               <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
                 <CustomButton onClick={() => setDeleteDialogOpen(false)} disabled={isPending}>キャンセル</CustomButton>
                 <CustomButton variant="accent" disabled={isPending} onClick={() => void handleDelete()}>
-                  削除する
+                  削除
                 </CustomButton>
               </ResponsiveActionGroup>
             }

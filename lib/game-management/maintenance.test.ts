@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildMaintenanceSummaryText,
   getMaintenanceHealthStatusLabel,
+  isMaintenanceDateInFuture,
   supportsMaintenance,
 } from './maintenance';
 
@@ -22,7 +23,7 @@ describe('game-management maintenance helpers', () => {
       nextMaintenanceDate: '2026-06-01',
       isOverdue: true,
       latestHealthStatus: 2,
-    })).toBe('保守: 起動不調 / 最終: 2026/05/01 / 次回: 2026/06/01 / 期限超過');
+    })).toBe('メンテナンス: 起動不調 / 最終: 2026/05/01 / 次回: 2026/06/01 / 期限超過');
   });
 
   it('shows a clear message when no maintenance exists', () => {
@@ -33,7 +34,12 @@ describe('game-management maintenance helpers', () => {
       nextMaintenanceDate: null,
       isOverdue: false,
       latestHealthStatus: 0,
-    })).toBe('保守: 記録なし');
+    })).toBe('メンテナンス: 記録なし');
     expect(getMaintenanceHealthStatusLabel(0)).toBe('未確認');
+  });
+
+  it('accepts today and rejects only future maintenance dates', () => {
+    expect(isMaintenanceDateInFuture('2026-10-04', '2026-10-04')).toBe(false);
+    expect(isMaintenanceDateInFuture('2026-10-05', '2026-10-04')).toBe(true);
   });
 });

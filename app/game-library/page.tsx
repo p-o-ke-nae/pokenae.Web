@@ -17,16 +17,16 @@ export default async function GameLibraryPage() {
       extraCards={[
         {
           href: '/game-library/maintenance',
-          shortLabel: '保守',
-          title: '保守履歴',
-          description: 'ゲーム機・ソフト・メモリーカードの保守記録を確認・管理します。',
-          actionLabel: '保守履歴を開く',
+          shortLabel: 'メンテナンス',
+          title: 'メンテナンス',
+          description: 'ゲーム機・ソフト・メモリーカードのメンテナンス記録を確認・管理します。',
+          actionLabel: 'メンテナンスを開く',
         },
         {
           href: '/game-library/save-data-search',
-          shortLabel: '横断検索',
-          title: '横断セーブデータ検索',
-          description: '条件を指定してセーブデータを横断検索します。',
+          shortLabel: 'セーブ検索',
+          title: 'セーブデータ検索',
+          description: '条件を指定してセーブデータを検索します。',
           actionLabel: '検索画面を開く',
         },
         {

@@ -37,7 +37,7 @@ import {
   getMemoryCardDisplay,
   getMemoryCardEditionMasterName,
 } from './helpers';
-import MaintenanceRecordsSection, { type MaintenanceResourceKey } from './MaintenanceRecordsSection';
+import MaintenanceRecordsSection, { type MaintenanceFormState, type MaintenanceResourceKey } from './MaintenanceRecordsSection';
 import { PageFrame, PageSection, TrialBanner } from './shared';
 
 type MaintenanceTargetRow = {
@@ -58,6 +58,7 @@ type MaintenanceDialogState = {
   targets: MaintenanceTargetRow[];
   index: number;
   autoAdvance: boolean;
+  initialFormState?: MaintenanceFormState;
 };
 
 function matchesMaintenanceFilter(summary: MaintenanceSummaryDto, filter: MaintenanceHealthFilter): boolean {
@@ -85,7 +86,7 @@ function buildMaintenanceTargets(lookups: ManagementLookups, filter: Maintenance
         summary: buildMaintenanceSummaryText(item.maintenance),
         health: getMaintenanceHealthStatusLabel(item.maintenance.latestHealthStatus),
         nextDate: formatMaintenanceDate(item.maintenance.nextMaintenanceDate),
-        edit: '履歴を見る',
+        edit: 'メンテナンス',
         maintenanceSummary: item.maintenance,
       })),
     ...lookups.gameSoftwares
@@ -103,7 +104,7 @@ function buildMaintenanceTargets(lookups: ManagementLookups, filter: Maintenance
         summary: buildMaintenanceSummaryText(item.maintenance),
         health: getMaintenanceHealthStatusLabel(item.maintenance.latestHealthStatus),
         nextDate: formatMaintenanceDate(item.maintenance.nextMaintenanceDate),
-        edit: '履歴を見る',
+        edit: 'メンテナンス',
         maintenanceSummary: item.maintenance,
       })),
     ...lookups.memoryCards
@@ -118,7 +119,7 @@ function buildMaintenanceTargets(lookups: ManagementLookups, filter: Maintenance
         summary: buildMaintenanceSummaryText(item.maintenance),
         health: getMaintenanceHealthStatusLabel(item.maintenance.latestHealthStatus),
         nextDate: formatMaintenanceDate(item.maintenance.nextMaintenanceDate),
-        edit: '履歴を見る',
+        edit: 'メンテナンス',
         maintenanceSummary: item.maintenance,
       })),
   ];
@@ -196,7 +197,7 @@ export default function MaintenanceDashboardPage() {
 
   const activeTarget = dialogState ? dialogTargets[dialogState.index] ?? null : null;
 
-  const handleSaved = useCallback((mode: 'create' | 'update') => {
+  const handleSaved = useCallback((mode: 'create' | 'update', values: MaintenanceFormState) => {
     void load();
 
     setDialogState((current) => {
@@ -205,13 +206,14 @@ export default function MaintenanceDashboardPage() {
       }
 
       if (current.index >= current.targets.length - 1) {
-        setQueueMessage(`${current.targets.length} 件の保守記録キューを完了しました。`);
+        setQueueMessage(`${current.targets.length} 件のメンテナンス記録を保存しました。`);
         return null;
       }
 
       return {
         ...current,
         index: current.index + 1,
+        initialFormState: values,
       };
     });
   }, [load]);
@@ -233,7 +235,7 @@ export default function MaintenanceDashboardPage() {
           onClick={() => setDialogState({ targets: [row], index: 0, autoAdvance: false })}
           className="tool-inline-link"
         >
-          履歴を見る
+          メンテナンス
         </button>
       ),
     },
@@ -242,29 +244,28 @@ export default function MaintenanceDashboardPage() {
   return (
     <PageFrame
       eyebrowLabel=""
-      title="保守履歴"
-      description="ゲーム機・ソフト・メモリーカードの保守履歴を確認・記録します。"
+      title="メンテナンス"
+      description="ゲーム機・ソフト・メモリーカードのメンテナンスを確認・記録します。"
       layoutMode={layoutMode}
+      navigationActiveHref="/game-library/maintenance"
+      stickyActions={(
+        <CustomButton
+          variant="accent"
+          disabled={queueTargets.length === 0}
+          onClick={() => setDialogState({ targets: queueTargets, index: 0, autoAdvance: true })}
+        >
+          保存（{queueTargets.length}件）
+        </CustomButton>
+      )}
       actions={(
-        <>
-          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
-            <Link href="/game-library" className="button-link button-link--secondary">
-              ダッシュボードへ戻る
-            </Link>
-          </ResponsiveActionGroup>
-          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
-            <CustomButton
-              variant="accent"
-              disabled={queueTargets.length === 0}
-              onClick={() => setDialogState({ targets: queueTargets, index: 0, autoAdvance: true })}
-            >
-              選択した {queueTargets.length} 件を順次記録
-            </CustomButton>
-            <CustomButton onClick={() => void load()}>
-              再読み込み
-            </CustomButton>
-          </ResponsiveActionGroup>
-        </>
+        <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
+          <Link href="/game-library" className="button-link button-link--secondary">
+            戻る
+          </Link>
+          <CustomButton onClick={() => void load()}>
+            再読込
+          </CustomButton>
+        </ResponsiveActionGroup>
       )}
     >
       {isTrial || error || queueMessage ? (
@@ -275,13 +276,13 @@ export default function MaintenanceDashboardPage() {
         </div>
       ) : null}
       {loading ? (
-        <p className="tool-muted text-sm" role="status">保守対象を読み込んでいます...</p>
+        <p className="tool-muted text-sm" role="status">メンテナンス対象を読み込んでいます...</p>
       ) : (
         <>
           <PageSection title="絞り込み">
             <div className="tool-filter">
               <div className="space-y-2">
-                <CustomLabel htmlFor="maintenance-dashboard-filter">保守状態</CustomLabel>
+                <CustomLabel htmlFor="maintenance-dashboard-filter">メンテナンス状態</CustomLabel>
                 <CustomComboBox
                   id="maintenance-dashboard-filter"
                   value={maintenanceHealthFilter}
@@ -293,11 +294,11 @@ export default function MaintenanceDashboardPage() {
                 </CustomComboBox>
               </div>
               <p className="m-0 text-sm leading-6 text-[var(--color-text-muted)]">
-                一覧から対象を複数選択すると、保守記録ダイアログを順番に開いて記録できます。
+                一覧から対象を複数選択すると、メンテナンス記録を続けて保存できます。
               </p>
             </div>
           </PageSection>
-          <PageSection title="保守対象">
+          <PageSection title="メンテナンス対象">
             <div className="tool-toolbar">
               <div className="tool-toolbar__meta">
                 <span>表示件数: {rows.length} 件</span>
@@ -305,7 +306,7 @@ export default function MaintenanceDashboardPage() {
               </div>
             </div>
             <DataTable
-              title="保守対象一覧"
+              title="メンテナンス対象一覧"
               columns={columns}
               data={rows}
               filterOptionsData={rows}
@@ -316,7 +317,7 @@ export default function MaintenanceDashboardPage() {
               onSelectionChange={setSelectedKeys}
               paginated
               resizable
-              emptyMessage="保守対象がありません。"
+              emptyMessage="メンテナンス対象がありません。"
             />
           </PageSection>
         </>
@@ -324,7 +325,7 @@ export default function MaintenanceDashboardPage() {
       <Dialog
         open={activeTarget != null}
         onClose={() => setDialogState(null)}
-        title={activeTarget ? `${activeTarget.resourceLabel}の保守履歴` : '保守履歴'}
+        title={activeTarget ? `${activeTarget.resourceLabel}のメンテナンス` : 'メンテナンス'}
         size="lg"
         footer={(
           <DialogFooterLayout
@@ -356,6 +357,7 @@ export default function MaintenanceDashboardPage() {
               summary={activeTarget.maintenanceSummary}
               trialMode={isTrial}
               autoOpenCreateOnMount={Boolean(dialogState?.autoAdvance) && !isTrial}
+              initialFormState={dialogState?.initialFormState}
               layoutMode={layoutMode}
               onChanged={() => { void load(); }}
               onSaved={handleSaved}

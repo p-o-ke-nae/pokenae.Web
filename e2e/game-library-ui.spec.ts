@@ -92,7 +92,7 @@ function expectNoOverlap(boxes: Box[]) {
   }
 }
 
-async function expectFooterLayout(dialog: Locator, isMobile: boolean, primaryName: string) {
+async function expectFooterLayout(dialog: Locator, isMobile: boolean, primaryName: string, primarySolo = true) {
   const dialogBox = await dialog.boundingBox();
   expect(dialogBox).not.toBeNull();
   const boxes = await footerButtonBoxes(dialog);
@@ -114,13 +114,17 @@ async function expectFooterLayout(dialog: Locator, isMobile: boolean, primaryNam
   expect(primary, `${primaryName} が見つからない`).toBeDefined();
 
   if (isMobile) {
-    // 主操作は最下段で単独の全幅行
-    const maxY = Math.max(...boxes.map((box) => box.y));
-    expect(Math.abs(primary!.y - maxY)).toBeLessThanOrEqual(1);
-    const sameRow = boxes.filter((box) => Math.abs(box.y - primary!.y) <= 1);
-    expect(sameRow, JSON.stringify(boxes)).toHaveLength(1);
-    const widest = Math.max(...boxes.map((box) => box.width));
-    expect(primary!.width).toBeGreaterThanOrEqual(widest - 1);
+    if (primarySolo) {
+      const maxY = Math.max(...boxes.map((box) => box.y));
+      expect(Math.abs(primary!.y - maxY)).toBeLessThanOrEqual(1);
+      const sameRow = boxes.filter((box) => Math.abs(box.y - primary!.y) <= 1);
+      expect(sameRow, JSON.stringify(boxes)).toHaveLength(1);
+      const widest = Math.max(...boxes.map((box) => box.width));
+      expect(primary!.width).toBeGreaterThanOrEqual(widest - 1);
+    } else {
+      const ys = boxes.map((box) => box.y);
+      expect(Math.max(...ys) - Math.min(...ys), JSON.stringify(boxes)).toBeLessThanOrEqual(1);
+    }
     // 同じ行のボタンは同じ幅（均等割り）
     const rows = new Map<number, Box[]>();
     for (const box of boxes) {
@@ -157,8 +161,21 @@ test.describe("ゲームライブラリ UI", () => {
     for (const label of ["Maintenance", "Search", "Master"]) {
       await expect(page.getByText(label, { exact: true })).toHaveCount(0);
     }
-    for (const label of ["保守", "横断検索", "マスタ管理"]) {
+    for (const label of ["メンテナンス", "セーブ検索", "マスタ管理"]) {
       await expect(page.locator(".admin-card__eyebrow").getByText(label, { exact: true })).toBeVisible();
+    }
+    const libraryNavigation = page.getByRole("navigation", { name: "ゲームライブラリ画面" });
+    for (const href of [
+      "/game-library",
+      "/game-library/game-consoles",
+      "/game-library/game-softwares",
+      "/game-library/accounts",
+      "/game-library/memory-cards",
+      "/game-library/save-datas",
+      "/game-library/maintenance",
+      "/game-library/save-data-search",
+    ]) {
+      await expect(libraryNavigation.locator(`a[href="${href}"]`)).toBeVisible();
     }
     await expect(page.locator("main main")).toHaveCount(0);
     await expectUnboxedSections(page);
@@ -200,12 +217,12 @@ test.describe("ゲームライブラリ UI", () => {
     }
   });
 
-  test("一覧・保守・横断検索もカードで包まず見出しで区切る", async ({ page }) => {
+  test("一覧・メンテナンス・セーブ検索もカードで包まず見出しで区切る", async ({ page }) => {
     const blogWidth = await mainWidth(page, "/blog");
 
     await page.goto("/game-library/game-consoles");
     await expect(page.getByRole("heading", { level: 2, name: "データ一覧" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "ダッシュボードへ戻る" })).toHaveAttribute("href", "/game-library");
+    await expect(page.getByRole("link", { name: "戻る" })).toHaveAttribute("href", "/game-library");
     await expect(page.getByText("Game Management", { exact: true })).toHaveCount(0);
     const modeSwitch = page.getByRole("switch", { name: /閲覧モード/ });
     await expect(modeSwitch).toBeVisible();
@@ -215,15 +232,15 @@ test.describe("ゲームライブラリ UI", () => {
 
     await page.goto("/game-library/maintenance");
     await expect(page.getByText("Game Library", { exact: true })).toHaveCount(0);
-    await expect(page.getByRole("heading", { level: 2, name: "保守対象" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "ダッシュボードへ戻る" })).toHaveAttribute("href", "/game-library");
+    await expect(page.getByRole("heading", { level: 2, name: "メンテナンス対象" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "戻る" })).toHaveAttribute("href", "/game-library");
     await expectUnboxedSections(page);
 
     await page.goto("/game-library/save-data-search");
     await expect(page.getByText("Game Library", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 2, name: "条件グループ" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "検索結果" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "ダッシュボードへ戻る" })).toHaveAttribute("href", "/game-library");
+    await expect(page.getByRole("link", { name: "戻る" })).toHaveAttribute("href", "/game-library");
     await expectUnboxedSections(page);
   });
 
@@ -237,7 +254,92 @@ test.describe("ゲームライブラリ UI", () => {
       await expect(dialog).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
     await expect(dialog.locator("footer.dialog__footer")).toBeVisible();
-    await expectFooterLayout(dialog, isMobile, "作成して閉じる");
+    await expectFooterLayout(dialog, isMobile, "保存", false);
+  });
+
+  test("横断セーブ検索のスキーマ読込が完了する", async ({ page }) => {
+    const schemaRequests: string[] = [];
+    await page.route("**/api/public/**", async (route) => {
+      const path = new URL(route.request().url()).pathname.replace("/api/public/", "");
+      let data: unknown[] | Record<string, unknown> = [];
+      if (path === "game-software-masters") {
+        data = [{
+          id: 100,
+          name: "テストソフト",
+          abbreviation: "TEST",
+          gameConsoleCategoryId: 1,
+          contentGroupId: 10,
+          displayOrder: 1,
+          isDeleted: false,
+        }];
+      } else if (path === "game-software-masters/100/save-data-schema") {
+        schemaRequests.push(path);
+        data = {
+          gameSoftwareMasterId: 100,
+          contentGroupId: 10,
+          fields: [{
+            fieldKey: "trainer-name",
+            label: "主人公名",
+            description: null,
+            fieldType: 0,
+            displayOrder: 1,
+            isRequired: false,
+            isDisabled: false,
+            options: [],
+          }],
+        };
+      } else if (path === "game-software-masters/100/story-progress-schema") {
+        schemaRequests.push(path);
+        data = { gameSoftwareMasterId: 100, contentGroupId: 10, choices: [] };
+      }
+
+      await route.fulfill({ status: 200, contentType: "application/json", json: { success: true, data } });
+    });
+
+    await page.goto("/game-library/save-data-search");
+    await page.getByLabel("ゲームソフトマスタ").selectOption("100");
+    await expect(page.getByRole("button", { name: "条件を追加" })).toBeEnabled();
+    await expect.poll(() => schemaRequests.length).toBe(2);
+    await expect(page.getByText("スキーマを読み込んでいます...")).toHaveCount(0);
+  });
+
+  test("ネストしたメンテナンス画面を閉じても親の詳細は開いたまま", async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem("pokenae_trial_v1:game-consoles", JSON.stringify([{
+        id: 1,
+        gameConsoleMasterId: 1,
+        gameConsoleEditionMasterId: null,
+        ownerGoogleUserId: "trial-user",
+        displayOrder: 1,
+        label: "テスト本体",
+        memo: null,
+        isDeleted: false,
+        maintenance: {
+          hasRecord: false,
+          intervalDays: 365,
+          lastMaintenanceDate: null,
+          nextMaintenanceDate: null,
+          isOverdue: false,
+          latestHealthStatus: 0,
+        },
+      }]));
+    });
+
+    await page.goto("/game-library/game-consoles");
+    await page.getByRole("button", { name: "編集" }).first().click();
+    const parentDialog = page.getByRole("dialog", { name: "ゲーム機詳細" });
+    await expect(parentDialog).toBeVisible();
+    await parentDialog.getByRole("button", { name: "メンテナンス" }).click();
+    const maintenanceDialog = page.getByRole("dialog", { name: "ゲーム機のメンテナンス" });
+    await expect(maintenanceDialog).toBeVisible();
+    const maintenanceModeSwitch = maintenanceDialog.getByRole("switch").first();
+    await expect(maintenanceModeSwitch).toHaveAttribute("aria-checked", "false");
+    await maintenanceModeSwitch.click();
+    await expect(maintenanceModeSwitch).toHaveAttribute("aria-checked", "true");
+    await maintenanceDialog.locator(":scope > .dialog__surface > .dialog__header > .dialog__close").click();
+
+    await expect(maintenanceDialog).toBeHidden();
+    await expect(page.getByRole("dialog", { name: "ゲーム機編集" })).toBeVisible();
   });
 });
 

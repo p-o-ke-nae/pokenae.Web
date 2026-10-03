@@ -222,8 +222,6 @@ export default function SaveDataSearchPage() {
       return;
     }
 
-    let cancelled = false;
-
     const loadSchemas = async () => {
       setSchemaLoadingIds((current) => Array.from(new Set([...current, ...pendingIds])));
 
@@ -232,10 +230,6 @@ export default function SaveDataSearchPage() {
         saveDataSchema: await fetchPublicSaveDataSchema(gameSoftwareMasterId),
         storyProgressSchema: await fetchPublicStoryProgressSchema(gameSoftwareMasterId),
       })));
-
-      if (cancelled) {
-        return;
-      }
 
       const nextSchemaErrors: Record<number, string> = {};
       const nextSaveDataSchemas: Record<number, SaveDataSchemaDto> = {};
@@ -261,10 +255,6 @@ export default function SaveDataSearchPage() {
     };
 
     void loadSchemas();
-
-    return () => {
-      cancelled = true;
-    };
   }, [requestedMasterIds, saveDataSchemas, schemaLoadErrors, schemaLoadingIds]);
 
   const submittedCriteria = useMemo(() => {
@@ -351,25 +341,24 @@ export default function SaveDataSearchPage() {
   return (
     <PageFrame
       eyebrowLabel=""
-      title="横断セーブデータ検索"
-      description="共通 variant と複数の schema 条件グループを組み合わせ、セーブデータを作品横断で検索します。"
+      title="セーブデータ検索"
+      description="複数の条件グループを組み合わせて、セーブデータを検索します。"
       layoutMode={layoutMode}
+      navigationActiveHref="/game-library/save-data-search"
+      stickyActions={(
+        <CustomButton variant="accent" onClick={handleSearch} disabled={schemaLoadingIds.length > 0}>
+          検索
+        </CustomButton>
+      )}
       actions={(
-        <>
-          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
-            <Link href="/game-library" className="button-link button-link--secondary">
-              ダッシュボードへ戻る
-            </Link>
-          </ResponsiveActionGroup>
-          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
-            <CustomButton variant="accent" onClick={handleSearch}>
-              検索する
-            </CustomButton>
-            <CustomButton onClick={handleReload}>
-              再読み込み
-            </CustomButton>
-          </ResponsiveActionGroup>
-        </>
+        <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
+          <Link href="/game-library" className="button-link button-link--secondary">
+            戻る
+          </Link>
+          <CustomButton onClick={handleReload}>
+            再読込
+          </CustomButton>
+        </ResponsiveActionGroup>
       )}
     >
       {isTrial || error || searchError ? (

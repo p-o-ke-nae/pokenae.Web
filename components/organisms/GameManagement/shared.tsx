@@ -1,6 +1,7 @@
 'use client';
 
 import { useId } from 'react';
+import Link from 'next/link';
 
 import CustomComboBox from '@/components/atoms/CustomComboBox';
 import CustomHeader from '@/components/atoms/CustomHeader';
@@ -30,6 +31,17 @@ import {
   getGameSoftwareMasterName,
 } from './helpers';
 import { shouldRenderSelectPlaceholder } from './select-utils';
+import { RESOURCE_DEFINITIONS, USER_RESOURCE_ORDER } from '@/lib/game-management/resources';
+
+const GAME_LIBRARY_NAVIGATION_ITEMS = [
+  { href: '/game-library', label: 'ダッシュボード' },
+  ...USER_RESOURCE_ORDER.map((key) => ({
+    href: `/game-library/${key}`,
+    label: RESOURCE_DEFINITIONS[key].shortLabel,
+  })),
+  { href: '/game-library/maintenance', label: 'メンテナンス' },
+  { href: '/game-library/save-data-search', label: 'セーブ検索' },
+];
 
 // ---------------------------------------------------------------------------
 // SelectField
@@ -133,18 +145,22 @@ export function PageFrame({
   title,
   description,
   actions,
+  stickyActions,
   layoutMode = 'desktop',
+  navigationActiveHref,
   children,
 }: {
   eyebrowLabel?: string;
   title: string;
   description: string;
   actions?: React.ReactNode;
+  stickyActions?: React.ReactNode;
   layoutMode?: LayoutMode;
+  navigationActiveHref?: string;
   children: React.ReactNode;
 }) {
   return (
-    <main className="page-container tool-page">
+    <main className={['page-container tool-page', stickyActions ? 'tool-page--has-sticky-actions' : ''].filter(Boolean).join(' ')}>
       <header className="page-header">
         {eyebrowLabel ? <p className="tool-page__eyebrow">{eyebrowLabel}</p> : null}
         <CustomHeader level={1}>{title}</CustomHeader>
@@ -154,8 +170,94 @@ export function PageFrame({
             {actions}
           </div>
         ) : null}
+        {navigationActiveHref ? (
+          <nav className="game-library-navigation" aria-label="ゲームライブラリ画面">
+            {GAME_LIBRARY_NAVIGATION_ITEMS.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={item.href === navigationActiveHref ? 'page' : undefined}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        ) : null}
       </header>
       <div className="tool-page__body">{children}</div>
+      {stickyActions ? (
+        <div className="tool-sticky-actions" role="group" aria-label="ページ操作">
+          {stickyActions}
+        </div>
+      ) : null}
+      {navigationActiveHref ? (
+        <style jsx>{`
+          .game-library-navigation {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            overflow-x: auto;
+            padding: 0.125rem 0 0.5rem;
+            scrollbar-width: thin;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          .game-library-navigation a {
+            flex: 0 0 auto;
+            border: 1px solid var(--color-base-70-dark);
+            border-radius: 999px;
+            padding: 0.375rem 0.75rem;
+            color: var(--color-text-strong);
+            font-size: 0.8125rem;
+            text-decoration: none;
+            white-space: nowrap;
+          }
+
+          .game-library-navigation a[aria-current='page'] {
+            border-color: var(--color-accent-25);
+            background: color-mix(in srgb, var(--color-accent-25) 12%, white);
+            font-weight: 700;
+          }
+
+          .game-library-navigation a:focus-visible {
+            outline: 2px solid var(--color-accent-25);
+            outline-offset: 2px;
+          }
+        `}</style>
+      ) : null}
+      {stickyActions ? (
+        <style jsx>{`
+          .tool-page--has-sticky-actions {
+            padding-block-end: 5rem;
+          }
+
+          .tool-sticky-actions {
+            position: fixed;
+            z-index: 20;
+            inset-inline-end: max(1rem, env(safe-area-inset-right, 0px));
+            inset-block-end: max(1rem, env(safe-area-inset-bottom, 0px));
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: 1px solid var(--color-base-70-dark);
+            border-radius: 0.75rem;
+            padding: 0.5rem;
+            background: color-mix(in srgb, white 94%, var(--color-base-70));
+            box-shadow: 0 0.5rem 1.5rem rgba(31, 31, 42, 0.18);
+          }
+
+          @media (max-width: 640px) {
+            .tool-sticky-actions {
+              inset-inline: max(0.75rem, env(safe-area-inset-left, 0px));
+              justify-content: stretch;
+            }
+
+            .tool-sticky-actions :global(.custom-button) {
+              width: 100%;
+            }
+          }
+        `}</style>
+      ) : null}
     </main>
   );
 }

@@ -19,6 +19,8 @@ export type DialogFooterLayoutProps = {
 	layoutMode?: LayoutMode;
 	/** モバイル時の1行あたりの最大列数（既定 3） */
 	mobileMaxColumns?: number;
+	/** モバイル時も主要操作を単独行に分けない */
+	separatePrimary?: boolean;
 };
 
 /** useResponsiveLayoutMode の mobile 判定（幅 < 640px）と揃えたメディアクエリ上限 */
@@ -72,10 +74,18 @@ function toTokens(node: ReactNode, prefix: string): FooterToken<ReactNode>[] {
  * - PC / タブレット: leading を左、trailing を右に1行で並べ、幅が足りない場合は折り返す
  * - モバイル: 操作グループごとに1行、行内は均等幅のグリッド。trailing の主要操作は最下段の全幅行
  */
-export default function DialogFooterLayout({ status, leading, trailing, className = "", layoutMode = 'desktop', mobileMaxColumns }: DialogFooterLayoutProps) {
+export default function DialogFooterLayout({
+	status,
+	leading,
+	trailing,
+	className = "",
+	layoutMode = 'desktop',
+	mobileMaxColumns,
+	separatePrimary = true,
+}: DialogFooterLayoutProps) {
 	const classes = ["dialog-footer-layout", className].filter(Boolean).join(" ");
 	const leadingRows = planFooterRows(toTokens(leading, "l:"), { maxColumns: mobileMaxColumns });
-	const trailingRows = planFooterRows(toTokens(trailing, "t:"), { separatePrimary: true, maxColumns: mobileMaxColumns });
+	const trailingRows = planFooterRows(toTokens(trailing, "t:"), { separatePrimary, maxColumns: mobileMaxColumns });
 	const sides = [
 		{ key: "leading", className: "dialog-footer-layout__side dialog-footer-layout__leading", rows: leadingRows },
 		{ key: "trailing", className: "dialog-footer-layout__side dialog-footer-layout__trailing", rows: trailingRows },
