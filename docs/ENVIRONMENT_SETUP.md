@@ -79,6 +79,18 @@ Variables、認証情報は Secrets に同じキー名で登録します。
 | `CONTENT_REPOSITORY_REF`                   | 公開コンテンツの参照 branch |
 | `GAME_LIBRARY_API_VERSION_RANGE`           | 対応 API バージョン範囲 |
 
+##### game-library API の接続先
+
+| GitHub Environment | デプロイ先 | `API_SERVICE_GAME_LIBRARY_API_BASE_URL` / `NEXT_PUBLIC_API_BASE_URL` / `NEXT_PUBLIC_API_URL` |
+| ------------------ | ---------- | ------------------------------------------------------------------------------------------- |
+| `production`       | VPS（main） | `https://gamelibrarytool.delightfulground-2e3fd153.japanwest.azurecontainerapps.io` |
+| `development`      | ACA（develop） | `https://gamelibrarytool-develop.delightfulground-2e3fd153.japanwest.azurecontainerapps.io` |
+| `copilot`          | ACA（copilot/**） | develop と同じ |
+
+`NEXT_PUBLIC_*` はビルド時に埋め込まれるため、変更後は対象 branch の再ビルド・再デプロイが必要です。
+本番 VPS デプロイの最後に `${NEXTAUTH_URL}/api/public/account-type-masters` を取得し、
+Web 経由で本番 game-library API へ到達できることを検証します（API はゼロスケールのためリトライ付き）。
+
 #### Environment Secrets
 
 | Secret 名                  | コンテナ内の環境変数              | 説明 |

@@ -492,6 +492,20 @@ jobs:
           echo "[SUCCESS] Application privilege drop verified"
           EOF
 
+      - name: Verify game-library API through public site
+        env:
+          SITE_URL: ${{ vars.NEXTAUTH_URL }}
+        run: |
+          set -euo pipefail
+
+          # game-library API はゼロスケールのためコールドスタートを考慮してリトライする
+          curl --fail --silent --show-error \
+            --max-time 60 \
+            --retry 6 --retry-all-errors --retry-delay 10 \
+            "${SITE_URL%/}/api/public/account-type-masters" > /dev/null
+
+          echo "[SUCCESS] game-library API is reachable through ${SITE_URL%/}"
+
       - name: Clean up deployment artifacts
         if: always()
         env:
