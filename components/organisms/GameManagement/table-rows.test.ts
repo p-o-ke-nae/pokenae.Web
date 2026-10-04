@@ -29,7 +29,9 @@ describe('game-library user resource table columns', () => {
     const columns = getTableColumns('accounts');
 
     expect(columns.find(({ key }) => key === 'relation')?.header).toBe('アカウント種類');
+    expect(columns.find(({ key }) => key === 'relation')?.width).toBe('15rem');
     expect(columns.find(({ key }) => key === 'note')?.header).toBe('メモ');
+    expect(columns.some(({ key }) => key === 'status')).toBe(false);
   });
 
   it('shows memory card type, maintenance, and memo without status', () => {

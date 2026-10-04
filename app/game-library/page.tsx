@@ -14,21 +14,23 @@ export default async function GameLibraryPage() {
       sectionDescription="ゲーム機やソフト、関連データを管理します。"
       contentTags={app?.tags ?? []}
       tagDefinitions={tagDefinitions}
-      extraCards={[
-        {
-          href: '/game-library/maintenance',
-          shortLabel: 'メンテナンス',
-          title: 'メンテナンス',
-          description: 'ゲーム機・ソフト・メモリーカードのメンテナンス記録を確認・管理します。',
-          actionLabel: 'メンテナンスを開く',
-        },
+      primaryCards={[
         {
           href: '/game-library/save-data-search',
           shortLabel: 'セーブ検索',
           title: 'セーブデータ検索',
-          description: '条件を指定してセーブデータを検索します。',
-          actionLabel: '検索画面を開く',
+          description: '複数の条件でセーブデータと保存先を検索します。',
+          actionLabel: '検索',
         },
+        {
+          href: '/game-library/maintenance',
+          shortLabel: 'メンテナンス',
+          title: 'メンテナンス',
+          description: '対象の状態確認と記録を行います。',
+          actionLabel: 'メンテナンス',
+        },
+      ]}
+      extraCards={[
         {
           href: '/game-management',
           shortLabel: 'マスタ管理',

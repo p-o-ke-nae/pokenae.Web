@@ -155,18 +155,21 @@ test.describe("ゲームライブラリ UI", () => {
     expect(libraryWidth).toBeGreaterThanOrEqual(blogWidth - 1);
 
     await expect(page.getByRole("heading", { level: 1, name: "ゲームライブラリ" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "メイン" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "データ管理" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "関連画面" })).toBeVisible();
     await expect(page.getByText("Game Library", { exact: true })).toHaveCount(0);
     for (const label of ["Maintenance", "Search", "Master"]) {
       await expect(page.getByText(label, { exact: true })).toHaveCount(0);
     }
-    for (const label of ["メンテナンス", "セーブ検索", "マスタ管理"]) {
-      await expect(page.locator(".admin-card__eyebrow").getByText(label, { exact: true })).toBeVisible();
-    }
-    const libraryNavigation = page.getByRole("navigation", { name: "ゲームライブラリ画面" });
+    const mainSection = page.locator("section.tool-section").filter({
+      has: page.getByRole("heading", { level: 2, name: "メイン" }),
+    });
+    const mainCards = mainSection.locator(".admin-card");
+    await expect(mainCards.nth(0)).toContainText("セーブ検索");
+    await expect(mainCards.nth(1)).toContainText("メンテナンス");
+    await expect(page.locator('a[href="/game-management"]')).toBeVisible();
     for (const href of [
-      "/game-library",
       "/game-library/game-consoles",
       "/game-library/game-softwares",
       "/game-library/accounts",
@@ -174,8 +177,9 @@ test.describe("ゲームライブラリ UI", () => {
       "/game-library/save-datas",
       "/game-library/maintenance",
       "/game-library/save-data-search",
+      "/game-management",
     ]) {
-      await expect(libraryNavigation.locator(`a[href="${href}"]`)).toBeVisible();
+      await expect(page.locator(`a[href="${href}"]`).first()).toBeVisible();
     }
     await expect(page.locator("main main")).toHaveCount(0);
     await expectUnboxedSections(page);
@@ -223,6 +227,9 @@ test.describe("ゲームライブラリ UI", () => {
     await page.goto("/game-library/game-consoles");
     await expect(page.getByRole("heading", { level: 2, name: "データ一覧" })).toBeVisible();
     await expect(page.getByRole("link", { name: "戻る" })).toHaveAttribute("href", "/game-library");
+    await expect(page.locator(".tool-sticky-actions")).toHaveCSS("position", "fixed");
+    await expect(page.locator(".tool-sticky-actions").getByRole("button", { name: "新規", exact: true })).toBeVisible();
+    await expect(page.locator(".tool-sticky-actions").getByRole("button", { name: "再読込" })).toBeVisible();
     await expect(page.getByText("Game Management", { exact: true })).toHaveCount(0);
     const modeSwitch = page.getByRole("switch", { name: /閲覧モード/ });
     await expect(modeSwitch).toBeVisible();
@@ -250,14 +257,14 @@ test.describe("ゲームライブラリ UI", () => {
     const dialog = page.getByRole("dialog");
     // ハイドレーション完了前のクリックを避けるため、開くまで再試行する
     await expect(async () => {
-      if (!(await dialog.isVisible())) await page.getByRole("button", { name: "新規作成" }).click();
+      if (!(await dialog.isVisible())) await page.getByRole("button", { name: "新規", exact: true }).click();
       await expect(dialog).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
     await expect(dialog.locator("footer.dialog__footer")).toBeVisible();
     await expectFooterLayout(dialog, isMobile, "保存", false);
   });
 
-  test("1つのカスタム項目で全セーブデータを横断検索できる", async ({ page }) => {
+  test("複数の検索項目とマスタ条件を組み合わせて検索できる", async ({ page }) => {
     await page.addInitScript(() => {
       const createSave = (id: number, masterId: number, trainerName: string) => ({
         id,
@@ -289,8 +296,8 @@ test.describe("ゲームライブラリ UI", () => {
         deleteReason: null,
       });
       localStorage.setItem("pokenae_trial_v1:save-datas", JSON.stringify([
-        createSave(1, 100, "ピカ"),
-        createSave(2, 200, "Oza"),
+        createSave(1, 100, "テスト主人公A"),
+        createSave(2, 200, "テスト主人公B"),
       ]));
     });
     const schemaRequests: string[] = [];
@@ -331,12 +338,21 @@ test.describe("ゲームライブラリ UI", () => {
 
     await page.goto("/game-library/save-data-search");
     await expect.poll(() => schemaRequests.length).toBe(2);
-    await page.getByLabel("カスタム項目").selectOption("trainer-name");
-    await page.getByLabel("値").fill("oza");
+    await page.getByRole("button", { name: "検索項目を追加" }).click();
+    const searchDialog = page.getByRole("dialog", { name: "検索項目を選択" });
+    await searchDialog.getByRole("checkbox", { name: "主人公名" }).check();
+    await searchDialog.getByRole("checkbox", { name: "ゲームソフトマスタ" }).check();
+    await searchDialog.getByRole("button", { name: "追加" }).click();
+    await page.locator('[id="search-value-custom:trainer-name"]').fill("テスト主人公B");
+    await page.locator('[id="search-operator-custom:trainer-name"]').selectOption("equals");
+    await page.locator('[id="search-value-master:game-software"]').selectOption("200");
     await page.getByRole("button", { name: "検索", exact: true }).click();
-    await expect(page.getByText(/セーブデータ #2/)).toBeVisible();
-    await expect(page.getByText(/セーブデータ #1/)).toHaveCount(0);
-    await page.getByLabel("ゲームソフトマスタ（任意）").selectOption("100");
+    await expect(page.getByText("TEST200 — テストソフト200")).toBeVisible();
+    await expect(page.getByText("主人公名: テスト主人公B", { exact: true })).toBeVisible();
+    await expect(page.getByText(/セーブデータ #/)).toHaveCount(0);
+    await expect(page.getByText("TEST100 — テストソフト100")).toHaveCount(0);
+
+    await page.locator('[id="search-value-master:game-software"]').selectOption("100");
     await page.getByRole("button", { name: "検索", exact: true }).click();
     await expect(page.getByText("一致するセーブデータはありませんでした。")).toBeVisible();
   });

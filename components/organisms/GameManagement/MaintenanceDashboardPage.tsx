@@ -355,6 +355,7 @@ export default function MaintenanceDashboardPage() {
               resourceKey={activeTarget.resourceKey}
               parentId={activeTarget.id}
               summary={activeTarget.maintenanceSummary}
+              targetName={activeTarget.name}
               trialMode={isTrial}
               autoOpenCreateOnMount={Boolean(dialogState?.autoAdvance) && !isTrial}
               initialFormState={dialogState?.initialFormState}

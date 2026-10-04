@@ -34,14 +34,12 @@ import { shouldRenderSelectPlaceholder } from './select-utils';
 import { RESOURCE_DEFINITIONS, USER_RESOURCE_ORDER } from '@/lib/game-management/resources';
 
 const GAME_LIBRARY_NAVIGATION_ITEMS = [
-  { href: '/game-library', label: 'ダッシュボード', description: 'ライブラリ全体の概要' },
   ...USER_RESOURCE_ORDER.map((key) => ({
     href: `/game-library/${key}`,
     label: RESOURCE_DEFINITIONS[key].shortLabel,
-    description: RESOURCE_DEFINITIONS[key].description,
   })),
-  { href: '/game-library/maintenance', label: 'メンテナンス', description: '状態確認と記録' },
-  { href: '/game-library/save-data-search', label: 'セーブ検索', description: '全セーブデータから検索' },
+  { href: '/game-library/maintenance', label: 'メンテナンス' },
+  { href: '/game-library/save-data-search', label: 'セーブ検索' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -171,16 +169,17 @@ export function PageFrame({
             {actions}
           </div>
         ) : null}
-        {navigationActiveHref ? (
+        {navigationActiveHref && navigationActiveHref !== '/game-library' ? (
           <nav className="game-library-navigation" aria-label="ゲームライブラリ画面">
             {GAME_LIBRARY_NAVIGATION_ITEMS.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
+                className="admin-card game-library-navigation__item"
                 aria-current={item.href === navigationActiveHref ? 'page' : undefined}
               >
-                <span className="game-library-navigation__label">{item.label}</span>
-                <span className="game-library-navigation__description">{item.description}</span>
+                <span className="admin-card__eyebrow">{item.label}</span>
+                <span className="admin-card__action">画面を開く</span>
               </Link>
             ))}
           </nav>
@@ -196,60 +195,38 @@ export function PageFrame({
         <style jsx>{`
           .game-library-navigation {
             display: flex;
-            gap: 0.625rem;
+            gap: 0.5rem;
             margin-top: 1rem;
             overflow-x: auto;
-            padding: 0.25rem 0.125rem 0.625rem;
+            padding: 0.25rem 0.125rem 0.5rem;
             scrollbar-width: thin;
             -webkit-overflow-scrolling: touch;
           }
 
-          .game-library-navigation a {
+          .game-library-navigation :global(.game-library-navigation__item) {
             display: flex;
-            flex: 0 0 11rem;
-            flex-direction: column;
-            justify-content: center;
-            gap: 0.2rem;
-            min-height: 4.25rem;
-            border: 1px solid var(--color-base-70-dark);
-            border-radius: 0.75rem;
-            padding: 0.625rem 0.75rem;
-            color: var(--color-text-strong);
+            flex: 0 0 8.5rem;
+            min-height: 3.25rem;
+            justify-content: space-between;
+            padding: 0.5rem 0.625rem;
             text-decoration: none;
-            background: color-mix(in srgb, white 82%, var(--color-base-70));
           }
 
-          .game-library-navigation a[aria-current='page'] {
+          .game-library-navigation :global(.game-library-navigation__item[aria-current='page']) {
             border-color: var(--color-accent-25);
-            background: color-mix(in srgb, var(--color-accent-25) 10%, white);
             box-shadow: inset 0 0 0 1px var(--color-accent-25);
           }
 
-          .game-library-navigation__label {
-            font-size: 0.875rem;
-            font-weight: 700;
-            white-space: nowrap;
-          }
-
-          .game-library-navigation__description {
-            overflow: hidden;
-            color: var(--color-text-muted);
-            font-size: 0.6875rem;
-            line-height: 1.35;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-          }
-
-          .game-library-navigation a:focus-visible {
+          .game-library-navigation :global(.game-library-navigation__item:focus-visible) {
             outline: 2px solid var(--color-accent-25);
             outline-offset: 2px;
           }
         `}</style>
       ) : null}
       {stickyActions ? (
-        <style jsx>{`
+        <style jsx global>{`
           .tool-page--has-sticky-actions {
-            padding-block-end: 5rem;
+            padding-block-end: 7.5rem;
           }
 
           .tool-sticky-actions {
@@ -270,11 +247,18 @@ export function PageFrame({
           @media (max-width: 640px) {
             .tool-sticky-actions {
               inset-inline: max(0.75rem, env(safe-area-inset-left, 0px));
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
               justify-content: stretch;
             }
 
             .tool-sticky-actions :global(.custom-button) {
               width: 100%;
+              min-width: 0;
+            }
+
+            .tool-sticky-actions :global(.custom-button__label) {
+              overflow-wrap: anywhere;
             }
           }
         `}</style>

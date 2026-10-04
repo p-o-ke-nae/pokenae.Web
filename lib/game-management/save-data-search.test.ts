@@ -258,32 +258,32 @@ const lookups: ManagementLookups = {
 };
 
 describe('save-data search helpers', () => {
-  it('searches one selected custom field across saves from multiple software masters', () => {
+  const fields = getSaveDataSearchFields({ 100: schema, 200: { ...schema, gameSoftwareMasterId: 200 } }, lookups);
+
+  it('searches a custom field across saves from multiple software masters', () => {
     const secondSchema = { ...schema, gameSoftwareMasterId: 200 };
     const secondSaveData = {
       ...lookups.saveDatas[1]!,
       extendedFields: [{
         ...lookups.saveDatas[0]!.extendedFields[0]!,
-        stringValue: 'Oza',
+        stringValue: 'SEARCH-TEST',
       }],
     };
     const searchLookups = { ...lookups, saveDatas: [lookups.saveDatas[0]!, secondSaveData] };
-    const matches = evaluateSaveDataSearch(searchLookups, { 100: schema, 200: secondSchema }, {
-      gameSoftwareMasterId: null,
-      fieldKey: 'trainer-name',
-      value: 'oza',
-    });
+    const searchFields = getSaveDataSearchFields({ 100: schema, 200: secondSchema }, searchLookups);
+    const matches = evaluateSaveDataSearch(searchLookups, { 100: schema, 200: secondSchema }, [
+      { fieldId: 'custom:trainer-name', operator: 'contains', value: 'search-test' },
+    ], searchFields);
 
     expect(matches.map((match) => match.saveData.id)).toEqual([2]);
-    expect(matches[0]?.matchedFieldValue).toBe('Oza');
+    expect(matches[0]?.matchedValues).toEqual(['SEARCH-TEST']);
   });
 
-  it('can limit a custom-field search to a selected software master', () => {
-    const matches = evaluateSaveDataSearch(lookups, { 100: schema }, {
-      gameSoftwareMasterId: 100,
-      fieldKey: 'trainer-name',
-      value: 'ピ',
-    });
+  it('combines selected search items and supports non-equality operators', () => {
+    const matches = evaluateSaveDataSearch(lookups, { 100: schema }, [
+      { fieldId: 'custom:trainer-name', operator: 'equals', value: 'ピカ' },
+      { fieldId: 'custom:badge-count', operator: 'less-than', value: '2' },
+    ], fields);
 
     expect(matches.map((match) => match.saveData.id)).toEqual([1]);
   });
@@ -293,29 +293,51 @@ describe('save-data search helpers', () => {
       ['trainer-name', 'ピ'],
       ['badge-count', '1.0'],
       ['play-time', '1.00'],
-      ['is-cleared', 'はい'],
+      ['is-cleared', 'true'],
       ['last-played-on', '2024-12-31'],
-      ['starter', 'ピカチュウ'],
+      ['starter', 'pikachu'],
     ]) {
-      expect(evaluateSaveDataSearch(lookups, { 100: schema }, {
-        gameSoftwareMasterId: 100,
-        fieldKey,
-        value,
-      }).map((match) => match.saveData.id)).toEqual([1]);
+      const searchField = fields.find((field) => field.fieldKey === fieldKey)!;
+      expect(evaluateSaveDataSearch(lookups, { 100: schema }, [
+        {
+          fieldId: searchField.fieldId,
+          operator: searchField.fieldType === 0 || searchField.fieldType === 1 ? 'contains' : 'equals',
+          value,
+        },
+      ], fields).map((match) => match.saveData.id)).toEqual([1]);
     }
-    expect(evaluateSaveDataSearch(lookups, { 100: schema }, {
-      gameSoftwareMasterId: 100,
-      fieldKey: 'badge-count',
-      value: '2',
-    })).toEqual([]);
+    expect(evaluateSaveDataSearch(lookups, { 100: schema }, [
+      { fieldId: 'custom:badge-count', operator: 'equals', value: '2' },
+    ], fields)).toEqual([]);
   });
 
-  it('lists the union of enabled custom fields across schemas', () => {
-    const fields = getSaveDataSearchFields({ 100: schema, 200: { ...schema, gameSoftwareMasterId: 200 } });
-    expect(fields.find((field) => field.fieldKey === 'trainer-name')).toEqual({
+  it('lists the union of custom fields and master fields without work counts', () => {
+    const secondSchema = {
+      ...schema,
+      gameSoftwareMasterId: 200,
+      fields: schema.fields.map((field) => field.fieldKey === 'starter'
+        ? { ...field, options: [...field.options, { optionKey: 'snorlax', label: 'カビゴン', description: null, displayOrder: 3 }] }
+        : field),
+    };
+    const searchFields = getSaveDataSearchFields({ 100: schema, 200: secondSchema }, lookups);
+    expect(searchFields.find((field) => field.fieldKey === 'trainer-name')).toMatchObject({
+      fieldId: 'custom:trainer-name',
       fieldKey: 'trainer-name',
       label: '主人公名',
-      availableIn: 2,
     });
+    expect(searchFields.find((field) => field.fieldId === 'master:game-software')?.label).toBe('ゲームソフトマスタ');
+    expect(searchFields.find((field) => field.fieldKey === 'starter')?.options).toContainEqual({
+      value: 'snorlax',
+      label: 'カビゴン',
+    });
+  });
+
+  it('treats a game software master as an ordinary selectable criterion', () => {
+    expect(evaluateSaveDataSearch(lookups, {}, [
+      { fieldId: 'master:game-software', operator: 'equals', value: '100' },
+    ], fields).map((match) => match.saveData.id)).toEqual([1]);
+    expect(evaluateSaveDataSearch(lookups, {}, [
+      { fieldId: 'master:game-software', operator: 'not-equals', value: '100' },
+    ], fields).map((match) => match.saveData.id)).toEqual([2]);
   });
 });

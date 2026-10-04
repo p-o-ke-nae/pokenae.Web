@@ -144,6 +144,7 @@ export default function MaintenanceRecordsSection({
   resourceKey,
   parentId,
   summary,
+  targetName,
   readOnly = false,
   trialMode = false,
   autoOpenCreateOnMount = false,
@@ -157,6 +158,7 @@ export default function MaintenanceRecordsSection({
   resourceKey: MaintenanceResourceKey;
   parentId: number;
   summary?: MaintenanceSummaryDto;
+  targetName?: string;
   readOnly?: boolean;
   trialMode?: boolean;
   autoOpenCreateOnMount?: boolean;
@@ -397,6 +399,11 @@ export default function MaintenanceRecordsSection({
         )}
       >
         <div className="space-y-5">
+          {targetName ? (
+            <p className="m-0 rounded-[0.35rem] border border-[var(--color-base-70)] bg-[var(--color-base-70-light)] p-3 text-sm font-semibold text-[var(--color-text-strong)]">
+              対象: {targetName}
+            </p>
+          ) : null}
           {submitError ? <CustomMessageArea variant="error">{submitError}</CustomMessageArea> : null}
           <div className="space-y-2">
             <CustomLabel htmlFor="maintenanceDate" required>実施日</CustomLabel>

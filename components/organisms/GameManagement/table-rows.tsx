@@ -98,9 +98,8 @@ const GAME_SOFTWARE_TABLE_COLUMNS: DataTableColumn<ManagementTableRow>[] = [
 
 const ACCOUNT_TABLE_COLUMNS: DataTableColumn<ManagementTableRow>[] = [
   { key: 'primary', header: '名称', sortable: true, filterable: true, width: '14rem' },
-  { key: 'relation', header: 'アカウント種類', filterable: true, filterMode: 'select', width: '10rem' },
+  { key: 'relation', header: 'アカウント種類', filterable: true, filterMode: 'select', width: '15rem' },
   { key: 'note', header: 'メモ', filterable: true },
-  { key: 'status', header: '状態', width: '9rem', sortable: true, filterable: true, filterMode: 'select' },
   { key: 'edit', header: '操作', width: '7rem' },
 ];
 

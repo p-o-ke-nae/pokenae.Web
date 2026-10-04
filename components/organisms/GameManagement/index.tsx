@@ -9,7 +9,6 @@ import CustomComboBox from '@/components/atoms/CustomComboBox';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
 import DataTable, { DATA_TABLE_DEFAULT_PAGE_HEIGHT, type DataTableColumn, type SortState } from '@/components/molecules/DataTable';
-import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
 import {
   moveSelectedItemsByOne,
   moveSelectedItemsToTarget,
@@ -371,6 +370,7 @@ export function GameManagementDashboard({
     sectionLabel = '',
     sectionTitle = 'ゲーム管理ダッシュボード',
     sectionDescription = '各マスタ、所有ゲーム機、ゲームソフト、アカウント、メモリーカード、セーブデータの一覧確認と編集画面への遷移をここから行えます。',
+    primaryCards = [],
     extraCards = [],
     contentTags = [],
     tagDefinitions = [],
@@ -381,6 +381,7 @@ export function GameManagementDashboard({
     sectionLabel?: string;
     sectionTitle?: string;
     sectionDescription?: string;
+    primaryCards?: DashboardExtraCard[];
     extraCards?: DashboardExtraCard[];
     contentTags?: string[];
     tagDefinitions?: TagDefinition[];
@@ -452,6 +453,20 @@ export function GameManagementDashboard({
           <p className="tool-muted text-sm" role="status">権限を確認しています...</p>
         ) : effectiveAuthError ? null : (
           <>
+            {primaryCards.length > 0 ? (
+              <PageSection title="メイン">
+                <div className="card-grid">
+                  {primaryCards.map((card) => (
+                    <Link key={card.href} href={card.href} className="admin-card">
+                      <span className="admin-card__eyebrow">{card.shortLabel}</span>
+                      <h3 className="admin-card__title">{card.title}</h3>
+                      <span>{card.description}</span>
+                      <span className="admin-card__action">{card.actionLabel ?? '画面を開く'}</span>
+                    </Link>
+                  ))}
+                </div>
+              </PageSection>
+            ) : null}
             <PageSection title="データ管理" description="各データの一覧を開いて確認・編集します。">
               <div className="card-grid">
                 {displayKeys.map((resourceKey) => {
@@ -1215,25 +1230,40 @@ export function GameManagementDashboard({
       description={definition.description}
       layoutMode={layoutMode}
       navigationActiveHref={basePath === '/game-library' ? `${basePath}/${resourceKey}` : undefined}
-      stickyActions={isDirty && pageMode === 'edit' ? (
-        <CustomButton variant="accent" onClick={() => void handleSaveDisplayOrder()} disabled={saving}>
-          保存
-        </CustomButton>
-      ) : null}
-      actions={
+      stickyActions={(
         <>
-          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={definition.canCreate ? 3 : 2} align="end">
-            <Link href={basePath} className="button-link button-link--secondary">
-              戻る
-            </Link>
-            {definition.canCreate ? (
-              <CustomButton variant="accent" onClick={() => { setPageMode('edit'); openEditorDialog(); }}>
-                新規作成
-              </CustomButton>
-            ) : null}
-            <CustomButton onClick={() => void load()}>再読込</CustomButton>
-          </ResponsiveActionGroup>
+          {definition.canCreate ? (
+            <CustomButton
+              variant="accent"
+              onClick={() => { setPageMode('edit'); openEditorDialog(); }}
+            >
+              新規
+            </CustomButton>
+          ) : null}
+          {bulkEditAvailable ? (
+            <CustomButton
+              disabled={selectedVisibleRowCount < 2}
+              onClick={() => {
+                const ids = rows
+                  .filter((row) => selectedRowKeys.includes(row.tableRowKey))
+                  .map((row) => row.id);
+                setBulkEditorTargetIds(ids);
+                setBulkEditorOpen(true);
+              }}
+            >
+              一括編集（{selectedVisibleRowCount}）
+            </CustomButton>
+          ) : null}
+          {isDirty && pageMode === 'edit' ? (
+            <CustomButton variant="accent" onClick={() => void handleSaveDisplayOrder()} disabled={saving}>
+              保存
+            </CustomButton>
+          ) : null}
+          <CustomButton onClick={() => void load()}>再読込</CustomButton>
         </>
+      )}
+      actions={
+        <Link href={basePath} className="button-link button-link--secondary">戻る</Link>
       }
     >
       {error || saveError || isTrial ? (
@@ -1314,28 +1344,6 @@ export function GameManagementDashboard({
                   <span className="text-xs text-[var(--color-warning)]">{reorderDisabledReason}</span>
                 )}
               </div>
-                <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={bulkEditAvailable ? 2 : 1} align="end">
-                  {bulkEditAvailable ? (
-                    <CustomButton
-                      disabled={selectedVisibleRowCount < 2}
-                      onClick={() => {
-                        const ids = rows
-                          .filter((row) => selectedRowKeys.includes(row.tableRowKey))
-                          .map((row) => row.id);
-                        setBulkEditorTargetIds(ids);
-                        setBulkEditorOpen(true);
-                      }}
-                    >
-                      一括編集（{selectedVisibleRowCount} 件）
-                    </CustomButton>
-                  ) : null}
-                  <CustomButton
-                    onClick={() => void handleSaveDisplayOrder()}
-                    disabled={!isDirty || saving || pageMode === 'view'}
-                  >
-                    表示順を保存
-                  </CustomButton>
-                </ResponsiveActionGroup>
             </div>
             <DataTable
               key={dataTableKey}
