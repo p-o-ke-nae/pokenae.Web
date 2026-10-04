@@ -86,7 +86,7 @@ function AddRowDemo() {
       {tableData.addedRows.length > 0 && (
         <details className="text-xs">
           <summary className="cursor-pointer text-zinc-500">追加行データ (JSON)</summary>
-          <pre className="mt-1 p-2 bg-zinc-100 dark:bg-zinc-800 rounded text-xs overflow-auto">
+          <pre className="mt-1 p-2 bg-zinc-100 rounded text-xs overflow-auto">
             {JSON.stringify(tableData.addedRows.map(omitTrackedFields), null, 2)}
           </pre>
         </details>
@@ -185,7 +185,7 @@ function EditableDemo() {
         <summary className="cursor-pointer text-zinc-500 font-medium select-none">
           現在の JSON データ（リアルタイム更新）
         </summary>
-        <pre className="mt-1 p-3 bg-zinc-100 dark:bg-zinc-800 rounded text-xs overflow-auto max-h-64 leading-relaxed">
+        <pre className="mt-1 p-3 bg-zinc-100 rounded text-xs overflow-auto max-h-64 leading-relaxed">
           {JSON.stringify(currentJson, null, 2)}
         </pre>
       </details>
@@ -270,17 +270,17 @@ export default function ComponentsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black p-8">
+    <div className="min-h-screen bg-zinc-50 p-8">
       <div className="max-w-4xl mx-auto space-y-12">
         <CustomHeader level={1}>コンポーネントギャラリー</CustomHeader>
-        <p className="text-zinc-600 dark:text-zinc-400">
+        <p className="text-zinc-600">
           開発・デバッグ環境向けコンポーネント一覧
         </p>
 
         {/* PokenaeLogo */}
         <section className="space-y-4">
           <CustomHeader level={2}>PokenaeLogo</CustomHeader>
-          <div className="flex flex-col items-start gap-4 p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+          <div className="flex flex-col items-start gap-4 p-6 bg-white rounded-lg shadow-sm">
             <PokenaeLogo ref={logoRef} width={240} height={70} />
             <CustomButton variant="accent" onClick={() => logoRef.current?.replay()}>
               アニメーション再生
@@ -293,7 +293,7 @@ export default function ComponentsPage() {
         {/* CustomHeader */}
         <section className="space-y-4">
           <CustomHeader level={2}>CustomHeader</CustomHeader>
-          <div className="space-y-2 p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+          <div className="space-y-2 p-6 bg-white rounded-lg shadow-sm">
             <CustomHeader level={1}>見出し H1</CustomHeader>
             <CustomHeader level={2}>見出し H2</CustomHeader>
             <CustomHeader level={3}>見出し H3</CustomHeader>
@@ -306,7 +306,7 @@ export default function ComponentsPage() {
         {/* CustomLabel */}
         <section className="space-y-4">
           <CustomHeader level={2}>CustomLabel</CustomHeader>
-          <div className="flex flex-wrap gap-4 p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+          <div className="flex flex-wrap gap-4 p-6 bg-white rounded-lg shadow-sm">
             <CustomLabel>通常ラベル</CustomLabel>
             <CustomLabel required>必須ラベル</CustomLabel>
           </div>
@@ -315,7 +315,7 @@ export default function ComponentsPage() {
         {/* CustomButton */}
         <section className="space-y-4">
           <CustomHeader level={2}>CustomButton</CustomHeader>
-          <div className="flex flex-wrap gap-3 p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+          <div className="flex flex-wrap gap-3 p-6 bg-white rounded-lg shadow-sm">
             <CustomButton variant="neutral">Neutral</CustomButton>
             <CustomButton variant="accent">Accent</CustomButton>
             <CustomButton variant="ghost">Ghost</CustomButton>
@@ -327,7 +327,7 @@ export default function ComponentsPage() {
         {/* CustomCheckBox (Atom) */}
         <section className="space-y-4">
           <CustomHeader level={2}>CustomCheckBox（原始粒度・Atom）</CustomHeader>
-          <div className="flex flex-wrap gap-4 items-center p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+          <div className="flex flex-wrap gap-4 items-center p-6 bg-white rounded-lg shadow-sm">
             <CustomCheckBox aria-label="デフォルト" />
             <CustomCheckBox defaultChecked aria-label="チェック済み" />
             <CustomCheckBox disabled aria-label="無効" />
@@ -338,7 +338,7 @@ export default function ComponentsPage() {
         {/* CheckboxField (Molecule) */}
         <section className="space-y-4">
           <CustomHeader level={2}>CheckboxField（分子粒度・Molecule）</CustomHeader>
-          <div className="flex flex-col gap-3 p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+          <div className="flex flex-col gap-3 p-6 bg-white rounded-lg shadow-sm">
             <CheckboxField label="通常チェックボックス" />
             <CheckboxField label="デフォルトチェック済み" defaultChecked />
             <CheckboxField label="必須項目" required />
@@ -349,7 +349,7 @@ export default function ComponentsPage() {
         {/* CustomRadioButton (Atom) */}
         <section className="space-y-4">
           <CustomHeader level={2}>CustomRadioButton（原始粒度・Atom）</CustomHeader>
-          <div className="flex flex-wrap gap-4 items-center p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+          <div className="flex flex-wrap gap-4 items-center p-6 bg-white rounded-lg shadow-sm">
             <CustomRadioButton name="radio-atom" value="a" defaultChecked aria-label="選択肢A" />
             <CustomRadioButton name="radio-atom" value="b" aria-label="選択肢B" />
             <CustomRadioButton name="radio-atom" value="c" disabled aria-label="無効" />
@@ -359,7 +359,7 @@ export default function ComponentsPage() {
         {/* RadioField (Molecule) */}
         <section className="space-y-4">
           <CustomHeader level={2}>RadioField（分子粒度・Molecule）</CustomHeader>
-          <div className="flex flex-col gap-3 p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+          <div className="flex flex-col gap-3 p-6 bg-white rounded-lg shadow-sm">
             <RadioField name="radio-mol" value="a" label="選択肢 A" defaultChecked />
             <RadioField name="radio-mol" value="b" label="選択肢 B" />
             <RadioField name="radio-mol" value="c" label="選択肢 C（無効）" disabled />
@@ -369,7 +369,7 @@ export default function ComponentsPage() {
         {/* CustomTextBox */}
         <section className="space-y-4">
           <CustomHeader level={2}>CustomTextBox</CustomHeader>
-          <div className="flex flex-col gap-3 max-w-sm p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+          <div className="flex flex-col gap-3 max-w-sm p-6 bg-white rounded-lg shadow-sm">
             <div>
               <CustomLabel htmlFor="text1">通常テキストボックス</CustomLabel>
               <CustomTextBox id="text1" placeholder="テキストを入力" className="mt-1" />
@@ -388,7 +388,7 @@ export default function ComponentsPage() {
         {/* CustomTextArea */}
         <section className="space-y-4">
           <CustomHeader level={2}>CustomTextArea</CustomHeader>
-          <div className="flex flex-col gap-3 max-w-sm p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+          <div className="flex flex-col gap-3 max-w-sm p-6 bg-white rounded-lg shadow-sm">
             <div>
               <CustomLabel htmlFor="textarea1">テキストエリア</CustomLabel>
               <CustomTextArea id="textarea1" placeholder="複数行のテキストを入力" className="mt-1" rows={4} />
@@ -403,7 +403,7 @@ export default function ComponentsPage() {
         {/* CustomComboBox */}
         <section className="space-y-4">
           <CustomHeader level={2}>CustomComboBox</CustomHeader>
-          <div className="flex flex-col gap-3 max-w-sm p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+          <div className="flex flex-col gap-3 max-w-sm p-6 bg-white rounded-lg shadow-sm">
             <div>
               <CustomLabel htmlFor="combo1">通常コンボボックス</CustomLabel>
               <CustomComboBox id="combo1" placeholder="選択してください" className="mt-1">
@@ -432,11 +432,11 @@ export default function ComponentsPage() {
         {/* CustomMessageArea */}
         <section className="space-y-4">
           <CustomHeader level={2}>CustomMessageArea</CustomHeader>
-          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm overflow-hidden">
+          <div className="p-6 bg-white rounded-lg shadow-sm overflow-hidden">
             <p className="text-xs text-zinc-500 mb-3">banner=true: 上部に固定表示</p>
-            <div className="relative overflow-hidden rounded border border-zinc-200 dark:border-zinc-700" style={{ height: '8rem' }}>
+            <div className="relative overflow-hidden rounded border border-zinc-200" style={{ height: '8rem' }}>
               <CustomMessageArea variant="error" banner>エラー: バナー表示（上部スティッキー）</CustomMessageArea>
-              <div className="p-4 text-sm text-zinc-600 dark:text-zinc-400">コンテンツ領域</div>
+              <div className="p-4 text-sm text-zinc-600">コンテンツ領域</div>
             </div>
             <p className="text-xs text-zinc-500 mt-4 mb-3">inline（デフォルト）</p>
             <div className="flex flex-col gap-3 max-w-lg">
@@ -455,7 +455,7 @@ export default function ComponentsPage() {
         {/* CustomLoader */}
         <section className="space-y-4">
           <CustomHeader level={2}>CustomLoader（原始粒度・Atom）</CustomHeader>
-          <div className="flex flex-wrap gap-6 items-center p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+          <div className="flex flex-wrap gap-6 items-center p-6 bg-white rounded-lg shadow-sm">
             <div className="flex flex-col items-center gap-2">
               <CustomLoader size="sm" />
               <span className="text-xs text-zinc-500">Small</span>
@@ -468,7 +468,7 @@ export default function ComponentsPage() {
               <CustomLoader size="lg" />
               <span className="text-xs text-zinc-500">Large</span>
             </div>
-            <div className="w-px h-12 bg-zinc-200 dark:bg-zinc-700" />
+            <div className="w-px h-12 bg-zinc-200" />
             <div className="flex flex-col items-center gap-2">
               <CustomLoader size="sm" variant="bold" />
               <span className="text-xs text-zinc-500">Small Bold</span>
@@ -487,7 +487,7 @@ export default function ComponentsPage() {
         {/* LoadingOverlay (Molecule) */}
         <section className="space-y-4">
           <CustomHeader level={2}>LoadingOverlay（分子粒度・Molecule）</CustomHeader>
-          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+          <div className="p-6 bg-white rounded-lg shadow-sm">
             <CustomButton variant="accent" onClick={simulateLoading}>
               通信を開始（3秒後に完了）
             </CustomButton>
@@ -497,7 +497,7 @@ export default function ComponentsPage() {
         {/* CustomModal (Atom) */}
         <section className="space-y-4">
           <CustomHeader level={2}>CustomModal（原始粒度・Atom）</CustomHeader>
-          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+          <div className="p-6 bg-white rounded-lg shadow-sm">
             <CustomButton variant="neutral" onClick={() => setModalOpen(true)}>
               モーダルを開く
             </CustomButton>
@@ -522,7 +522,7 @@ export default function ComponentsPage() {
         {/* Dialog (Molecule) */}
         <section className="space-y-4">
           <CustomHeader level={2}>Dialog（分子粒度・Molecule）</CustomHeader>
-          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+          <div className="p-6 bg-white rounded-lg shadow-sm">
             <CustomButton variant="accent" onClick={() => setDialogOpen(true)}>
               ダイアログを開く
             </CustomButton>
@@ -541,7 +541,7 @@ export default function ComponentsPage() {
                 </>
               }
             >
-              <p className="text-sm text-zinc-700 dark:text-zinc-300">
+              <p className="text-sm text-zinc-700">
                 ダイアログのコンテンツがここに表示されます。<br />
                 任意の内容を含めることができます。
               </p>
@@ -552,7 +552,7 @@ export default function ComponentsPage() {
         {/* SearchField (Molecule) */}
         <section className="space-y-4">
           <CustomHeader level={2}>SearchField（分子粒度・Molecule）</CustomHeader>
-          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm space-y-4">
+          <div className="p-6 bg-white rounded-lg shadow-sm space-y-4">
             <div className="max-w-sm">
               <CustomLabel htmlFor="search-demo" required>ポケモン選択</CustomLabel>
               <SearchField
@@ -571,7 +571,7 @@ export default function ComponentsPage() {
         {/* DataTable (Molecule) */}
         <section className="space-y-4">
           <CustomHeader level={2}>DataTable（分子粒度・Molecule）</CustomHeader>
-          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm space-y-6">
+          <div className="p-6 bg-white rounded-lg shadow-sm space-y-6">
 
             {/* 1. 行選択チェックボックス */}
             <div className="space-y-2">
@@ -695,8 +695,8 @@ export default function ComponentsPage() {
         {/* Debug: Auth ヘッダ確認 */}
         <section className="space-y-4">
           <CustomHeader level={2}>認証ヘッダ確認（デバッグ）</CustomHeader>
-          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
-            <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">ボタンを押すと /api/debug/inspect-headers にリクエストを送り、サーバー側で受信したヘッダを表示します。</p>
+          <div className="p-6 bg-white rounded-lg shadow-sm">
+            <p className="text-sm text-zinc-600 mb-3">ボタンを押すと /api/debug/inspect-headers にリクエストを送り、サーバー側で受信したヘッダを表示します。</p>
             <div className="flex gap-3 mb-4">
               <CustomButton
                 variant="accent"
@@ -713,7 +713,7 @@ export default function ComponentsPage() {
             </div>
             {dbgLoading && <div className="mb-3"><CustomLoader /></div>}
             {dbgHeaders && (
-              <pre className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded text-sm overflow-auto">{JSON.stringify(dbgHeaders, null, 2)}</pre>
+              <pre className="p-3 bg-zinc-50 rounded text-sm overflow-auto">{JSON.stringify(dbgHeaders, null, 2)}</pre>
             )}
           </div>
         </section>

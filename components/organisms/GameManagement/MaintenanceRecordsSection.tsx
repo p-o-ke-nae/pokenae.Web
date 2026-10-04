@@ -5,11 +5,14 @@ import CustomButton from '@/components/atoms/CustomButton';
 import CustomCheckBox from '@/components/atoms/CustomCheckBox';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
+import PageModeToggle from '@/components/atoms/PageModeToggle';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
 import CustomTextBox from '@/components/atoms/CustomTextBox';
 import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
+import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import type { LayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
+import type { PageMode } from '@/lib/game-management/resources';
 import {
   createMaintenanceRecord,
   deleteMaintenanceRecord,
@@ -21,6 +24,7 @@ import { extractProblemFieldErrors } from '@/lib/game-management/api/core';
 import {
   buildMaintenanceSummaryText,
   formatMaintenanceDate,
+  isMaintenanceDateInFuture,
 } from '@/lib/game-management/maintenance';
 import type {
   CreateGameConsoleMaintenanceRequest,
@@ -48,7 +52,7 @@ type MaintenancePayload =
   | UpdateGameSoftwareMaintenanceRequest
   | UpdateMemoryCardMaintenanceRequest;
 
-type MaintenanceFormState = {
+export type MaintenanceFormState = {
   maintenanceDate: string;
   isPowerOnPerformed: boolean;
   isStartupConfirmed: boolean;
@@ -96,7 +100,7 @@ function validateFormState(formState: MaintenanceFormState): Record<string, stri
 
   if (!formState.maintenanceDate) {
     appendError('maintenanceDate', '実施日を入力してください。');
-  } else if (formState.maintenanceDate > getTodayDateString()) {
+  } else if (isMaintenanceDateInFuture(formState.maintenanceDate, getTodayDateString())) {
     appendError('maintenanceDate', '未来日は指定できません。');
   }
 
@@ -130,7 +134,7 @@ function FieldError({ messages }: { messages?: string[] }) {
   }
 
   return (
-    <p className="text-sm text-red-600 dark:text-red-400">
+    <p className="text-sm text-[var(--color-danger)]">
       {messages.join(' ')}
     </p>
   );
@@ -140,24 +144,32 @@ export default function MaintenanceRecordsSection({
   resourceKey,
   parentId,
   summary,
+  targetName,
   readOnly = false,
   trialMode = false,
   autoOpenCreateOnMount = false,
   layoutMode = 'desktop',
+  initialFormState,
+  pageMode,
+  onPageModeChange,
   onChanged,
   onSaved,
 }: {
   resourceKey: MaintenanceResourceKey;
   parentId: number;
   summary?: MaintenanceSummaryDto;
+  targetName?: string;
   readOnly?: boolean;
   trialMode?: boolean;
   autoOpenCreateOnMount?: boolean;
   layoutMode?: LayoutMode;
+  initialFormState?: MaintenanceFormState;
+  pageMode?: PageMode;
+  onPageModeChange?: (mode: PageMode) => void;
   onChanged: () => void;
-  onSaved?: (mode: 'create' | 'update') => void;
+  onSaved?: (mode: 'create' | 'update', values: MaintenanceFormState) => void;
 }) {
-  const { startLoading } = useLoadingOverlay();
+  const { isPending, startLoading } = useLoadingOverlay();
   const autoOpenedRef = useRef(false);
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
   const [loading, setLoading] = useState(!trialMode);
@@ -199,12 +211,12 @@ export default function MaintenanceRecordsSection({
 
   const openCreateDialog = useCallback(() => {
     setEditingRecord(null);
-    setFormState(createEmptyFormState());
+    setFormState(initialFormState ?? createEmptyFormState());
     setFormErrors({});
     setSubmitError(null);
     setSubmitSuccess(null);
     setEditorOpen(true);
-  }, []);
+  }, [initialFormState]);
 
   const openEditDialog = useCallback((record: MaintenanceRecord) => {
     setEditingRecord(record);
@@ -232,7 +244,7 @@ export default function MaintenanceRecordsSection({
     openCreateDialog();
   }, [autoOpenCreateOnMount, openCreateDialog, readOnly, trialMode]);
 
-  const submitLabel = editingRecord ? '更新する' : '記録を追加';
+  const submitLabel = '保存';
 
   const maintenanceSummaryText = useMemo(
     () => buildMaintenanceSummaryText(summary),
@@ -259,12 +271,12 @@ export default function MaintenanceRecordsSection({
         } else {
           await createMaintenanceRecord(resourceKey, parentId, payload);
         }
-      }, editingRecord ? '保守記録を更新中...' : '保守記録を保存中...');
+      }, 'メンテナンスを保存中...');
 
-      setSubmitSuccess(editingRecord ? '保守記録を更新しました。' : '保守記録を追加しました。');
+      setSubmitSuccess('メンテナンスを保存しました。');
       await loadRecords();
       onChanged();
-      onSaved?.(editingRecord ? 'update' : 'create');
+      onSaved?.(editingRecord ? 'update' : 'create', formState);
       closeEditorDialog();
     } catch (saveError) {
       const details = saveError instanceof Error && 'details' in saveError
@@ -286,7 +298,7 @@ export default function MaintenanceRecordsSection({
     try {
       await startLoading(async () => {
         await deleteMaintenanceRecord(resourceKey, parentId, deleteTarget.id);
-      }, '保守記録を削除中...');
+      }, 'メンテナンスを削除中...');
 
       setDeleteTarget(null);
       await loadRecords();
@@ -301,46 +313,49 @@ export default function MaintenanceRecordsSection({
 
   return (
     <>
-      <section className="space-y-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+      <section className="space-y-4 border-t-4 border-[var(--color-accent-25)] pt-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-2">
-            <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">保守記録</h3>
-            <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-300">{maintenanceSummaryText}</p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold text-[var(--color-text-strong)]">メンテナンス記録</h3>
+              <p className="text-sm leading-6 text-[var(--color-text-muted)]">{maintenanceSummaryText}</p>
+            </div>
+            {pageMode && onPageModeChange ? <PageModeToggle mode={pageMode} onChange={onPageModeChange} /> : null}
           </div>
           {!readOnly ? (
             <CustomButton onClick={openCreateDialog} disabled={trialMode}>
-              記録を追加
+              保存
             </CustomButton>
           ) : null}
         </div>
 
         {trialMode ? (
           <CustomMessageArea variant="info">
-            トライアルモードでは保守履歴の閲覧と保存は利用できません。ログイン後に保守記録を管理してください。
+            トライアルモードではメンテナンス記録の閲覧と保存は利用できません。ログイン後に管理してください。
           </CustomMessageArea>
         ) : null}
         {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
 
         {loading ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-300">保守記録を読み込んでいます...</p>
+          <p className="text-sm text-[var(--color-text-muted)]">メンテナンス記録を読み込んでいます...</p>
         ) : trialMode ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-300">トライアルモードでは保守記録はまだ表示されません。</p>
+          <p className="text-sm text-[var(--color-text-muted)]">トライアルモードではメンテナンス記録は表示されません。</p>
         ) : records.length === 0 ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-300">保守記録はまだありません。</p>
+          <p className="text-sm text-[var(--color-text-muted)]">メンテナンス記録はまだありません。</p>
         ) : (
           <div className="space-y-3">
             {records.map((record) => (
-              <article key={record.id} className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+              <article key={record.id} className="space-y-3 rounded-[0.35rem] border border-[var(--color-base-70)] bg-white p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                    <p className="text-sm font-semibold text-[var(--color-text-strong)]">
                       {formatMaintenanceDate(record.maintenanceDate)} / {getRecordStatusLabel(record)}
                     </p>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-300">
+                    <p className="text-sm text-[var(--color-text-muted)]">
                       通電: {record.isPowerOnPerformed ? '実施' : '未実施'} / 起動確認: {record.isStartupConfirmed ? '成功' : '未確認'}
                     </p>
                     {record.memo ? (
-                      <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-200">{record.memo}</p>
+                      <p className="text-sm leading-6 text-[var(--color-text-muted)]">{record.memo}</p>
                     ) : null}
                   </div>
                   {!readOnly ? (
@@ -363,32 +378,39 @@ export default function MaintenanceRecordsSection({
       <Dialog
         open={editorOpen}
         onClose={closeEditorDialog}
-        title={editingRecord ? '保守記録を編集' : '保守記録を追加'}
+        title={editingRecord ? 'メンテナンスを編集' : 'メンテナンスを追加'}
         size="md"
         footer={(
           <DialogFooterLayout
             layoutMode={layoutMode}
+            separatePrimary={false}
             status={submitSuccess ? <CustomMessageArea variant="success">{submitSuccess}</CustomMessageArea> : null}
             trailing={(
-              <>
-                <CustomButton variant="neutral" onClick={closeEditorDialog}>
+              <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
+                <CustomButton variant="neutral" onClick={closeEditorDialog} disabled={isPending}>
                   キャンセル
                 </CustomButton>
-                <CustomButton onClick={() => void handleSave()}>
+                <CustomButton variant="accent" onClick={() => void handleSave()} disabled={isPending}>
                   {submitLabel}
                 </CustomButton>
-              </>
+              </ResponsiveActionGroup>
             )}
           />
         )}
       >
         <div className="space-y-5">
+          {targetName ? (
+            <p className="m-0 rounded-[0.35rem] border border-[var(--color-base-70)] bg-[var(--color-base-70-light)] p-3 text-sm font-semibold text-[var(--color-text-strong)]">
+              対象: {targetName}
+            </p>
+          ) : null}
           {submitError ? <CustomMessageArea variant="error">{submitError}</CustomMessageArea> : null}
           <div className="space-y-2">
             <CustomLabel htmlFor="maintenanceDate" required>実施日</CustomLabel>
             <CustomTextBox
               id="maintenanceDate"
               type="date"
+              max={getTodayDateString()}
               value={formState.maintenanceDate}
               onChange={(event) => setFormState((current) => ({ ...current, maintenanceDate: event.target.value }))}
               isError={Boolean(formErrors.maintenanceDate?.length)}
@@ -398,26 +420,26 @@ export default function MaintenanceRecordsSection({
 
           <div className="space-y-3">
             <CustomLabel>実施内容</CustomLabel>
-            <label className="flex items-start gap-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+            <label className="flex items-start gap-3 rounded-[0.35rem] border border-[var(--color-base-70)] p-3">
               <CustomCheckBox
                 checked={formState.isPowerOnPerformed}
                 onChange={(event) => setFormState((current) => ({ ...current, isPowerOnPerformed: event.target.checked }))}
               />
-              <span className="space-y-1 text-sm text-zinc-700 dark:text-zinc-200">
+              <span className="space-y-1 text-sm text-[var(--foreground)]">
                 <span className="block font-medium">通電を実施</span>
-                <span className="block text-zinc-500 dark:text-zinc-300">電源投入まで行った場合はチェックしてください。</span>
+                <span className="block text-[var(--color-text-muted)]">電源投入まで行った場合はチェックしてください。</span>
               </span>
             </label>
             <FieldError messages={formErrors.isPowerOnPerformed} />
 
-            <label className="flex items-start gap-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+            <label className="flex items-start gap-3 rounded-[0.35rem] border border-[var(--color-base-70)] p-3">
               <CustomCheckBox
                 checked={formState.isStartupConfirmed}
                 onChange={(event) => setFormState((current) => ({ ...current, isStartupConfirmed: event.target.checked }))}
               />
-              <span className="space-y-1 text-sm text-zinc-700 dark:text-zinc-200">
+              <span className="space-y-1 text-sm text-[var(--foreground)]">
                 <span className="block font-medium">起動確認に成功</span>
-                <span className="block text-zinc-500 dark:text-zinc-300">タイトル画面到達など、正常起動を確認できた場合にチェックしてください。</span>
+                <span className="block text-[var(--color-text-muted)]">タイトル画面到達など、正常起動を確認できた場合にチェックしてください。</span>
               </span>
             </label>
             <FieldError messages={formErrors.isStartupConfirmed} />
@@ -439,28 +461,29 @@ export default function MaintenanceRecordsSection({
       <Dialog
         open={deleteTarget != null}
         onClose={() => setDeleteTarget(null)}
-        title="保守記録を削除"
+        title="メンテナンスを削除"
         size="sm"
         footer={(
           <DialogFooterLayout
             layoutMode={layoutMode}
+            separatePrimary={false}
             trailing={(
-              <>
-                <CustomButton variant="neutral" onClick={() => setDeleteTarget(null)}>
+              <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
+                <CustomButton variant="neutral" onClick={() => setDeleteTarget(null)} disabled={isPending}>
                   キャンセル
                 </CustomButton>
-                <CustomButton variant="ghost" onClick={() => void handleDelete()}>
-                  削除する
+                <CustomButton variant="ghost" onClick={() => void handleDelete()} disabled={isPending}>
+                  削除
                 </CustomButton>
-              </>
+              </ResponsiveActionGroup>
             )}
           />
         )}
       >
-        <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+        <p className="text-sm leading-6 text-[var(--color-text-muted)]">
           {deleteTarget
-            ? `${formatMaintenanceDate(deleteTarget.maintenanceDate)} の保守記録を削除します。`
-            : '保守記録を削除します。'}
+            ? `${formatMaintenanceDate(deleteTarget.maintenanceDate)} のメンテナンス記録を削除します。`
+            : 'メンテナンス記録を削除します。'}
         </p>
       </Dialog>
     </>

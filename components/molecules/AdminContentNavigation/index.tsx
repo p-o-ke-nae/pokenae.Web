@@ -9,11 +9,23 @@ export const adminContentNavigationItems = [
   { href: "/admin/content/tags", label: "タグ" },
 ] as const;
 
-export default function AdminContentNavigation({ current }: { current?: string }) {
+type AdminContentNavigationProps = {
+  current?: string;
+  items?: ReadonlyArray<{ href: string; label: string }>;
+  homeLink?: { href: string; label: string } | null;
+  ariaLabel?: string;
+};
+
+export default function AdminContentNavigation({
+  current,
+  items = adminContentNavigationItems,
+  homeLink = { href: "/admin", label: "管理画面" },
+  ariaLabel = "管理画面メニュー",
+}: AdminContentNavigationProps) {
   return (
-    <nav className="admin-content-nav" aria-label="管理画面メニュー">
-      <Link href="/admin">管理画面</Link>
-      {adminContentNavigationItems.map((item) => (
+    <nav className="admin-content-nav" aria-label={ariaLabel}>
+      {homeLink ? <Link href={homeLink.href}>{homeLink.label}</Link> : null}
+      {items.map((item) => (
         <Link
           key={item.href}
           href={item.href}

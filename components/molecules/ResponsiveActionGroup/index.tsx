@@ -7,7 +7,7 @@ type HorizontalAlign = 'start' | 'end';
 
 export type ResponsiveActionGroupProps = HTMLAttributes<HTMLDivElement> & {
   layoutMode?: LayoutMode;
-  mobileColumns?: 1 | 2;
+  mobileColumns?: 1 | 2 | 3;
   align?: HorizontalAlign;
   children?: ReactNode;
 };
@@ -65,6 +65,14 @@ export default function ResponsiveActionGroup({
         .responsive-action-group[data-layout-mode='mobile'] :global(.custom-button) {
           width: 100%;
           min-width: 0;
+          padding-inline: 0.75rem;
+          white-space: normal;
+        }
+
+        .responsive-action-group[data-layout-mode='mobile'] :global(.custom-button__label) {
+          white-space: normal;
+          text-align: center;
+          overflow-wrap: anywhere;
         }
 
         .responsive-action-group[data-layout-mode='mobile'] > :global(a),
@@ -74,7 +82,7 @@ export default function ResponsiveActionGroup({
           min-width: 0;
         }
 
-        @media (max-width: calc(${RESPONSIVE_ACTION_MOBILE_BREAKPOINT_PX}px - 0.02px)) {
+        @media (max-width: ${RESPONSIVE_ACTION_MOBILE_BREAKPOINT_PX - 0.02}px) {
           .responsive-action-group {
             display: grid;
             grid-template-columns: repeat(var(--responsive-action-group-mobile-columns), minmax(0, 1fr));
@@ -87,6 +95,14 @@ export default function ResponsiveActionGroup({
           .responsive-action-group :global(.custom-button) {
             width: 100%;
             min-width: 0;
+            padding-inline: 0.75rem;
+            white-space: normal;
+          }
+
+          .responsive-action-group :global(.custom-button__label) {
+            white-space: normal;
+            text-align: center;
+            overflow-wrap: anywhere;
           }
 
           .responsive-action-group > :global(a),

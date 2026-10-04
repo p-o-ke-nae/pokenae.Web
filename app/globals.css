@@ -15,10 +15,18 @@
   --color-link: #674663;
   --color-danger: #b3261e;
   --color-warning: #815500;
+  --color-success: #1f6b3a;
+  --color-text-muted: #605966;
   --shadow-card: 0 5px 18px rgba(65, 44, 63, 0.12);
   --site-width: 1180px;
   --content-width: 850px;
 }
+
+/*
+ * サイトはライトテーマ固定。Tailwind の dark: バリアントを OS のダークモード設定
+ * (prefers-color-scheme) から切り離し、適用されないクラスにのみ紐付ける。
+ */
+@custom-variant dark (&:where(.theme-dark-unsupported, .theme-dark-unsupported *));
 
 @theme inline {
   --color-background: var(--background);
@@ -74,7 +82,7 @@ img { max-width: 100%; }
 
 .page-container { width: 100%; }
 .page-header { margin-bottom: 1.5rem; }
-.page-lead { color: #605966; max-width: 70ch; }
+.page-lead { color: var(--color-text-muted); max-width: 70ch; }
 .legal-document { display:grid; gap:2rem; padding:clamp(1rem, 3vw, 2rem); border:1px solid var(--color-base-70); background:var(--background); color:var(--foreground); line-height:1.8; }
 .legal-document section { display:grid; gap:.75rem; }
 .legal-document p { margin:0; }
@@ -100,6 +108,58 @@ img { max-width: 100%; }
 .admin-card:hover { border-color: var(--color-accent-25-strong); }
 .admin-card strong { color: var(--color-accent-25-strong); font-size: 1.15rem; }
 .admin-card__action { align-self: end; color: var(--color-link); font-weight: 700; }
+.admin-card__eyebrow { color: var(--color-text-muted); font-size: .75rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.admin-card__title { margin: 0; color: var(--color-accent-25-strong); font-size: 1.15rem; line-height: 1.4; }
+
+/*
+ * ツール画面（ゲームライブラリ・ゲーム管理）共通レイアウト。
+ * ブログ等と同じ page-header / 見出し区切りで構成し、セクションをカードで囲まない。
+ */
+.tool-page { display: grid; gap: 2rem; min-width: 0; }
+.tool-page > .page-header { display: grid; gap: .75rem; margin-bottom: 0; }
+.tool-page > .page-header .page-lead { margin: 0; }
+.tool-page__eyebrow { margin: 0; color: var(--color-accent-25-strong); font-size: .75rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; user-select: none; }
+.tool-page__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1rem; }
+.tool-page__actions > * { min-width: 0; }
+.tool-page__actions[data-layout-mode="mobile"] { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+@media (max-width: 639.98px) {
+  .tool-page__actions { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+}
+.tool-page__body { display: grid; gap: 2.5rem; min-width: 0; }
+.tool-page__notices { display: grid; gap: .75rem; }
+.tool-page__body > .content-tags { margin-top: 0; }
+.tool-section { display: grid; gap: 1rem; min-width: 0; }
+.tool-section__header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .75rem 1rem; }
+.tool-section__header > :first-child { flex: 1 1 16rem; min-width: 0; }
+.tool-section__lead { margin: 0; color: var(--color-text-muted); font-size: .9rem; line-height: 1.7; }
+.tool-section__body { display: grid; gap: 1rem; min-width: 0; }
+.tool-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; color: var(--color-text-muted); font-size: .875rem; }
+.tool-toolbar__meta { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem 1rem; }
+.tool-filter { display: grid; gap: .75rem 1.25rem; padding: 1rem; border: 1px solid var(--color-base-70); background: var(--color-base-70-light); }
+@media (min-width: 768px) {
+  .tool-filter { grid-template-columns: minmax(0, 20rem) minmax(0, 1fr); align-items: end; }
+}
+.tool-muted { color: var(--color-text-muted); }
+.tool-warning { color: var(--color-warning); }
+.tool-danger { color: var(--color-danger); }
+.tool-success { color: var(--color-success); }
+.tool-inline-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-link);
+  font: inherit;
+  font-size: .875rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.tool-inline-link:hover { color: var(--color-accent-25-strong); }
+.tool-inline-link:disabled { color: var(--color-base-70-dark); cursor: not-allowed; }
 .admin-content-nav {
   display: flex;
   flex-wrap: wrap;
@@ -109,6 +169,7 @@ img { max-width: 100%; }
   border-radius: .35rem;
   background: var(--color-base-70-light);
 }
+.tool-page > .admin-content-nav { margin-block-end: -1rem; }
 .admin-content-nav a {
   display: inline-flex;
   align-items: center;

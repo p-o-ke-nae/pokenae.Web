@@ -8,6 +8,7 @@ import ContentItemGrid from "../ContentItemGrid";
 import { collectInvalidIndexes } from "../../../lib/content/admin-grid";
 import type { TagDefinition } from "../../../lib/content/types";
 import { toolListSchema } from "../../../lib/content/schemas";
+import { buildContentChangeNote } from "../../../lib/content/change-note";
 import type { ToolContent } from "../../../lib/content/admin-config";
 import type { ValidationIssue } from "../../../lib/content/canonical-validation";
 
@@ -207,6 +208,7 @@ function newTool(index: number): ToolDraft {
 export default function ToolEditor({ initial, baseRevision, tagDefinitions = [] }: ToolEditorProps) {
   const initialTools = useMemo(() => normalizeTools(initial), [initial]);
   const [tools, setTools] = useState(initialTools);
+  const [baselineTools, setBaselineTools] = useState(initialTools);
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
   const [selected, setSelected] = useState<PullRequest | null>(null);
   const [revision, setRevision] = useState(baseRevision);
@@ -322,6 +324,7 @@ export default function ToolEditor({ initial, baseRevision, tagDefinitions = [] 
     setSelected(null);
     setRevision(baseRevision);
     setTools(initialTools);
+    setBaselineTools(initialTools);
     setSkipInfo(false);
     clearFeedback();
   }
@@ -339,7 +342,9 @@ export default function ToolEditor({ initial, baseRevision, tagDefinitions = [] 
       if (!response.ok || !data.pullRequest) throw new Error(data.error ?? "Pull Request を取得できませんでした。");
       setSelected(data.pullRequest);
       setRevision(data.pullRequest.headRevision);
-      setTools(normalizeTools(readToolsPayload(data)));
+      const loadedTools = normalizeTools(readToolsPayload(data));
+      setTools(loadedTools);
+      setBaselineTools(loadedTools);
       setSkipInfo(record(data.update).visible === false);
       setIssues((data.issues ?? []).map(withToolsPrefix));
       setMessageIsError(Boolean(data.issues?.length));
@@ -369,9 +374,10 @@ export default function ToolEditor({ initial, baseRevision, tagDefinitions = [] 
       return;
     }
 
+    const changeNote = buildContentChangeNote("ツール", serializeTools(baselineTools), local.data);
     const body = selected
-      ? { kind: "tools", value: local.data, expectedRevision: revision, changeNote: "ツールを管理画面から更新", skipInfo }
-      : { kind: "tools", value: local.data, baseRevision: revision, changeNote: "ツールを管理画面から更新", skipInfo };
+      ? { kind: "tools", value: local.data, expectedRevision: revision, changeNote, skipInfo }
+      : { kind: "tools", value: local.data, baseRevision: revision, changeNote, skipInfo };
     try {
       const response = await fetch(
         selected ? `/api/content/config/pull-requests/${selected.number}?kind=tools` : "/api/content/config",
@@ -555,8 +561,9 @@ export default function ToolEditor({ initial, baseRevision, tagDefinitions = [] 
       .tool-editor textarea { resize:vertical; }
       .tool-editor .tool-editor__check { display:flex; align-items:center; gap:.5rem; font-weight:700; }
       .tool-editor .tool-editor__check input { width:auto; min-height:0; }
-      .tool-editor__card,.tool-editor__group { display:grid; gap:1rem; padding:1rem; border:1px solid var(--color-base-70); border-radius:.35rem; background:#fff; }
-      .tool-editor__group > legend { padding:0 .4rem; font-weight:700; }
+      .tool-editor__card { display:grid; gap:1rem; min-width:0; margin:0; padding:0; border:0; }
+      .tool-editor__group { display:grid; gap:1rem; min-width:0; margin:0; padding:.75rem 0 0; border:0; border-top:2px solid var(--color-base-70-dark); }
+      .tool-editor__group > legend { padding:0 .4rem 0 0; font-weight:700; }
       .tool-editor__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
       .tool-editor__field { display:grid; align-content:start; gap:.3rem; font-weight:700; }
       .tool-editor__wide { grid-column:1/-1; }
@@ -566,7 +573,7 @@ export default function ToolEditor({ initial, baseRevision, tagDefinitions = [] 
       .tool-editor__array-actions,.tool-editor__actions { display:flex; flex-wrap:wrap; gap:.5rem; }
       .tool-editor__array-actions .button-link { min-height:44px; padding:.45rem .7rem; }
       .tool-editor .validation-message { color:#751b16; font-size:.9rem; font-weight:400; }
-      @media(max-width:760px){.tool-editor__grid{grid-template-columns:1fr}.tool-editor__wide{grid-column:auto}.tool-editor__array-row{grid-template-columns:1fr}}
+      @media(max-width:760px){.tool-editor__grid{grid-template-columns:1fr}.tool-editor__wide{grid-column:auto}.tool-editor__array-row{grid-template-columns:1fr}.tool-editor__array-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}}
     `}</style>
   </div>;
 }
@@ -631,7 +638,7 @@ function ArrayField({ label, required, values, path, toolIndex, fieldError, erro
           <Field label={`${label} ${index + 1}`} error={error} errorId={id}>
             <input value={value} onChange={(event) => onChange(index, event.target.value)} />
           </Field>
-          <div className="tool-editor__array-actions" aria-label={`${label} ${index + 1} の操作`}>
+          <div className="tool-editor__array-actions" role="group" aria-label={`${label} ${index + 1} の操作`}>
             <button type="button" className="button-link button-link--secondary" disabled={index === 0} onClick={() => onMove(index, -1)}>上へ</button>
             <button type="button" className="button-link button-link--secondary" disabled={index === values.length - 1} onClick={() => onMove(index, 1)}>下へ</button>
             <button type="button" className="button-link button-link--secondary" onClick={() => onRemove(index)}>削除</button>

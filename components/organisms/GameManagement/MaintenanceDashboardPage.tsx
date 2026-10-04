@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import CustomButton from '@/components/atoms/CustomButton';
@@ -12,11 +11,11 @@ import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
 import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
 import {
   fetchAuthenticatedUserLookups,
+  fetchMaintenanceList,
   fetchPublicMasterLookups,
   getGameManagementErrorMessage,
 } from '@/lib/game-management/api';
 import {
-  buildMaintenanceSummaryText,
   formatMaintenanceDate,
   getMaintenanceHealthStatusLabel,
   MAINTENANCE_FILTER_OPTIONS,
@@ -37,8 +36,8 @@ import {
   getMemoryCardDisplay,
   getMemoryCardEditionMasterName,
 } from './helpers';
-import MaintenanceRecordsSection, { type MaintenanceResourceKey } from './MaintenanceRecordsSection';
-import { PageCard, PageFrame, TrialBanner } from './shared';
+import MaintenanceRecordsSection, { type MaintenanceFormState, type MaintenanceResourceKey } from './MaintenanceRecordsSection';
+import { PageFrame, PageSection, TrialBanner } from './shared';
 
 type MaintenanceTargetRow = {
   tableRowKey: string;
@@ -50,14 +49,23 @@ type MaintenanceTargetRow = {
   summary: string;
   health: string;
   nextDate: string;
+  latestDate: string;
   edit: string;
   maintenanceSummary: MaintenanceSummaryDto;
 };
+
+type LatestMaintenanceRecord = {
+  maintenanceDate: string;
+  memo: string | null;
+};
+
+type LatestMaintenanceRecords = Record<string, LatestMaintenanceRecord>;
 
 type MaintenanceDialogState = {
   targets: MaintenanceTargetRow[];
   index: number;
   autoAdvance: boolean;
+  initialFormState?: MaintenanceFormState;
 };
 
 function matchesMaintenanceFilter(summary: MaintenanceSummaryDto, filter: MaintenanceHealthFilter): boolean {
@@ -71,7 +79,11 @@ function matchesMaintenanceFilter(summary: MaintenanceSummaryDto, filter: Mainte
   }
 }
 
-function buildMaintenanceTargets(lookups: ManagementLookups, filter: MaintenanceHealthFilter): MaintenanceTargetRow[] {
+export function buildMaintenanceTargets(
+  lookups: ManagementLookups,
+  filter: MaintenanceHealthFilter,
+  latestMaintenanceRecords: LatestMaintenanceRecords = {},
+): MaintenanceTargetRow[] {
   const rows: MaintenanceTargetRow[] = [
     ...lookups.gameConsoles
       .filter((item) => matchesMaintenanceFilter(item.maintenance, filter))
@@ -82,10 +94,13 @@ function buildMaintenanceTargets(lookups: ManagementLookups, filter: Maintenance
         resourceLabel: 'ゲーム機',
         name: getGameConsoleDisplay(item, lookups),
         detail: getGameConsoleMasterName(item.gameConsoleMasterId, lookups),
-        summary: buildMaintenanceSummaryText(item.maintenance),
+        summary: latestMaintenanceRecords[`game-consoles:${item.id}`]?.memo?.trim() || 'メモなし',
         health: getMaintenanceHealthStatusLabel(item.maintenance.latestHealthStatus),
         nextDate: formatMaintenanceDate(item.maintenance.nextMaintenanceDate),
-        edit: '履歴を見る',
+        latestDate: formatMaintenanceDate(
+          latestMaintenanceRecords[`game-consoles:${item.id}`]?.maintenanceDate ?? item.maintenance.lastMaintenanceDate,
+        ),
+        edit: 'メンテナンス',
         maintenanceSummary: item.maintenance,
       })),
     ...lookups.gameSoftwares
@@ -100,10 +115,13 @@ function buildMaintenanceTargets(lookups: ManagementLookups, filter: Maintenance
           getGameSoftwareMasterName(item.gameSoftwareMasterId, lookups),
           item.variant == null ? null : item.variant === 0 ? 'パッケージ版' : 'ダウンロード版',
         ].filter(Boolean).join(' / '),
-        summary: buildMaintenanceSummaryText(item.maintenance),
+        summary: latestMaintenanceRecords[`game-softwares:${item.id}`]?.memo?.trim() || 'メモなし',
         health: getMaintenanceHealthStatusLabel(item.maintenance.latestHealthStatus),
         nextDate: formatMaintenanceDate(item.maintenance.nextMaintenanceDate),
-        edit: '履歴を見る',
+        latestDate: formatMaintenanceDate(
+          latestMaintenanceRecords[`game-softwares:${item.id}`]?.maintenanceDate ?? item.maintenance.lastMaintenanceDate,
+        ),
+        edit: 'メンテナンス',
         maintenanceSummary: item.maintenance,
       })),
     ...lookups.memoryCards
@@ -115,10 +133,13 @@ function buildMaintenanceTargets(lookups: ManagementLookups, filter: Maintenance
         resourceLabel: 'メモリーカード',
         name: getMemoryCardDisplay(item, lookups),
         detail: getMemoryCardEditionMasterName(item.memoryCardEditionMasterId, lookups),
-        summary: buildMaintenanceSummaryText(item.maintenance),
+        summary: latestMaintenanceRecords[`memory-cards:${item.id}`]?.memo?.trim() || 'メモなし',
         health: getMaintenanceHealthStatusLabel(item.maintenance.latestHealthStatus),
         nextDate: formatMaintenanceDate(item.maintenance.nextMaintenanceDate),
-        edit: '履歴を見る',
+        latestDate: formatMaintenanceDate(
+          latestMaintenanceRecords[`memory-cards:${item.id}`]?.maintenanceDate ?? item.maintenance.lastMaintenanceDate,
+        ),
+        edit: 'メンテナンス',
         maintenanceSummary: item.maintenance,
       })),
   ];
@@ -140,6 +161,33 @@ function buildMaintenanceTargets(lookups: ManagementLookups, filter: Maintenance
   });
 }
 
+export function getMaintenanceTargetColumns(
+  onEdit: (row: MaintenanceTargetRow) => void,
+): DataTableColumn<MaintenanceTargetRow>[] {
+  return [
+    { key: 'resourceLabel', header: '種別', sortable: true, filterable: true, filterMode: 'select', width: '9rem' },
+    { key: 'name', header: '対象', sortable: true, filterable: true, width: '14rem' },
+    { key: 'health', header: '状態', sortable: true, filterable: true, filterMode: 'select', width: '8rem' },
+    { key: 'nextDate', header: '次回目安', sortable: true, filterable: true, filterMode: 'select', width: '8rem' },
+    { key: 'summary', header: '最新サマリー', filterable: true, width: '16rem' },
+    { key: 'latestDate', header: '最新日', sortable: true, filterable: true, filterMode: 'select', width: '9rem' },
+    {
+      key: 'edit',
+      header: '操作',
+      width: '8rem',
+      render: (_value, row) => (
+        <button
+          type="button"
+          onClick={() => onEdit(row)}
+          className="tool-inline-link"
+        >
+          メンテナンス
+        </button>
+      ),
+    },
+  ];
+}
+
 export default function MaintenanceDashboardPage() {
   const { data: session } = useSession();
   const isTrial = !session?.user;
@@ -151,6 +199,7 @@ export default function MaintenanceDashboardPage() {
   const [maintenanceHealthFilter, setMaintenanceHealthFilter] = useState<MaintenanceHealthFilter>('All');
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [dialogState, setDialogState] = useState<MaintenanceDialogState | null>(null);
+  const [latestMaintenanceRecords, setLatestMaintenanceRecords] = useState<LatestMaintenanceRecords>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -174,9 +223,57 @@ export default function MaintenanceDashboardPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!lookups || isTrial) {
+      setLatestMaintenanceRecords({});
+      return;
+    }
+
+    let cancelled = false;
+    const targets = [
+      ...lookups.gameConsoles.filter((item) => item.maintenance.hasRecord)
+        .map((item) => ({ key: `game-consoles:${item.id}`, resourceKey: 'game-consoles' as const, id: item.id })),
+      ...lookups.gameSoftwares.filter((item) => item.maintenance.hasRecord)
+        .map((item) => ({ key: `game-softwares:${item.id}`, resourceKey: 'game-softwares' as const, id: item.id })),
+      ...lookups.memoryCards.filter((item) => item.maintenance.hasRecord)
+        .map((item) => ({ key: `memory-cards:${item.id}`, resourceKey: 'memory-cards' as const, id: item.id })),
+    ];
+
+    const loadLatestMaintenanceRecords = async () => {
+      const latestRecords: LatestMaintenanceRecords = {};
+      for (let index = 0; index < targets.length; index += 6) {
+        const batch = targets.slice(index, index + 6);
+        const results = await Promise.allSettled(batch.map(async (target) => {
+          const records = await fetchMaintenanceList(target.resourceKey, target.id);
+          const latestRecord = records
+            .filter((record) => !record.isDeleted)
+            .sort((left, right) => (
+              right.maintenanceDate.localeCompare(left.maintenanceDate)
+              || right.id - left.id
+            ))[0];
+          return latestRecord ? {
+            key: target.key,
+            record: { maintenanceDate: latestRecord.maintenanceDate, memo: latestRecord.memo },
+          } : null;
+        }));
+        results.forEach((result) => {
+          if (result.status === 'fulfilled' && result.value) {
+            latestRecords[result.value.key] = result.value.record;
+          }
+        });
+      }
+      if (!cancelled) setLatestMaintenanceRecords(latestRecords);
+    };
+
+    void loadLatestMaintenanceRecords();
+    return () => {
+      cancelled = true;
+    };
+  }, [isTrial, lookups]);
+
   const rows = useMemo(
-    () => (lookups ? buildMaintenanceTargets(lookups, maintenanceHealthFilter) : []),
-    [lookups, maintenanceHealthFilter],
+    () => (lookups ? buildMaintenanceTargets(lookups, maintenanceHealthFilter, latestMaintenanceRecords) : []),
+    [lookups, maintenanceHealthFilter, latestMaintenanceRecords],
   );
 
   const rowMap = useMemo(
@@ -196,7 +293,7 @@ export default function MaintenanceDashboardPage() {
 
   const activeTarget = dialogState ? dialogTargets[dialogState.index] ?? null : null;
 
-  const handleSaved = useCallback((mode: 'create' | 'update') => {
+  const handleSaved = useCallback((mode: 'create' | 'update', values: MaintenanceFormState) => {
     void load();
 
     setDialogState((current) => {
@@ -205,79 +302,61 @@ export default function MaintenanceDashboardPage() {
       }
 
       if (current.index >= current.targets.length - 1) {
-        setQueueMessage(`${current.targets.length} 件の保守記録キューを完了しました。`);
+        setQueueMessage(`${current.targets.length} 件のメンテナンス記録を保存しました。`);
         return null;
       }
 
       return {
         ...current,
         index: current.index + 1,
+        initialFormState: values,
       };
     });
   }, [load]);
 
-  const columns = useMemo<DataTableColumn<MaintenanceTargetRow>[]>(() => [
-    { key: 'resourceLabel', header: '種別', sortable: true, filterable: true, filterMode: 'select', width: '9rem' },
-    { key: 'name', header: '対象', sortable: true, filterable: true, width: '14rem' },
-    { key: 'detail', header: '詳細', filterable: true, width: '16rem' },
-    { key: 'health', header: '状態', sortable: true, filterable: true, filterMode: 'select', width: '8rem' },
-    { key: 'nextDate', header: '次回目安', sortable: true, filterable: true, filterMode: 'select', width: '8rem' },
-    { key: 'summary', header: '最新サマリー', filterable: true },
-    {
-      key: 'edit',
-      header: '操作',
-      width: '8rem',
-      render: (_value, row) => (
-        <button
-          type="button"
-          onClick={() => setDialogState({ targets: [row], index: 0, autoAdvance: false })}
-          className="text-sm font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
-        >
-          履歴を見る
-        </button>
-      ),
-    },
-  ], []);
+  const columns = useMemo(() => getMaintenanceTargetColumns((row) => (
+    setDialogState({ targets: [row], index: 0, autoAdvance: false })
+  )), []);
 
   return (
     <PageFrame
-      eyebrowLabel="Game Library"
-      title="保守履歴"
-      description="ゲーム機・ゲームソフト・メモリーカードの最新保守状態を横断表示し、選択した対象を順次記録できます。"
+      eyebrowLabel=""
+      title="メンテナンス"
+      description="ゲーム機・ソフト・メモリーカードのメンテナンスを確認・記録します。"
       layoutMode={layoutMode}
+      navigationActiveHref="/game-library/maintenance"
+      stickyActions={(
+        <CustomButton
+          variant="accent"
+          disabled={queueTargets.length === 0}
+          onClick={() => setDialogState({ targets: queueTargets, index: 0, autoAdvance: true })}
+        >
+          保存（{queueTargets.length}件）
+        </CustomButton>
+      )}
       actions={(
-        <>
-          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
-            <Link href="/game-library" className="text-sm font-medium text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-300">
-              ダッシュボードへ戻る
-            </Link>
-          </ResponsiveActionGroup>
-          <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
-            <CustomButton
-              variant="accent"
-              disabled={queueTargets.length === 0}
-              onClick={() => setDialogState({ targets: queueTargets, index: 0, autoAdvance: true })}
-            >
-              選択した {queueTargets.length} 件を順次記録
-            </CustomButton>
-            <CustomButton onClick={() => void load()}>
-              再読み込み
-            </CustomButton>
-          </ResponsiveActionGroup>
-        </>
+        <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
+          <CustomButton onClick={() => void load()}>
+            再読込
+          </CustomButton>
+        </ResponsiveActionGroup>
       )}
     >
-      {isTrial ? <TrialBanner /> : null}
-      {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
-      {queueMessage ? <CustomMessageArea variant="success">{queueMessage}</CustomMessageArea> : null}
-      <PageCard>
-        {loading ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-300">保守対象を読み込んでいます...</p>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60 md:grid-cols-[minmax(0,20rem)_1fr] md:items-end">
+      {isTrial || error || queueMessage ? (
+        <div className="tool-page__notices">
+          {isTrial ? <TrialBanner /> : null}
+          {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
+          {queueMessage ? <CustomMessageArea variant="success">{queueMessage}</CustomMessageArea> : null}
+        </div>
+      ) : null}
+      {loading ? (
+        <p className="tool-muted text-sm" role="status">メンテナンス対象を読み込んでいます...</p>
+      ) : (
+        <>
+          <PageSection title="絞り込み">
+            <div className="tool-filter">
               <div className="space-y-2">
-                <CustomLabel htmlFor="maintenance-dashboard-filter">保守状態</CustomLabel>
+                <CustomLabel htmlFor="maintenance-dashboard-filter">メンテナンス状態</CustomLabel>
                 <CustomComboBox
                   id="maintenance-dashboard-filter"
                   value={maintenanceHealthFilter}
@@ -288,16 +367,20 @@ export default function MaintenanceDashboardPage() {
                   ))}
                 </CustomComboBox>
               </div>
-              <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-300">
-                一覧から対象を複数選択すると、保守記録ダイアログを順番に開いて記録できます。
+              <p className="m-0 text-sm leading-6 text-[var(--color-text-muted)]">
+                一覧から対象を複数選択すると、メンテナンス記録を続けて保存できます。
               </p>
             </div>
-            <div className="flex flex-col gap-2 text-sm text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
-              <span>表示件数: {rows.length} 件</span>
-              <span>選択中: {queueTargets.length} 件</span>
+          </PageSection>
+          <PageSection title="メンテナンス対象">
+            <div className="tool-toolbar">
+              <div className="tool-toolbar__meta">
+                <span>表示件数: {rows.length} 件</span>
+                <span>選択中: {queueTargets.length} 件</span>
+              </div>
             </div>
             <DataTable
-              title="保守対象一覧"
+              title="メンテナンス対象一覧"
               columns={columns}
               data={rows}
               filterOptionsData={rows}
@@ -308,21 +391,21 @@ export default function MaintenanceDashboardPage() {
               onSelectionChange={setSelectedKeys}
               paginated
               resizable
-              emptyMessage="保守対象がありません。"
+              emptyMessage="メンテナンス対象がありません。"
             />
-          </div>
-        )}
-      </PageCard>
+          </PageSection>
+        </>
+      )}
       <Dialog
         open={activeTarget != null}
         onClose={() => setDialogState(null)}
-        title={activeTarget ? `${activeTarget.resourceLabel}の保守履歴` : '保守履歴'}
+        title={activeTarget ? `${activeTarget.resourceLabel}のメンテナンス` : 'メンテナンス'}
         size="lg"
         footer={(
           <DialogFooterLayout
             layoutMode={layoutMode}
             status={dialogState?.autoAdvance && activeTarget ? (
-              <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">
+              <span role="status" aria-live="polite" className="text-xs text-[var(--color-text-muted)]">
                 {dialogState.index + 1} / {dialogTargets.length} 件目
               </span>
             ) : null}
@@ -336,18 +419,20 @@ export default function MaintenanceDashboardPage() {
       >
         {activeTarget ? (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-300">
-              <p className="font-semibold text-zinc-800 dark:text-zinc-100">{activeTarget.name}</p>
-              <p>{activeTarget.detail}</p>
-              <p className="mt-2">{activeTarget.summary}</p>
+            <div className="notice text-sm text-[var(--color-text-muted)]">
+              <p className="m-0 font-semibold text-[var(--color-text-strong)]">{activeTarget.name}</p>
+              <p className="m-0">{activeTarget.detail}</p>
+              <p className="mt-2 mb-0">{activeTarget.summary}</p>
             </div>
             <MaintenanceRecordsSection
               key={`${activeTarget.tableRowKey}:${dialogState?.index ?? 0}`}
               resourceKey={activeTarget.resourceKey}
               parentId={activeTarget.id}
               summary={activeTarget.maintenanceSummary}
+              targetName={activeTarget.name}
               trialMode={isTrial}
               autoOpenCreateOnMount={Boolean(dialogState?.autoAdvance) && !isTrial}
+              initialFormState={dialogState?.initialFormState}
               layoutMode={layoutMode}
               onChanged={() => { void load(); }}
               onSaved={handleSaved}

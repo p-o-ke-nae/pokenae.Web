@@ -9,31 +9,33 @@ export default async function GameLibraryPage() {
     <GameManagementDashboard
       basePath="/game-library"
       resourceKeys={USER_RESOURCE_ORDER}
-      sectionLabel="Game Library"
+      sectionLabel=""
       sectionTitle="ゲームライブラリ"
-      sectionDescription="所有しているゲーム機、ゲームソフト、アカウント、メモリーカード、セーブデータを管理します。"
+      sectionDescription="ゲーム機やソフト、関連データを管理します。"
       contentTags={app?.tags ?? []}
       tagDefinitions={tagDefinitions}
-      extraCards={[
-        {
-          href: '/game-library/maintenance',
-          shortLabel: 'Maintenance',
-          title: '保守履歴',
-          description: 'ゲーム機・ゲームソフト・メモリーカードの保守状態を横断表示し、順次記録できます。',
-          actionLabel: '保守履歴を開く',
-        },
+      primaryCards={[
         {
           href: '/game-library/save-data-search',
-          shortLabel: 'Search',
-          title: '横断セーブデータ検索',
-          description: '共通 variant と複数の schema 条件グループを使い、作品横断でセーブデータを検索できます。',
-          actionLabel: '検索画面を開く',
+          shortLabel: 'セーブ検索',
+          title: 'セーブデータ検索',
+          description: '複数の条件でセーブデータと保存先を検索します。',
+          actionLabel: '検索',
         },
         {
+          href: '/game-library/maintenance',
+          shortLabel: 'メンテナンス',
+          title: 'メンテナンス',
+          description: '対象の状態確認と記録を行います。',
+          actionLabel: 'メンテナンス',
+        },
+      ]}
+      extraCards={[
+        {
           href: '/game-management',
-          shortLabel: 'Master',
+          shortLabel: 'マスタ管理',
           title: 'マスタ管理',
-          description: 'ゲーム機、ゲームソフト、セーブデータなどのマスタ情報を管理します。',
+          description: 'ゲーム情報のマスタを管理します。',
           actionLabel: 'マスタ管理を開く',
         },
       ]}

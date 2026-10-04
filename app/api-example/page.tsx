@@ -35,26 +35,26 @@ export default function ApiExamplePage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black p-8">
+    <div className="min-h-screen bg-zinc-50 p-8">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8 text-black dark:text-white">
+        <h1 className="text-3xl font-bold mb-8 text-black">
           APIルーティング基盤 - サンプルページ
         </h1>
 
-        <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-black dark:text-white">
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 text-black">
             設定
           </h2>
           
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2 text-zinc-700 dark:text-zinc-300">
+              <label className="block text-sm font-medium mb-2 text-zinc-700">
                 サービス選択
               </label>
               <select
                 value={selectedService}
                 onChange={(e) => setSelectedService(e.target.value as ApiServiceName)}
-                className="w-full p-2 border rounded bg-white dark:bg-zinc-800 text-black dark:text-white border-zinc-300 dark:border-zinc-700"
+                className="w-full p-2 border rounded bg-white text-black border-zinc-300"
               >
                 <option value="service1">Service 1</option>
                 <option value="service2">Service 2</option>
@@ -63,7 +63,7 @@ export default function ApiExamplePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2 text-zinc-700 dark:text-zinc-300">
+              <label className="block text-sm font-medium mb-2 text-zinc-700">
                 エンドポイント
               </label>
               <input
@@ -71,15 +71,15 @@ export default function ApiExamplePage() {
                 value={endpoint}
                 onChange={(e) => setEndpoint(e.target.value)}
                 placeholder="/users"
-                className="w-full p-2 border rounded bg-white dark:bg-zinc-800 text-black dark:text-white border-zinc-300 dark:border-zinc-700"
+                className="w-full p-2 border rounded bg-white text-black border-zinc-300"
               />
             </div>
           </div>
         </div>
 
         {/* useApiフックの例 */}
-        <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-black dark:text-white">
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 text-black">
             1. useApiフックを使用
           </h2>
           
@@ -93,21 +93,21 @@ export default function ApiExamplePage() {
 
           <div className="mt-4">
             {loading && (
-              <div className="text-zinc-600 dark:text-zinc-400">
+              <div className="text-zinc-600">
                 読み込み中...
               </div>
             )}
             
             {error && (
-              <div className="p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">
+              <div className="p-4 bg-red-100 text-red-700 rounded">
                 <strong>エラー:</strong> {error}
               </div>
             )}
             
             {data !== null && (
-              <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded">
-                <strong className="text-black dark:text-white">レスポンス:</strong>
-                <pre className="mt-2 text-sm overflow-x-auto text-zinc-800 dark:text-zinc-200">
+              <div className="p-4 bg-zinc-100 rounded">
+                <strong className="text-black">レスポンス:</strong>
+                <pre className="mt-2 text-sm overflow-x-auto text-zinc-800">
                   {JSON.stringify(data, null, 2)}
                 </pre>
               </div>
@@ -116,8 +116,8 @@ export default function ApiExamplePage() {
         </div>
 
         {/* 手動クライアント使用の例 */}
-        <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-black dark:text-white">
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 text-black">
             2. 手動でクライアントを使用
           </h2>
           
@@ -129,9 +129,9 @@ export default function ApiExamplePage() {
           </button>
 
           {manualResult && (
-            <div className="mt-4 p-4 bg-zinc-100 dark:bg-zinc-800 rounded">
-              <strong className="text-black dark:text-white">レスポンス:</strong>
-              <pre className="mt-2 text-sm overflow-x-auto text-zinc-800 dark:text-zinc-200">
+            <div className="mt-4 p-4 bg-zinc-100 rounded">
+              <strong className="text-black">レスポンス:</strong>
+              <pre className="mt-2 text-sm overflow-x-auto text-zinc-800">
                 {manualResult}
               </pre>
             </div>
@@ -139,14 +139,14 @@ export default function ApiExamplePage() {
         </div>
 
         {/* 説明 */}
-        <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-semibold mb-4 text-black dark:text-white">
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <h2 className="text-xl font-semibold mb-4 text-black">
             使用方法
           </h2>
           
-          <div className="space-y-4 text-zinc-700 dark:text-zinc-300">
+          <div className="space-y-4 text-zinc-700">
             <div>
-              <h3 className="font-semibold text-black dark:text-white">現在の状態</h3>
+              <h3 className="font-semibold text-black">現在の状態</h3>
               <p className="text-sm mt-1">
                 このページは、実際のバックエンドAPIが存在しない場合、エラーが表示されます。
                 実際の使用時は、.env.localに正しいAPI URLを設定してください。
@@ -154,16 +154,16 @@ export default function ApiExamplePage() {
             </div>
 
             <div>
-              <h3 className="font-semibold text-black dark:text-white">リクエストURL</h3>
-              <p className="text-sm mt-1 font-mono bg-zinc-100 dark:bg-zinc-800 p-2 rounded">
+              <h3 className="font-semibold text-black">リクエストURL</h3>
+              <p className="text-sm mt-1 font-mono bg-zinc-100 p-2 rounded">
                 /api/services/{selectedService}{endpoint}
               </p>
             </div>
 
             <div>
-              <h3 className="font-semibold text-black dark:text-white">詳細なドキュメント</h3>
+              <h3 className="font-semibold text-black">詳細なドキュメント</h3>
               <p className="text-sm mt-1">
-                詳細な使用方法は <code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">docs/API_ROUTING.md</code> を参照してください。
+                詳細な使用方法は <code className="bg-zinc-100 px-1 rounded">docs/API_ROUTING.md</code> を参照してください。
               </p>
             </div>
           </div>

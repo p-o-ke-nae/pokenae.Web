@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CustomButton from '@/components/atoms/CustomButton';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
+import PageModeToggle from '@/components/atoms/PageModeToggle';
 import CustomTextArea from '@/components/atoms/CustomTextArea';
 import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
 import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
@@ -406,88 +407,84 @@ export default function EditorDialog({
         footer={
           <DialogFooterLayout
             layoutMode={layoutMode}
+            separatePrimary={false}
             status={isPending ? (
-              <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">
+              <span role="status" aria-live="polite" className="text-xs text-[var(--color-text-muted)]">
                 保存中はダイアログを閉じられません。
               </span>
             ) : null}
             leading={
               !isNew ? (
-                <div className="space-y-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3 sm:space-y-0">
-                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2}>
+                <>
+                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={3} aria-label="レコード移動">
                     <CustomButton
                       disabled={!canGoPrev || loading}
                       onClick={() => navigate('prev')}
+                      aria-label="前へ"
                     >
-                      ← 前へ
+                      ←
                     </CustomButton>
+                    <span className="flex items-center justify-center text-xs text-[var(--color-text-muted)]">
+                      {currentIndex >= 0 ? `${currentIndex + 1} / ${rowIds.length}` : ''}
+                    </span>
                     <CustomButton
                       disabled={!canGoNext || loading}
                       onClick={() => navigate('next')}
+                      aria-label="次へ"
                     >
-                      次へ →
+                      →
                     </CustomButton>
                   </ResponsiveActionGroup>
-                  {currentIndex >= 0 ? (
-                    <span className="text-xs text-zinc-500">
-                      {currentIndex + 1} / {rowIds.length}
-                    </span>
-                  ) : null}
-                </div>
+                </>
               ) : null
             }
-            trailing={
-              isViewMode && onPageModeChange ? (
-                <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
-                  <CustomButton onClick={onClose} disabled={isPending}>閉じる</CustomButton>
-                  <CustomButton variant="accent" disabled={isPending} onClick={() => onPageModeChange('edit')}>
-                    編集を有効化
+            trailing={(
+              <ResponsiveActionGroup
+                layoutMode={layoutMode}
+                mobileColumns={3}
+                align="end"
+              >
+                {!isNew && !isViewMode && definition.canDelete ? (
+                  <CustomButton variant="ghost" onClick={() => setDeleteDialogOpen(true)}>
+                    削除
                   </CustomButton>
-                </ResponsiveActionGroup>
-              ) : (
-                <>
-                  {!isNew && (definition.canDelete || (!isViewMode && onPageModeChange)) ? (
-                    <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1}>
-                      {definition.canDelete ? (
-                        <CustomButton variant="ghost" onClick={() => setDeleteDialogOpen(true)}>
-                          削除
-                        </CustomButton>
-                      ) : null}
-                      {!isViewMode && onPageModeChange ? (
-                        <CustomButton onClick={() => onPageModeChange('view')}>
-                          読み取り専用に戻す
-                        </CustomButton>
-                      ) : null}
-                    </ResponsiveActionGroup>
-                  ) : null}
-                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
-                    <CustomButton onClick={onClose} disabled={isPending}>キャンセル</CustomButton>
-                    {isNew ? (
-                      <>
-                        <CustomButton onClick={() => void handleSave('continue')} disabled={isPending || loading}>
-                          作成して続ける
-                        </CustomButton>
-                        <CustomButton variant="accent" onClick={() => void handleSave('close')} disabled={isPending || loading}>
-                          作成して閉じる
-                        </CustomButton>
-                      </>
-                    ) : definition.canEdit ? (
-                      <CustomButton variant="accent" onClick={() => void handleSave('close')} disabled={isPending || loading}>
-                        保存する
-                      </CustomButton>
-                    ) : null}
-                  </ResponsiveActionGroup>
-                </>
-              )
-            }
+                ) : null}
+                <CustomButton onClick={onClose} disabled={isPending}>
+                  {isViewMode ? '閉じる' : 'キャンセル'}
+                </CustomButton>
+                {isNew ? (
+                  <>
+                    <CustomButton onClick={() => void handleSave('continue')} disabled={isPending || loading}>
+                      続けて保存
+                    </CustomButton>
+                    <CustomButton variant="accent" onClick={() => void handleSave('close')} disabled={isPending || loading}>
+                      保存
+                    </CustomButton>
+                  </>
+                ) : !isViewMode && definition.canEdit ? (
+                  <CustomButton variant="accent" onClick={() => void handleSave('close')} disabled={isPending || loading}>
+                    保存
+                  </CustomButton>
+                ) : null}
+              </ResponsiveActionGroup>
+            )}
           />
         }
       >
         <div ref={bodyRef} className="space-y-4">
+          {!isNew && onPageModeChange ? (
+            <div className="flex justify-end">
+              <PageModeToggle
+                mode={pageMode}
+                onChange={onPageModeChange}
+                disabled={isPending}
+              />
+            </div>
+          ) : null}
           {error ? <CustomMessageArea variant="error" className="whitespace-pre-line">{error}</CustomMessageArea> : null}
           {success ? <CustomMessageArea variant="success">{success}</CustomMessageArea> : null}
           {loading ? (
-            <p className="text-sm text-zinc-500">読み込んでいます...</p>
+            <p className="text-sm text-[var(--color-text-muted)]">読み込んでいます...</p>
           ) : (
             <>
               <FormFields
@@ -505,36 +502,36 @@ export default function EditorDialog({
                 displayOnly={isViewMode}
               />
               {!isNew && recordId != null && (
-                <div className="select-none space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-                  <p className="font-semibold text-zinc-800 dark:text-zinc-100">レコード情報</p>
+                <div className="select-none space-y-2 rounded-[0.35rem] border border-[var(--color-base-70)] bg-[var(--color-base-70-light)] p-4 text-sm text-[var(--color-text-muted)]">
+                  <p className="font-semibold text-[var(--color-text-strong)]">レコード情報</p>
                   <p>ID: {recordId}</p>
                   {record ? <ResourceSummary resourceKey={resourceKey} record={record} lookups={lookups} storyProgressLabel={selectedStoryProgressLabel} /> : null}
                 </div>
               )}
                {!isNew && recordId != null && supportsMaintenance(resourceKey) ? (
                  <>
-                   <section className="space-y-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+                   <section className="space-y-4 border-t-4 border-[var(--color-accent-25)] pt-4">
                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                        <div className="space-y-2">
-                         <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">保守履歴</h3>
-                         <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-300">
+                         <h3 className="text-base font-semibold text-[var(--color-text-strong)]">メンテナンス</h3>
+                         <p className="text-sm leading-6 text-[var(--color-text-muted)]">
                            {buildMaintenanceSummaryText(maintenanceSummary)}
                          </p>
                        </div>
                        <CustomButton variant="neutral" onClick={() => setMaintenanceDialogOpen(true)}>
-                         履歴を見る
+                         メンテナンス
                        </CustomButton>
                      </div>
                      {isTrial ? (
                        <CustomMessageArea variant="info">
-                         トライアルモードでは保守履歴ダイアログは確認できますが、保存操作は利用できません。
+                         トライアルモードではメンテナンスは確認できますが、保存操作は利用できません。
                        </CustomMessageArea>
                      ) : null}
                    </section>
                    <Dialog
                      open={maintenanceDialogOpen}
                      onClose={() => setMaintenanceDialogOpen(false)}
-                     title={`${definition.shortLabel}の保守履歴`}
+                     title={`${definition.shortLabel}のメンテナンス`}
                      size="lg"
                      footer={(
                        <DialogFooterLayout
@@ -555,6 +552,8 @@ export default function EditorDialog({
                        readOnly={isViewMode}
                        trialMode={isTrial}
                        layoutMode={layoutMode}
+                       pageMode={pageMode}
+                       onPageModeChange={onPageModeChange}
                        onChanged={() => { void handleMaintenanceChanged(); }}
                      />
                    </Dialog>
@@ -565,12 +564,12 @@ export default function EditorDialog({
                 const mergedFields = mergeSchemaWithSaveData(saveDataSchema, saveData);
                 if (mergedFields.length > 0) {
                   return (
-                    <div className="select-none space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-                      <p className="font-semibold text-zinc-800 dark:text-zinc-100">セーブデータスキーマ項目の現在値</p>
+                    <div className="select-none space-y-2 rounded-[0.35rem] border border-[var(--color-base-70)] bg-[var(--color-base-70-light)] p-4 text-sm text-[var(--color-text-muted)]">
+                      <p className="font-semibold text-[var(--color-text-strong)]">セーブデータスキーマ項目の現在値</p>
                       <div className="space-y-2">
                         {mergedFields.filter((field) => !field.isDisabled).map((field) => (
                           <p key={field.fieldKey}>
-                            <span className="font-medium text-zinc-800 dark:text-zinc-100">{field.label}</span>: {formatMergedFieldValue(field)}
+                            <span className="font-medium text-[var(--color-text-strong)]">{field.label}</span>: {formatMergedFieldValue(field)}
                           </p>
                         ))}
                       </div>
@@ -579,12 +578,12 @@ export default function EditorDialog({
                 }
                 if (saveData.extendedFields.length > 0) {
                   return (
-                    <div className="select-none space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-                      <p className="font-semibold text-zinc-800 dark:text-zinc-100">セーブデータスキーマ項目の現在値</p>
+                    <div className="select-none space-y-2 rounded-[0.35rem] border border-[var(--color-base-70)] bg-[var(--color-base-70-light)] p-4 text-sm text-[var(--color-text-muted)]">
+                      <p className="font-semibold text-[var(--color-text-strong)]">セーブデータスキーマ項目の現在値</p>
                       <div className="space-y-2">
                         {saveData.extendedFields.map((field) => (
                           <p key={field.fieldKey}>
-                            <span className="font-medium text-zinc-800 dark:text-zinc-100">{field.label}</span>: {formatSaveDataFieldValueForList(field)}
+                            <span className="font-medium text-[var(--color-text-strong)]">{field.label}</span>: {formatSaveDataFieldValueForList(field)}
                           </p>
                         ))}
                       </div>
@@ -611,7 +610,7 @@ export default function EditorDialog({
               <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
                 <CustomButton onClick={() => setDeleteDialogOpen(false)} disabled={isPending}>キャンセル</CustomButton>
                 <CustomButton variant="accent" disabled={isPending} onClick={() => void handleDelete()}>
-                  削除する
+                  削除
                 </CustomButton>
               </ResponsiveActionGroup>
             }
@@ -619,7 +618,7 @@ export default function EditorDialog({
         }
       >
         <div className="space-y-4">
-          <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">このレコードを削除します。操作は元に戻せない場合があります。</p>
+          <p className="text-sm leading-6 text-[var(--color-text-muted)]">このレコードを削除します。操作は元に戻せない場合があります。</p>
           {resourceKey === 'save-datas' ? (
             <div className="space-y-4">
               <SelectField

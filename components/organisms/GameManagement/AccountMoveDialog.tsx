@@ -100,7 +100,7 @@ export default function AccountMoveDialog({
       footer={
         <DialogFooterLayout
           layoutMode={layoutMode}
-          status={isPending ? <span role="status" aria-live="polite" className="text-xs text-zinc-500 dark:text-zinc-300">移行中はダイアログを閉じられません。</span> : null}
+          status={isPending ? <span role="status" aria-live="polite" className="text-xs text-[var(--color-text-muted)]">移行中はダイアログを閉じられません。</span> : null}
           trailing={
             <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
               <CustomButton onClick={handleClose} disabled={isPending}>
@@ -115,7 +115,7 @@ export default function AccountMoveDialog({
       }
     >
       <div className="space-y-5 p-1">
-        <div className="select-none rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200">
+        <div className="select-none rounded-[0.35rem] border border-[var(--color-base-70)] bg-[var(--color-base-70-light)] p-4 text-sm text-[var(--foreground)]">
           対象アカウント: {getAccountDisplay(account, lookups)}
         </div>
 

@@ -265,4 +265,32 @@ describe("buildToolContentChanges", () => {
       }),
     ]));
   });
+
+  it("hides app updates from INFO when visible is false", () => {
+    const result = prepareAppWrite({
+      rawValue: [{
+        slug: "hidden-app",
+        displayName: "Hidden App",
+        summary: "hidden from info",
+        href: "/hidden-app",
+        imageAlt: "",
+        metaLabel: "Webアプリ",
+        status: "published",
+        order: 0,
+        tags: [],
+      }],
+      currentPaths: [],
+      appSchema,
+      updateSchema,
+      updatePath: "content/updates/apps-20260926100000.json",
+      updateId: "apps-20260926100000",
+      summary: "Hidden Appを更新",
+      visible: false,
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const update = result.files.find((file) => file.path === "content/updates/apps-20260926100000.json");
+    expect(JSON.parse(String(update?.content))).toMatchObject({ target: "app", visible: false });
+  });
 });
