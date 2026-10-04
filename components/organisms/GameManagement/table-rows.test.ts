@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getTableColumns } from './table-rows';
+import { buildTableRows, getTableColumns } from './table-rows';
+import type { ManagementLookups } from '@/lib/game-management/types';
 
 describe('game-library user resource table columns', () => {
   it('shows game console maintenance and memo without relation or status', () => {
@@ -11,6 +12,7 @@ describe('game-library user resource table columns', () => {
       ['memo', 'メモ'],
       ['edit', '操作'],
     ]);
+    expect(columns.find(({ key }) => key === 'memo')?.width).toBe('32rem');
   });
 
   it('shows software type, maintenance, and memo without relation or status', () => {
@@ -23,6 +25,7 @@ describe('game-library user resource table columns', () => {
       ['memo', 'メモ'],
       ['edit', '操作'],
     ]);
+    expect(columns.find(({ key }) => key === 'memo')?.width).toBe('32rem');
   });
 
   it('labels account relation and note as account type and memo', () => {
@@ -31,6 +34,7 @@ describe('game-library user resource table columns', () => {
     expect(columns.find(({ key }) => key === 'relation')?.header).toBe('アカウント種類');
     expect(columns.find(({ key }) => key === 'relation')?.width).toBe('15rem');
     expect(columns.find(({ key }) => key === 'note')?.header).toBe('メモ');
+    expect(columns.find(({ key }) => key === 'note')?.width).toBe('32rem');
     expect(columns.some(({ key }) => key === 'status')).toBe(false);
   });
 
@@ -44,13 +48,50 @@ describe('game-library user resource table columns', () => {
       ['memo', 'メモ'],
       ['edit', '操作'],
     ]);
+    expect(columns.find(({ key }) => key === 'memo')?.width).toBe('32rem');
   });
 
-  it('uses title and storage destination without a hardware column for save data', () => {
+  it('shows save data memo after story progress with a wider column', () => {
     const columns = getTableColumns('save-datas');
 
-    expect(columns.some(({ key, header }) => key === 'title' && header === 'タイトル')).toBe(true);
-    expect(columns.some(({ key, header }) => key === 'save' && header === '保存先')).toBe(true);
+    expect(columns.map(({ key, header }) => [key, header])).toEqual([
+      ['title', 'タイトル'],
+      ['save', '保存先'],
+      ['storyProgress', 'ストーリー進行度'],
+      ['memo', 'メモ'],
+      ['operation', '操作'],
+      ['edit', '編集'],
+    ]);
+    expect(columns.find(({ key }) => key === 'memo')?.width).toBe('32rem');
     expect(columns.some(({ key }) => key === 'hard')).toBe(false);
+  });
+
+  it('maps a save data record memo into the memo column', () => {
+    const lookups = {
+      gameSoftwareMasters: [{ id: 1, name: 'ソフト', abbreviation: 'S', contentGroupId: 1 }],
+      gameSoftwares: [],
+      gameConsoles: [],
+      accounts: [],
+      memoryCards: [],
+      saveDatas: [{
+        id: 1,
+        ownerGoogleUserId: 'test',
+        displayOrder: 1,
+        memo: '保存データのメモ',
+        replacedBySaveDataId: null,
+        saveStorageType: 0,
+        gameSoftwareMasterId: 1,
+        gameSoftwareId: null,
+        gameConsoleId: null,
+        accountId: null,
+        memoryCardId: null,
+        storyProgressDefinitionId: null,
+        extendedFields: [],
+        isDeleted: false,
+        deleteReason: null,
+      }],
+    } as unknown as ManagementLookups;
+
+    expect(buildTableRows('save-datas', lookups, '/game-library').map((row) => row.memo)).toEqual(['保存データのメモ']);
   });
 });

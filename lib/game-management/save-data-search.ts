@@ -243,6 +243,16 @@ function getSearchValue(
 }
 
 function compareValue(actual: string, expected: string, operator: SaveDataSearchOperator, fieldType: SaveDataSearchFieldOption['fieldType']): boolean {
+  if (!actual.trim() || !expected.trim()) {
+    switch (operator) {
+      case 'equals': return !actual.trim() && !expected.trim();
+      case 'not-equals': return Boolean(actual.trim()) !== Boolean(expected.trim());
+      case 'contains': return !expected.trim() || normalizeText(actual).includes(normalizeText(expected));
+      case 'not-contains': return Boolean(expected.trim()) && !normalizeText(actual).includes(normalizeText(expected));
+      default: return false;
+    }
+  }
+
   if (operator === 'contains' || operator === 'not-contains') {
     const contains = normalizeText(actual).includes(normalizeText(expected));
     return operator === 'contains' ? contains : !contains;
@@ -270,15 +280,15 @@ export function evaluateSaveDataSearch(
   fields: SaveDataSearchFieldOption[],
   storyProgressSchemas: Record<number, StoryProgressSchemaDto> = {},
 ): SaveDataSearchMatch[] {
-  if (criteria.length === 0 || criteria.some((criterion) => !criterion.value.trim())) return [];
+  if (criteria.length === 0) return [];
 
   const matches = lookups.saveDatas.flatMap((saveData) => {
     const matchedValues: string[] = [];
     for (const criterion of criteria) {
       const field = fields.find((item) => item.fieldId === criterion.fieldId);
       if (!field) return [];
-      const actual = getSearchValue(saveData, schemaMap, storyProgressSchemas, field, lookups);
-      if (!actual || !compareValue(actual.value, criterion.value.trim(), criterion.operator, field.fieldType)) return [];
+      const actual = getSearchValue(saveData, schemaMap, storyProgressSchemas, field, lookups) ?? { value: '', display: '' };
+      if (!compareValue(actual.value, criterion.value.trim(), criterion.operator, field.fieldType)) return [];
       matchedValues.push(actual.display);
     }
     return [{ saveData, matchedValues }];

@@ -1066,15 +1066,15 @@ export function GameManagementDashboard({
 
     const columns = resourceKey === 'save-datas' && dynamicColumns.length > 0
       ? (() => {
-        const storyProgressIndex = baseColumns.findIndex((column) => column.key === 'storyProgress');
-        if (storyProgressIndex === -1) {
+        const memoIndex = baseColumns.findIndex((column) => column.key === 'memo');
+        if (memoIndex === -1) {
           return [...baseColumns, ...dynamicColumns];
         }
 
         return [
-          ...baseColumns.slice(0, storyProgressIndex + 1),
+          ...baseColumns.slice(0, memoIndex + 1),
           ...dynamicColumns,
-          ...baseColumns.slice(storyProgressIndex + 1),
+          ...baseColumns.slice(memoIndex + 1),
         ];
       })()
       : baseColumns;

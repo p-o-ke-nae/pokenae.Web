@@ -279,6 +279,31 @@ describe('save-data search helpers', () => {
     expect(matches[0]?.matchedValues).toEqual(['SEARCH-TEST']);
   });
 
+  it('searches empty custom values and supports not-equals against blank', () => {
+    const blankSave = {
+      ...lookups.saveDatas[0]!,
+      extendedFields: lookups.saveDatas[0]!.extendedFields.map((field) => (
+        field.fieldKey === 'trainer-name' ? { ...field, stringValue: '' } : field
+      )),
+    };
+    const populatedSave = {
+      ...lookups.saveDatas[1]!,
+      extendedFields: [{
+        ...lookups.saveDatas[0]!.extendedFields[0]!,
+        stringValue: 'ミュウ',
+      }],
+    };
+    const searchLookups = { ...lookups, saveDatas: [blankSave, populatedSave] };
+    const searchSchemas = { 100: schema, 200: { ...schema, gameSoftwareMasterId: 200 } };
+
+    expect(evaluateSaveDataSearch(searchLookups, searchSchemas, [
+      { fieldId: 'custom:trainer-name', operator: 'equals', value: '' },
+    ], fields).map((match) => match.saveData.id)).toEqual([1]);
+    expect(evaluateSaveDataSearch(searchLookups, searchSchemas, [
+      { fieldId: 'custom:trainer-name', operator: 'not-equals', value: '' },
+    ], fields).map((match) => match.saveData.id)).toEqual([2]);
+  });
+
   it('combines selected search items and supports non-equality operators', () => {
     const matches = evaluateSaveDataSearch(lookups, { 100: schema }, [
       { fieldId: 'custom:trainer-name', operator: 'equals', value: 'ピカ' },

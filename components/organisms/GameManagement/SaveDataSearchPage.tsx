@@ -24,6 +24,10 @@ import {
   type SaveDataSearchCriteria,
   type SaveDataSearchFieldOption,
 } from '@/lib/game-management/save-data-search';
+import {
+  buildSaveDataSearchUrl,
+  restoreSaveDataSearchCriteria,
+} from '@/lib/game-management/save-data-search-url';
 import { formatSaveStorageType } from '@/lib/game-management/save-storage-type';
 import { buildTrialUserData } from '@/lib/game-management/trial';
 import type { ManagementLookups, SaveDataSchemaDto, StoryProgressSchemaDto } from '@/lib/game-management/types';
@@ -39,41 +43,6 @@ import {
   getMemoryCardDisplay,
 } from './helpers';
 import { PageFrame, PageSection, TrialBanner } from './shared';
-
-const SEARCH_QUERY_KEYS = {
-  field: 'field',
-  operator: 'operator',
-  value: 'value',
-} as const;
-
-const SAVE_DATA_SEARCH_OPERATORS = new Set<SaveDataSearchCriteria['operator']>([
-  'equals',
-  'not-equals',
-  'contains',
-  'not-contains',
-  'greater-than',
-  'less-than',
-  'greater-or-equal',
-  'less-or-equal',
-]);
-
-function restoreSearchCriteria(search: string): SaveDataSearchCriteria[] {
-  const params = new URLSearchParams(search);
-  const fieldIds = params.getAll(SEARCH_QUERY_KEYS.field);
-  const operators = params.getAll(SEARCH_QUERY_KEYS.operator);
-  const values = params.getAll(SEARCH_QUERY_KEYS.value);
-  if (fieldIds.length === 0 || fieldIds.length !== operators.length || fieldIds.length !== values.length) return [];
-
-  const usedFields = new Set<string>();
-  return fieldIds.flatMap((fieldId, index) => {
-    const operator = operators[index];
-    if (!fieldId || usedFields.has(fieldId) || !SAVE_DATA_SEARCH_OPERATORS.has(operator as SaveDataSearchCriteria['operator'])) {
-      return [];
-    }
-    usedFields.add(fieldId);
-    return [{ fieldId, operator: operator as SaveDataSearchCriteria['operator'], value: values[index] ?? '' }];
-  });
-}
 
 function getStorageSummary(saveData: ManagementLookups['saveDatas'][number], lookups: ManagementLookups): string {
   switch (saveData.saveStorageType) {
@@ -156,7 +125,7 @@ export default function SaveDataSearchPage() {
   }, [load]);
 
   useEffect(() => {
-    const restoredCriteria = restoreSearchCriteria(window.location.search);
+    const restoredCriteria = restoreSaveDataSearchCriteria(window.location.search);
     setCriteria(restoredCriteria);
     setInitialSearchPending(restoredCriteria.length > 0);
     setUrlInitialized(true);
@@ -235,7 +204,6 @@ export default function SaveDataSearchPage() {
   );
   const canSearch = Boolean(
     !loading && lookups && !schemasPending && criteria.length > 0
-    && criteria.every((criterion) => criterion.value.trim()),
   );
   const availableFields = searchableFields.filter((field) => !criteria.some((item) => item.fieldId === field.fieldId));
   const visibleCandidates = availableFields.filter((field) => field.label.toLocaleLowerCase('ja').includes(candidateQuery.trim().toLocaleLowerCase('ja')));
@@ -246,7 +214,6 @@ export default function SaveDataSearchPage() {
       const field = fieldMap.get(criterion.fieldId);
       return Boolean(
         field
-        && criterion.value.trim()
         && getSaveDataSearchOperators(field).some((operator) => operator.value === criterion.operator),
       );
     });
@@ -263,21 +230,16 @@ export default function SaveDataSearchPage() {
 
   useEffect(() => {
     if (!urlInitialized) return;
-    const url = new URL(window.location.href);
-    url.searchParams.delete(SEARCH_QUERY_KEYS.field);
-    url.searchParams.delete(SEARCH_QUERY_KEYS.operator);
-    url.searchParams.delete(SEARCH_QUERY_KEYS.value);
-    criteria.forEach((criterion) => {
-      url.searchParams.append(SEARCH_QUERY_KEYS.field, criterion.fieldId);
-      url.searchParams.append(SEARCH_QUERY_KEYS.operator, criterion.operator);
-      url.searchParams.append(SEARCH_QUERY_KEYS.value, criterion.value);
-    });
-    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(
+      window.history.state,
+      '',
+      buildSaveDataSearchUrl(window.location.href, criteria),
+    );
   }, [criteria, urlInitialized]);
 
   const handleSearch = useCallback(() => {
-    if (criteria.length === 0 || criteria.some((criterion) => !criterion.value.trim())) {
-      setSearchError('検索項目と値をすべて指定してください。');
+    if (criteria.length === 0) {
+      setSearchError('検索項目を指定してください。');
       return;
     }
     if (schemaLoadingIds.length > 0 || Object.keys(schemaLoadErrors).length > 0) {
@@ -462,7 +424,7 @@ export default function SaveDataSearchPage() {
                       </p>
                       {submittedSearch.map((criterion, index) => (
                         <p key={criterion.fieldId} className="text-sm text-[var(--color-text-muted)]">
-                          {fieldMap.get(criterion.fieldId)?.label ?? criterion.fieldId}: {result.matchedValues[index]}
+                          {fieldMap.get(criterion.fieldId)?.label ?? criterion.fieldId}: {criterion.value.trim() ? result.matchedValues[index] : '（空欄）'}
                         </p>
                       ))}
                     </div>

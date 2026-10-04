@@ -84,7 +84,7 @@ const GAME_SOFTWARE_CONTENT_GROUP_TABLE_COLUMNS: DataTableColumn<ManagementTable
 const GAME_CONSOLE_TABLE_COLUMNS: DataTableColumn<ManagementTableRow>[] = [
   { key: 'primary', header: '名称', sortable: true, filterable: true, width: '14rem' },
   { key: 'maintenance', header: 'メンテナンス', sortable: true, filterable: true, filterMode: 'select', width: '9rem' },
-  { key: 'memo', header: 'メモ', filterable: true },
+  { key: 'memo', header: 'メモ', filterable: true, width: '32rem' },
   { key: 'edit', header: '操作', width: '7rem' },
 ];
 
@@ -92,14 +92,14 @@ const GAME_SOFTWARE_TABLE_COLUMNS: DataTableColumn<ManagementTableRow>[] = [
   { key: 'primary', header: '名称', sortable: true, filterable: true, width: '14rem' },
   { key: 'maintenance', header: 'メンテナンス', sortable: true, filterable: true, filterMode: 'select', width: '9rem' },
   { key: 'variant', header: '種類', sortable: true, filterable: true, filterMode: 'select', width: '9rem' },
-  { key: 'memo', header: 'メモ', filterable: true },
+  { key: 'memo', header: 'メモ', filterable: true, width: '32rem' },
   { key: 'edit', header: '操作', width: '7rem' },
 ];
 
 const ACCOUNT_TABLE_COLUMNS: DataTableColumn<ManagementTableRow>[] = [
   { key: 'primary', header: '名称', sortable: true, filterable: true, width: '14rem' },
   { key: 'relation', header: 'アカウント種類', filterable: true, filterMode: 'select', width: '15rem' },
-  { key: 'note', header: 'メモ', filterable: true },
+  { key: 'note', header: 'メモ', filterable: true, width: '32rem' },
   { key: 'edit', header: '操作', width: '7rem' },
 ];
 
@@ -107,7 +107,7 @@ const MEMORY_CARD_TABLE_COLUMNS: DataTableColumn<ManagementTableRow>[] = [
   { key: 'primary', header: '名称', sortable: true, filterable: true, width: '14rem' },
   { key: 'relation', header: '種類', filterable: true, filterMode: 'select', width: '10rem' },
   { key: 'maintenance', header: 'メンテナンス', sortable: true, filterable: true, filterMode: 'select', width: '9rem' },
-  { key: 'memo', header: 'メモ', filterable: true },
+  { key: 'memo', header: 'メモ', filterable: true, width: '32rem' },
   { key: 'edit', header: '操作', width: '7rem' },
 ];
 
@@ -115,6 +115,7 @@ const SAVE_DATA_TABLE_COLUMNS: DataTableColumn<ManagementTableRow>[] = [
   { key: 'title', header: 'タイトル', sortable: true, filterable: true, width: '12rem' },
   { key: 'save', header: '保存先', sortable: true, filterable: true, width: '24rem' },
   { key: 'storyProgress', header: 'ストーリー進行度', sortable: true, filterable: true, filterMode: 'select', width: '12rem' },
+  { key: 'memo', header: 'メモ', filterable: true, width: '32rem' },
   { key: 'operation', header: '操作', width: '4.5rem' },
   { key: 'edit', header: '編集', width: '6rem' },
 ];
@@ -378,6 +379,7 @@ export function buildTableRows(
           storyProgress: item.storyProgressDefinitionId
             ? (getStoryProgressLabel(masterId, item.storyProgressDefinitionId, storyProgressLabels) ?? '')
             : '',
+          memo: item.memo ?? '',
           saveDataContentGroupId: getSaveDataContentGroupId(item, lookups),
           saveDataGameSoftwareMasterId: masterId,
           saveDataDynamicFieldLabels: dynamicFieldLabels,

@@ -264,6 +264,13 @@ test.describe("ゲームライブラリ UI", () => {
     await expect(searchNavigation.locator('a[aria-current="page"]')).toHaveAttribute("href", "/game-library/save-data-search");
     await expect(page.getByRole("link", { name: "戻る" })).toHaveCount(0);
     await expectUnboxedSections(page);
+
+    await page.goto("/game-library/save-datas");
+    const saveDataHeaders = page.getByRole("columnheader");
+    await expect(saveDataHeaders.filter({ hasText: "ストーリー進行度" })).toBeVisible();
+    await expect(saveDataHeaders.filter({ hasText: "メモ" })).toBeVisible();
+    await expect(saveDataHeaders.nth(3)).toContainText("メモ");
+    await expect(saveDataHeaders.nth(3)).toHaveCSS("width", "512px");
   });
 
   test("編集ダイアログのフッターボタンが崩れずに並ぶ", async ({ page, isMobile }) => {
@@ -365,16 +372,13 @@ test.describe("ゲームライブラリ UI", () => {
       await route.fulfill({ status: 200, contentType: "application/json", json: { success: true, data } });
     });
 
-    const searchParams = new URLSearchParams();
-    for (const [field, operator, value] of [
-      ["custom:trainer-name", "equals", "テスト主人公B"],
-      ["master:game-software", "equals", "200"],
-      ["master:story-progress", "equals", "2000"],
-    ]) {
-      searchParams.append("field", field);
-      searchParams.append("operator", operator);
-      searchParams.append("value", value);
-    }
+    const searchParams = new URLSearchParams({
+      criteria: JSON.stringify([
+        { fieldId: "custom:trainer-name", operator: "equals", value: "テスト主人公B" },
+        { fieldId: "master:game-software", operator: "equals", value: "200" },
+        { fieldId: "master:story-progress", operator: "equals", value: "2000" },
+      ]),
+    });
     await page.goto(`/game-library/save-data-search?${searchParams.toString()}`);
     await expect.poll(() => schemaRequests.length).toBe(2);
     await expect(page.locator('[id="search-value-custom:trainer-name"]')).toHaveValue("テスト主人公B");
@@ -389,11 +393,18 @@ test.describe("ゲームライブラリ UI", () => {
     await page.locator('[id="search-value-master:game-software"]').selectOption("100");
     await page.getByRole("button", { name: "検索", exact: true }).click();
     await expect(page.getByText("一致するセーブデータはありませんでした。")).toBeVisible();
-    await expect.poll(() => new URL(page.url()).searchParams.getAll("value")).toEqual([
-      "テスト主人公B",
-      "100",
-      "2000",
-    ]);
+
+    await page.locator('[id="search-value-master:game-software"]').selectOption("200");
+    await page.locator('[id="search-value-custom:trainer-name"]').fill("");
+    await page.locator('[id="search-operator-custom:trainer-name"]').selectOption("not-equals");
+    await page.getByRole("button", { name: "検索", exact: true }).click();
+    await expect(page.getByText("TEST200 — テストソフト200")).toBeVisible();
+    await expect(page.getByText("主人公名: テスト主人公B", { exact: true })).toBeVisible();
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      const criteria = JSON.parse(url.searchParams.get("criteria") ?? "[]");
+      return criteria[0]?.value;
+    }).toBe("");
   });
 
   test("ネストしたメンテナンス画面を閉じても親の詳細は開いたまま", async ({ page }) => {
