@@ -4,6 +4,7 @@ import type {
   SaveDataDto,
   SaveDataFieldType,
   SaveDataSchemaDto,
+  StoryProgressSchemaDto,
 } from './types';
 
 export type SaveDataSearchOperator =
@@ -51,7 +52,10 @@ function normalizeText(value: string): string {
   return value.trim().toLocaleLowerCase('ja');
 }
 
-function getMasterSearchOptions(lookups: ManagementLookups): SaveDataSearchFieldOption[] {
+function getMasterSearchOptions(
+  lookups: ManagementLookups,
+  storyProgressSchemas: Record<number, StoryProgressSchemaDto>,
+): SaveDataSearchFieldOption[] {
   const optionsByField: Record<string, Array<{ value: string; label: string }>> = {
     'master:game-software': lookups.gameSoftwareMasters.map((item) => ({ value: String(item.id), label: item.abbreviation || item.name })),
     'master:console-category': lookups.gameConsoleCategories.map((item) => ({ value: String(item.id), label: item.abbreviation || item.name })),
@@ -72,15 +76,36 @@ function getMasterSearchOptions(lookups: ManagementLookups): SaveDataSearchField
     ],
   };
 
-  return MASTER_SEARCH_FIELDS.map((field) => ({
-    ...field,
-    options: optionsByField[field.fieldId] ?? [],
-  })).filter((field) => field.options.length > 0);
+  const storyProgressOptions = new Map<string, { value: string; label: string }>();
+  Object.values(storyProgressSchemas).forEach((schema) => {
+    schema.choices.filter((choice) => !choice.isDisabled).forEach((choice) => {
+      const value = String(choice.storyProgressDefinitionId);
+      if (!storyProgressOptions.has(value)) {
+        storyProgressOptions.set(value, { value, label: choice.label });
+      }
+    });
+  });
+
+  return [
+    ...MASTER_SEARCH_FIELDS.map((field) => ({
+      ...field,
+      options: optionsByField[field.fieldId] ?? [],
+    })).filter((field) => field.options.length > 0),
+    ...(storyProgressOptions.size > 0
+      ? [{
+        fieldId: 'master:story-progress',
+        label: 'ストーリー進捗',
+        fieldType: 'master' as const,
+        options: Array.from(storyProgressOptions.values()),
+      }]
+      : []),
+  ];
 }
 
 export function getSaveDataSearchFields(
   schemaMap: Record<number, SaveDataSchemaDto>,
   lookups: ManagementLookups,
+  storyProgressSchemas: Record<number, StoryProgressSchemaDto> = {},
 ): SaveDataSearchFieldOption[] {
   const fields = new Map<string, SaveDataSearchFieldOption>();
   Object.values(schemaMap).forEach((schema) => {
@@ -108,7 +133,7 @@ export function getSaveDataSearchFields(
   });
 
   return [
-    ...getMasterSearchOptions(lookups),
+    ...getMasterSearchOptions(lookups, storyProgressSchemas),
     ...Array.from(fields.values()).sort((left, right) => (
       left.label.localeCompare(right.label, 'ja') || left.fieldId.localeCompare(right.fieldId)
     )),
@@ -150,6 +175,7 @@ function getCustomFieldValue(
 function getSearchValue(
   saveData: SaveDataDto,
   schemaMap: Record<number, SaveDataSchemaDto>,
+  storyProgressSchemas: Record<number, StoryProgressSchemaDto>,
   field: SaveDataSearchFieldOption,
   lookups: ManagementLookups,
 ): { value: string; display: string } | null {
@@ -196,15 +222,23 @@ function getSearchValue(
         ? null
         : lookups.gameSoftwares.find((item) => item.id === saveData.gameSoftwareId)?.variant;
       break;
+    case 'master:story-progress':
+      value = saveData.storyProgressDefinitionId;
+      break;
     default:
       return null;
   }
 
   if (value == null) return null;
   const stringValue = String(value);
+  const storyProgressLabel = field.fieldId === 'master:story-progress'
+    ? storyProgressSchemas[saveData.gameSoftwareMasterId]?.choices.find(
+      (choice) => choice.storyProgressDefinitionId === value,
+    )?.label
+    : undefined;
   return {
     value: stringValue,
-    display: field.options.find((option) => option.value === stringValue)?.label ?? stringValue,
+    display: storyProgressLabel ?? field.options.find((option) => option.value === stringValue)?.label ?? stringValue,
   };
 }
 
@@ -234,6 +268,7 @@ export function evaluateSaveDataSearch(
   schemaMap: Record<number, SaveDataSchemaDto>,
   criteria: SaveDataSearchCriteria[],
   fields: SaveDataSearchFieldOption[],
+  storyProgressSchemas: Record<number, StoryProgressSchemaDto> = {},
 ): SaveDataSearchMatch[] {
   if (criteria.length === 0 || criteria.some((criterion) => !criterion.value.trim())) return [];
 
@@ -242,7 +277,7 @@ export function evaluateSaveDataSearch(
     for (const criterion of criteria) {
       const field = fields.find((item) => item.fieldId === criterion.fieldId);
       if (!field) return [];
-      const actual = getSearchValue(saveData, schemaMap, field, lookups);
+      const actual = getSearchValue(saveData, schemaMap, storyProgressSchemas, field, lookups);
       if (!actual || !compareValue(actual.value, criterion.value.trim(), criterion.operator, field.fieldType)) return [];
       matchedValues.push(actual.display);
     }

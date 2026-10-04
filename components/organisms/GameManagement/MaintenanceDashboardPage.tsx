@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import CustomButton from '@/components/atoms/CustomButton';
@@ -259,9 +258,6 @@ export default function MaintenanceDashboardPage() {
       )}
       actions={(
         <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
-          <Link href="/game-library" className="button-link button-link--secondary">
-            戻る
-          </Link>
           <CustomButton onClick={() => void load()}>
             再読込
           </CustomButton>

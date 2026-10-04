@@ -155,7 +155,7 @@ test.describe("ゲームライブラリ UI", () => {
     expect(libraryWidth).toBeGreaterThanOrEqual(blogWidth - 1);
 
     await expect(page.getByRole("heading", { level: 1, name: "ゲームライブラリ" })).toBeVisible();
-    await expect(page.getByRole("heading", { level: 2, name: "メイン" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "検索・メンテ" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "データ管理" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "関連画面" })).toBeVisible();
     await expect(page.getByText("Game Library", { exact: true })).toHaveCount(0);
@@ -163,12 +163,18 @@ test.describe("ゲームライブラリ UI", () => {
       await expect(page.getByText(label, { exact: true })).toHaveCount(0);
     }
     const mainSection = page.locator("section.tool-section").filter({
-      has: page.getByRole("heading", { level: 2, name: "メイン" }),
+      has: page.getByRole("heading", { level: 2, name: "検索・メンテ" }),
     });
     const mainCards = mainSection.locator(".admin-card");
     await expect(mainCards.nth(0)).toContainText("セーブ検索");
     await expect(mainCards.nth(1)).toContainText("メンテナンス");
     await expect(page.locator('a[href="/game-management"]')).toBeVisible();
+    const navigation = page.getByRole("navigation", { name: "ゲームライブラリメニュー" });
+    await expect(navigation.locator("a").nth(0)).toHaveAttribute("href", "/game-library/save-data-search");
+    await expect(navigation.locator("a").nth(1)).toHaveAttribute("href", "/game-library/maintenance");
+    await expect(navigation.locator("a").nth(2)).toHaveAttribute("href", "/game-library");
+    await expect(navigation.locator('a[aria-current="page"]')).toHaveAttribute("href", "/game-library");
+    await expect(navigation.locator(".admin-card")).toHaveCount(0);
     for (const href of [
       "/game-library/game-consoles",
       "/game-library/game-softwares",
@@ -226,7 +232,10 @@ test.describe("ゲームライブラリ UI", () => {
 
     await page.goto("/game-library/game-consoles");
     await expect(page.getByRole("heading", { level: 2, name: "データ一覧" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "戻る" })).toHaveAttribute("href", "/game-library");
+    const consoleNavigation = page.getByRole("navigation", { name: "ゲームライブラリメニュー" });
+    await expect(consoleNavigation).toBeVisible();
+    await expect(consoleNavigation.locator('a[aria-current="page"]')).toHaveAttribute("href", "/game-library/game-consoles");
+    await expect(page.getByRole("link", { name: "戻る" })).toHaveCount(0);
     await expect(page.locator(".tool-sticky-actions")).toHaveCSS("position", "fixed");
     await expect(page.locator(".tool-sticky-actions").getByRole("button", { name: "新規", exact: true })).toBeVisible();
     await expect(page.locator(".tool-sticky-actions").getByRole("button", { name: "再読込" })).toBeVisible();
@@ -240,14 +249,20 @@ test.describe("ゲームライブラリ UI", () => {
     await page.goto("/game-library/maintenance");
     await expect(page.getByText("Game Library", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 2, name: "メンテナンス対象" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "戻る" })).toHaveAttribute("href", "/game-library");
+    const maintenanceNavigation = page.getByRole("navigation", { name: "ゲームライブラリメニュー" });
+    await expect(maintenanceNavigation).toBeVisible();
+    await expect(maintenanceNavigation.locator('a[aria-current="page"]')).toHaveAttribute("href", "/game-library/maintenance");
+    await expect(page.getByRole("link", { name: "戻る" })).toHaveCount(0);
     await expectUnboxedSections(page);
 
     await page.goto("/game-library/save-data-search");
     await expect(page.getByText("Game Library", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 2, name: "検索条件" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "検索結果" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "戻る" })).toHaveAttribute("href", "/game-library");
+    const searchNavigation = page.getByRole("navigation", { name: "ゲームライブラリメニュー" });
+    await expect(searchNavigation).toBeVisible();
+    await expect(searchNavigation.locator('a[aria-current="page"]')).toHaveAttribute("href", "/game-library/save-data-search");
+    await expect(page.getByRole("link", { name: "戻る" })).toHaveCount(0);
     await expectUnboxedSections(page);
   });
 
@@ -278,7 +293,7 @@ test.describe("ゲームライブラリ UI", () => {
         gameConsoleId: null,
         accountId: null,
         memoryCardId: null,
-        storyProgressDefinitionId: null,
+        storyProgressDefinitionId: masterId === 100 ? 1000 : 2000,
         extendedFields: [{
           fieldKey: "trainer-name",
           label: "主人公名",
@@ -331,30 +346,54 @@ test.describe("ゲームライブラリ UI", () => {
             options: [],
           }],
         };
+      } else if (path === "game-software-masters/100/story-progress-schema" || path === "game-software-masters/200/story-progress-schema") {
+        const gameSoftwareMasterId = Number(path.split("/")[1]);
+        data = {
+          gameSoftwareMasterId,
+          contentGroupId: 10,
+          choices: [{
+            storyProgressDefinitionId: gameSoftwareMasterId * 10,
+            progressKey: gameSoftwareMasterId === 100 ? "start" : "finish",
+            label: gameSoftwareMasterId === 100 ? "冒険開始" : "物語完結",
+            description: null,
+            displayOrder: 1,
+            isDisabled: false,
+          }],
+        };
       }
 
       await route.fulfill({ status: 200, contentType: "application/json", json: { success: true, data } });
     });
 
-    await page.goto("/game-library/save-data-search");
+    const searchParams = new URLSearchParams();
+    for (const [field, operator, value] of [
+      ["custom:trainer-name", "equals", "テスト主人公B"],
+      ["master:game-software", "equals", "200"],
+      ["master:story-progress", "equals", "2000"],
+    ]) {
+      searchParams.append("field", field);
+      searchParams.append("operator", operator);
+      searchParams.append("value", value);
+    }
+    await page.goto(`/game-library/save-data-search?${searchParams.toString()}`);
     await expect.poll(() => schemaRequests.length).toBe(2);
-    await page.getByRole("button", { name: "検索項目を追加" }).click();
-    const searchDialog = page.getByRole("dialog", { name: "検索項目を選択" });
-    await searchDialog.getByRole("checkbox", { name: "主人公名" }).check();
-    await searchDialog.getByRole("checkbox", { name: "ゲームソフトマスタ" }).check();
-    await searchDialog.getByRole("button", { name: "追加" }).click();
-    await page.locator('[id="search-value-custom:trainer-name"]').fill("テスト主人公B");
-    await page.locator('[id="search-operator-custom:trainer-name"]').selectOption("equals");
-    await page.locator('[id="search-value-master:game-software"]').selectOption("200");
-    await page.getByRole("button", { name: "検索", exact: true }).click();
+    await expect(page.locator('[id="search-value-custom:trainer-name"]')).toHaveValue("テスト主人公B");
+    await expect(page.locator('[id="search-value-master:game-software"]')).toHaveValue("200");
+    await expect(page.locator('[id="search-value-master:story-progress"]')).toHaveValue("2000");
     await expect(page.getByText("TEST200 — テストソフト200")).toBeVisible();
     await expect(page.getByText("主人公名: テスト主人公B", { exact: true })).toBeVisible();
+    await expect(page.getByText("ストーリー進捗: 物語完結", { exact: true })).toBeVisible();
     await expect(page.getByText(/セーブデータ #/)).toHaveCount(0);
     await expect(page.getByText("TEST100 — テストソフト100")).toHaveCount(0);
 
     await page.locator('[id="search-value-master:game-software"]').selectOption("100");
     await page.getByRole("button", { name: "検索", exact: true }).click();
     await expect(page.getByText("一致するセーブデータはありませんでした。")).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.getAll("value")).toEqual([
+      "テスト主人公B",
+      "100",
+      "2000",
+    ]);
   });
 
   test("ネストしたメンテナンス画面を閉じても親の詳細は開いたまま", async ({ page }) => {

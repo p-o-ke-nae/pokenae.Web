@@ -1,11 +1,11 @@
 'use client';
 
 import { useId } from 'react';
-import Link from 'next/link';
 
 import CustomComboBox from '@/components/atoms/CustomComboBox';
 import CustomHeader from '@/components/atoms/CustomHeader';
 import CustomLabel from '@/components/atoms/CustomLabel';
+import AdminContentNavigation from '@/components/molecules/AdminContentNavigation';
 import type { LayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
 import { buildMaintenanceSummaryText } from '@/lib/game-management/maintenance';
 import { formatSaveStorageType } from '@/lib/game-management/save-storage-type';
@@ -34,12 +34,13 @@ import { shouldRenderSelectPlaceholder } from './select-utils';
 import { RESOURCE_DEFINITIONS, USER_RESOURCE_ORDER } from '@/lib/game-management/resources';
 
 const GAME_LIBRARY_NAVIGATION_ITEMS = [
+  { href: '/game-library/save-data-search', label: 'セーブデータ検索' },
+  { href: '/game-library/maintenance', label: 'メンテナンス' },
+  { href: '/game-library', label: 'ダッシュボード' },
   ...USER_RESOURCE_ORDER.map((key) => ({
     href: `/game-library/${key}`,
     label: RESOURCE_DEFINITIONS[key].shortLabel,
   })),
-  { href: '/game-library/maintenance', label: 'メンテナンス' },
-  { href: '/game-library/save-data-search', label: 'セーブ検索' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -160,6 +161,14 @@ export function PageFrame({
 }) {
   return (
     <main className={['page-container tool-page', stickyActions ? 'tool-page--has-sticky-actions' : ''].filter(Boolean).join(' ')}>
+      {navigationActiveHref ? (
+        <AdminContentNavigation
+          ariaLabel="ゲームライブラリメニュー"
+          current={navigationActiveHref}
+          homeLink={null}
+          items={GAME_LIBRARY_NAVIGATION_ITEMS}
+        />
+      ) : null}
       <header className="page-header">
         {eyebrowLabel ? <p className="tool-page__eyebrow">{eyebrowLabel}</p> : null}
         <CustomHeader level={1}>{title}</CustomHeader>
@@ -169,59 +178,12 @@ export function PageFrame({
             {actions}
           </div>
         ) : null}
-        {navigationActiveHref && navigationActiveHref !== '/game-library' ? (
-          <nav className="game-library-navigation" aria-label="ゲームライブラリ画面">
-            {GAME_LIBRARY_NAVIGATION_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="admin-card game-library-navigation__item"
-                aria-current={item.href === navigationActiveHref ? 'page' : undefined}
-              >
-                <span className="admin-card__eyebrow">{item.label}</span>
-                <span className="admin-card__action">画面を開く</span>
-              </Link>
-            ))}
-          </nav>
-        ) : null}
       </header>
       <div className="tool-page__body">{children}</div>
       {stickyActions ? (
         <div className="tool-sticky-actions" role="group" aria-label="ページ操作">
           {stickyActions}
         </div>
-      ) : null}
-      {navigationActiveHref ? (
-        <style jsx>{`
-          .game-library-navigation {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 1rem;
-            overflow-x: auto;
-            padding: 0.25rem 0.125rem 0.5rem;
-            scrollbar-width: thin;
-            -webkit-overflow-scrolling: touch;
-          }
-
-          .game-library-navigation :global(.game-library-navigation__item) {
-            display: flex;
-            flex: 0 0 8.5rem;
-            min-height: 3.25rem;
-            justify-content: space-between;
-            padding: 0.5rem 0.625rem;
-            text-decoration: none;
-          }
-
-          .game-library-navigation :global(.game-library-navigation__item[aria-current='page']) {
-            border-color: var(--color-accent-25);
-            box-shadow: inset 0 0 0 1px var(--color-accent-25);
-          }
-
-          .game-library-navigation :global(.game-library-navigation__item:focus-visible) {
-            outline: 2px solid var(--color-accent-25);
-            outline-offset: 2px;
-          }
-        `}</style>
       ) : null}
       {stickyActions ? (
         <style jsx global>{`

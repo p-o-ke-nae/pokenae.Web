@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { evaluateSaveDataSearch, getSaveDataSearchFields } from './save-data-search';
-import type { ManagementLookups, SaveDataSchemaDto } from './types';
+import type { ManagementLookups, SaveDataSchemaDto, StoryProgressSchemaDto } from './types';
 
 const schema: SaveDataSchemaDto = {
   gameSoftwareMasterId: 100,
@@ -339,5 +339,56 @@ describe('save-data search helpers', () => {
     expect(evaluateSaveDataSearch(lookups, {}, [
       { fieldId: 'master:game-software', operator: 'not-equals', value: '100' },
     ], fields).map((match) => match.saveData.id)).toEqual([2]);
+  });
+
+  it('searches story progress across software masters and shows each save data label', () => {
+    const storyProgressSchemas: Record<number, StoryProgressSchemaDto> = {
+      100: {
+        gameSoftwareMasterId: 100,
+        contentGroupId: 10,
+        choices: [{
+          storyProgressDefinitionId: 1000,
+          progressKey: 'start',
+          label: '冒険開始',
+          description: null,
+          displayOrder: 1,
+          isDisabled: false,
+        }],
+      },
+      200: {
+        gameSoftwareMasterId: 200,
+        contentGroupId: 10,
+        choices: [{
+          storyProgressDefinitionId: 2000,
+          progressKey: 'final',
+          label: '最終局面',
+          description: null,
+          displayOrder: 1,
+          isDisabled: false,
+        }],
+      },
+    };
+    const searchFields = getSaveDataSearchFields(
+      { 100: schema, 200: { ...schema, gameSoftwareMasterId: 200 } },
+      lookups,
+      storyProgressSchemas,
+    );
+    const matches = evaluateSaveDataSearch(
+      lookups,
+      { 100: schema, 200: { ...schema, gameSoftwareMasterId: 200 } },
+      [{ fieldId: 'master:story-progress', operator: 'equals', value: '2000' }],
+      searchFields,
+      storyProgressSchemas,
+    );
+
+    expect(searchFields.find((field) => field.fieldId === 'master:story-progress')).toMatchObject({
+      label: 'ストーリー進捗',
+      options: [
+        { value: '1000', label: '冒険開始' },
+        { value: '2000', label: '最終局面' },
+      ],
+    });
+    expect(matches.map((match) => match.saveData.id)).toEqual([2]);
+    expect(matches[0]?.matchedValues).toEqual(['最終局面']);
   });
 });

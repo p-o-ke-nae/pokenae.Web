@@ -454,7 +454,7 @@ export function GameManagementDashboard({
         ) : effectiveAuthError ? null : (
           <>
             {primaryCards.length > 0 ? (
-              <PageSection title="メイン">
+              <PageSection title="検索・メンテ">
                 <div className="card-grid">
                   {primaryCards.map((card) => (
                     <Link key={card.href} href={card.href} className="admin-card">
@@ -1262,9 +1262,9 @@ export function GameManagementDashboard({
           <CustomButton onClick={() => void load()}>再読込</CustomButton>
         </>
       )}
-      actions={
+      actions={basePath !== '/game-library' ? (
         <Link href={basePath} className="button-link button-link--secondary">戻る</Link>
-      }
+      ) : undefined}
     >
       {error || saveError || isTrial ? (
         <div className="tool-page__notices">

@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import CustomButton from '@/components/atoms/CustomButton';
@@ -15,6 +14,7 @@ import {
   fetchAuthenticatedUserLookups,
   fetchPublicMasterLookups,
   fetchPublicSaveDataSchema,
+  fetchPublicStoryProgressSchema,
   getGameManagementErrorMessage,
 } from '@/lib/game-management/api';
 import {
@@ -26,7 +26,7 @@ import {
 } from '@/lib/game-management/save-data-search';
 import { formatSaveStorageType } from '@/lib/game-management/save-storage-type';
 import { buildTrialUserData } from '@/lib/game-management/trial';
-import type { ManagementLookups, SaveDataSchemaDto } from '@/lib/game-management/types';
+import type { ManagementLookups, SaveDataSchemaDto, StoryProgressSchemaDto } from '@/lib/game-management/types';
 import { useResponsiveLayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
 import resources from '@/lib/resources';
 import { getResourceDefinition } from '@/lib/game-management/resources';
@@ -39,6 +39,41 @@ import {
   getMemoryCardDisplay,
 } from './helpers';
 import { PageFrame, PageSection, TrialBanner } from './shared';
+
+const SEARCH_QUERY_KEYS = {
+  field: 'field',
+  operator: 'operator',
+  value: 'value',
+} as const;
+
+const SAVE_DATA_SEARCH_OPERATORS = new Set<SaveDataSearchCriteria['operator']>([
+  'equals',
+  'not-equals',
+  'contains',
+  'not-contains',
+  'greater-than',
+  'less-than',
+  'greater-or-equal',
+  'less-or-equal',
+]);
+
+function restoreSearchCriteria(search: string): SaveDataSearchCriteria[] {
+  const params = new URLSearchParams(search);
+  const fieldIds = params.getAll(SEARCH_QUERY_KEYS.field);
+  const operators = params.getAll(SEARCH_QUERY_KEYS.operator);
+  const values = params.getAll(SEARCH_QUERY_KEYS.value);
+  if (fieldIds.length === 0 || fieldIds.length !== operators.length || fieldIds.length !== values.length) return [];
+
+  const usedFields = new Set<string>();
+  return fieldIds.flatMap((fieldId, index) => {
+    const operator = operators[index];
+    if (!fieldId || usedFields.has(fieldId) || !SAVE_DATA_SEARCH_OPERATORS.has(operator as SaveDataSearchCriteria['operator'])) {
+      return [];
+    }
+    usedFields.add(fieldId);
+    return [{ fieldId, operator: operator as SaveDataSearchCriteria['operator'], value: values[index] ?? '' }];
+  });
+}
 
 function getStorageSummary(saveData: ManagementLookups['saveDatas'][number], lookups: ManagementLookups): string {
   switch (saveData.saveStorageType) {
@@ -85,10 +120,13 @@ export default function SaveDataSearchPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [criteria, setCriteria] = useState<SaveDataSearchCriteria[]>([]);
   const [submittedSearch, setSubmittedSearch] = useState<SaveDataSearchCriteria[] | null>(null);
+  const [urlInitialized, setUrlInitialized] = useState(false);
+  const [initialSearchPending, setInitialSearchPending] = useState(false);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [candidateQuery, setCandidateQuery] = useState('');
   const [selectedFieldIds, setSelectedFieldIds] = useState<string[]>([]);
   const [saveDataSchemas, setSaveDataSchemas] = useState<Record<number, SaveDataSchemaDto>>({});
+  const [storyProgressSchemas, setStoryProgressSchemas] = useState<Record<number, StoryProgressSchemaDto>>({});
   const [schemaLoadErrors, setSchemaLoadErrors] = useState<Record<number, string>>({});
   const [schemaLoadingIds, setSchemaLoadingIds] = useState<number[]>([]);
   const [editorRecordId, setEditorRecordId] = useState<number | null>(null);
@@ -117,6 +155,13 @@ export default function SaveDataSearchPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const restoredCriteria = restoreSearchCriteria(window.location.search);
+    setCriteria(restoredCriteria);
+    setInitialSearchPending(restoredCriteria.length > 0);
+    setUrlInitialized(true);
+  }, []);
+
   const requestedMasterIds = useMemo(() => Array.from(new Set(
     (lookups?.saveDatas ?? [])
       .map((saveData) => saveData.gameSoftwareMasterId)
@@ -133,23 +178,32 @@ export default function SaveDataSearchPage() {
     const generation = schemaRequestGenerationRef.current;
     setSchemaLoadingIds((current) => Array.from(new Set([...current, ...pendingIds])));
     const loadSchemas = async () => {
-      const results: PromiseSettledResult<{ masterId: number; schema: SaveDataSchemaDto }>[] = [];
+      const results: PromiseSettledResult<{
+        masterId: number;
+        schema: SaveDataSchemaDto;
+        storyProgressSchema: StoryProgressSchemaDto;
+      }>[] = [];
       for (let index = 0; index < pendingIds.length; index += 8) {
         const batch = pendingIds.slice(index, index + 8);
-        const batchResults = await Promise.allSettled(batch.map(async (masterId) => ({
-          masterId,
-          schema: await fetchPublicSaveDataSchema(masterId),
-        })));
+        const batchResults = await Promise.allSettled(batch.map(async (masterId) => {
+          const [schema, storyProgressSchema] = await Promise.all([
+            fetchPublicSaveDataSchema(masterId),
+            fetchPublicStoryProgressSchema(masterId),
+          ]);
+          return { masterId, schema, storyProgressSchema };
+        }));
         if (generation !== schemaRequestGenerationRef.current) return;
         results.push(...batchResults);
       }
 
       const nextSchemas: Record<number, SaveDataSchemaDto> = {};
+      const nextStoryProgressSchemas: Record<number, StoryProgressSchemaDto> = {};
       const nextErrors: Record<number, string> = {};
       results.forEach((result, index) => {
         const masterId = pendingIds[index]!;
         if (result.status === 'fulfilled') {
           nextSchemas[masterId] = result.value.schema;
+          nextStoryProgressSchemas[masterId] = result.value.storyProgressSchema;
         } else {
           nextErrors[masterId] = getGameManagementErrorMessage(result.reason, {
             fallback: resources.gameManagement.errors.schemaLoad,
@@ -157,6 +211,7 @@ export default function SaveDataSearchPage() {
         }
       });
       setSaveDataSchemas((current) => ({ ...current, ...nextSchemas }));
+      setStoryProgressSchemas((current) => ({ ...current, ...nextStoryProgressSchemas }));
       setSchemaLoadErrors((current) => ({ ...current, ...nextErrors }));
       setSchemaLoadingIds((current) => current.filter((id) => !pendingIds.includes(id)));
     };
@@ -164,23 +219,61 @@ export default function SaveDataSearchPage() {
   }, [loading, lookups, requestedMasterIds, saveDataSchemas, schemaLoadErrors, schemaLoadingIds]);
 
   const searchableFields = useMemo(
-    () => lookups ? getSaveDataSearchFields(saveDataSchemas, lookups) : [],
-    [lookups, saveDataSchemas],
+    () => lookups ? getSaveDataSearchFields(saveDataSchemas, lookups, storyProgressSchemas) : [],
+    [lookups, saveDataSchemas, storyProgressSchemas],
   );
   const fieldMap = useMemo(() => new Map(searchableFields.map((field) => [field.fieldId, field])), [searchableFields]);
   const results = useMemo(() => (
     lookups && submittedSearch
-      ? evaluateSaveDataSearch(lookups, saveDataSchemas, submittedSearch, searchableFields)
+      ? evaluateSaveDataSearch(lookups, saveDataSchemas, submittedSearch, searchableFields, storyProgressSchemas)
       : []
-  ), [lookups, saveDataSchemas, searchableFields, submittedSearch]);
+  ), [lookups, saveDataSchemas, searchableFields, storyProgressSchemas, submittedSearch]);
   const resultIds = useMemo(() => results.map((result) => result.saveData.id), [results]);
   const schemasPending = schemaLoadingIds.length > 0 || Object.keys(schemaLoadErrors).length > 0;
+  const schemasReady = schemaLoadingIds.length === 0 && requestedMasterIds.every(
+    (masterId) => Boolean(saveDataSchemas[masterId] || schemaLoadErrors[masterId]),
+  );
   const canSearch = Boolean(
     !loading && lookups && !schemasPending && criteria.length > 0
     && criteria.every((criterion) => criterion.value.trim()),
   );
   const availableFields = searchableFields.filter((field) => !criteria.some((item) => item.fieldId === field.fieldId));
   const visibleCandidates = availableFields.filter((field) => field.label.toLocaleLowerCase('ja').includes(candidateQuery.trim().toLocaleLowerCase('ja')));
+
+  useEffect(() => {
+    if (!urlInitialized || !initialSearchPending || loading || !lookups || !schemasReady || Object.keys(schemaLoadErrors).length > 0) return;
+    const validCriteria = criteria.filter((criterion) => {
+      const field = fieldMap.get(criterion.fieldId);
+      return Boolean(
+        field
+        && criterion.value.trim()
+        && getSaveDataSearchOperators(field).some((operator) => operator.value === criterion.operator),
+      );
+    });
+    if (validCriteria.length !== criteria.length) {
+      setCriteria(validCriteria);
+      setSearchError('URL内の検索条件を確認してください。');
+      setInitialSearchPending(false);
+      return;
+    }
+    setSearchError(null);
+    setSubmittedSearch(criteria.map((criterion) => ({ ...criterion })));
+    setInitialSearchPending(false);
+  }, [criteria, fieldMap, initialSearchPending, loading, lookups, schemaLoadErrors, schemasReady, urlInitialized]);
+
+  useEffect(() => {
+    if (!urlInitialized) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete(SEARCH_QUERY_KEYS.field);
+    url.searchParams.delete(SEARCH_QUERY_KEYS.operator);
+    url.searchParams.delete(SEARCH_QUERY_KEYS.value);
+    criteria.forEach((criterion) => {
+      url.searchParams.append(SEARCH_QUERY_KEYS.field, criterion.fieldId);
+      url.searchParams.append(SEARCH_QUERY_KEYS.operator, criterion.operator);
+      url.searchParams.append(SEARCH_QUERY_KEYS.value, criterion.value);
+    });
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [criteria, urlInitialized]);
 
   const handleSearch = useCallback(() => {
     if (criteria.length === 0 || criteria.some((criterion) => !criterion.value.trim())) {
@@ -198,6 +291,7 @@ export default function SaveDataSearchPage() {
   const handleReload = useCallback(() => {
     schemaRequestGenerationRef.current += 1;
     setSaveDataSchemas({});
+    setStoryProgressSchemas({});
     setSchemaLoadErrors({});
     setSchemaLoadingIds([]);
     setSubmittedSearch(null);
@@ -232,7 +326,7 @@ export default function SaveDataSearchPage() {
   return (
     <PageFrame
       title="セーブデータ検索"
-      description="複数の検索項目を組み合わせ、セーブデータと保存先を検索します。"
+      description="複数の検索項目を組み合わせ、セーブデータと保存先を検索します。検索条件はURLで共有できます。"
       layoutMode={layoutMode}
       navigationActiveHref="/game-library/save-data-search"
       stickyActions={(
@@ -242,7 +336,6 @@ export default function SaveDataSearchPage() {
       )}
       actions={(
         <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
-          <Link href="/game-library" className="button-link button-link--secondary">戻る</Link>
           <CustomButton onClick={handleReload}>再読込</CustomButton>
         </ResponsiveActionGroup>
       )}
@@ -265,7 +358,7 @@ export default function SaveDataSearchPage() {
             {Object.keys(schemaLoadErrors).length > 0 ? (
               <CustomMessageArea variant="error">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <span>一部のセーブデータスキーマを読み込めませんでした。完全な横断検索のため、再試行してください。</span>
+                  <span>一部の検索スキーマを読み込めませんでした。検索するには再試行してください。</span>
                   <CustomButton variant="ghost" onClick={handleRetrySchemas}>再試行</CustomButton>
                 </div>
               </CustomMessageArea>
