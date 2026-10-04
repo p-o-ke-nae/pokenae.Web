@@ -53,15 +53,31 @@ function parseCriteria(value: unknown): SaveDataSearchCriteria[] {
   });
 }
 
+function parseSerializedCriteria(value: string): SaveDataSearchCriteria[] {
+  let serialized = value;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const parsed: unknown = JSON.parse(serialized);
+      if (typeof parsed !== 'string') return parseCriteria(parsed);
+      serialized = parsed;
+    } catch {
+      try {
+        const decoded = decodeURIComponent(serialized);
+        if (decoded === serialized) return [];
+        serialized = decoded;
+      } catch {
+        return [];
+      }
+    }
+  }
+  return [];
+}
+
 export function restoreSaveDataSearchCriteria(search: string): SaveDataSearchCriteria[] {
   const params = new URLSearchParams(search);
   const serializedCriteria = params.get(SEARCH_QUERY_KEY);
   if (serializedCriteria !== null) {
-    try {
-      return parseCriteria(JSON.parse(serializedCriteria));
-    } catch {
-      return [];
-    }
+    return parseSerializedCriteria(serializedCriteria);
   }
 
   const fieldIds = params.getAll(LEGACY_QUERY_KEYS.field);

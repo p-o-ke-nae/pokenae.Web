@@ -11,11 +11,11 @@ import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
 import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup';
 import {
   fetchAuthenticatedUserLookups,
+  fetchMaintenanceList,
   fetchPublicMasterLookups,
   getGameManagementErrorMessage,
 } from '@/lib/game-management/api';
 import {
-  buildMaintenanceSummaryText,
   formatMaintenanceDate,
   getMaintenanceHealthStatusLabel,
   MAINTENANCE_FILTER_OPTIONS,
@@ -49,9 +49,17 @@ type MaintenanceTargetRow = {
   summary: string;
   health: string;
   nextDate: string;
+  latestDate: string;
   edit: string;
   maintenanceSummary: MaintenanceSummaryDto;
 };
+
+type LatestMaintenanceRecord = {
+  maintenanceDate: string;
+  memo: string | null;
+};
+
+type LatestMaintenanceRecords = Record<string, LatestMaintenanceRecord>;
 
 type MaintenanceDialogState = {
   targets: MaintenanceTargetRow[];
@@ -71,7 +79,11 @@ function matchesMaintenanceFilter(summary: MaintenanceSummaryDto, filter: Mainte
   }
 }
 
-function buildMaintenanceTargets(lookups: ManagementLookups, filter: MaintenanceHealthFilter): MaintenanceTargetRow[] {
+export function buildMaintenanceTargets(
+  lookups: ManagementLookups,
+  filter: MaintenanceHealthFilter,
+  latestMaintenanceRecords: LatestMaintenanceRecords = {},
+): MaintenanceTargetRow[] {
   const rows: MaintenanceTargetRow[] = [
     ...lookups.gameConsoles
       .filter((item) => matchesMaintenanceFilter(item.maintenance, filter))
@@ -82,9 +94,12 @@ function buildMaintenanceTargets(lookups: ManagementLookups, filter: Maintenance
         resourceLabel: 'ゲーム機',
         name: getGameConsoleDisplay(item, lookups),
         detail: getGameConsoleMasterName(item.gameConsoleMasterId, lookups),
-        summary: buildMaintenanceSummaryText(item.maintenance),
+        summary: latestMaintenanceRecords[`game-consoles:${item.id}`]?.memo?.trim() || 'メモなし',
         health: getMaintenanceHealthStatusLabel(item.maintenance.latestHealthStatus),
         nextDate: formatMaintenanceDate(item.maintenance.nextMaintenanceDate),
+        latestDate: formatMaintenanceDate(
+          latestMaintenanceRecords[`game-consoles:${item.id}`]?.maintenanceDate ?? item.maintenance.lastMaintenanceDate,
+        ),
         edit: 'メンテナンス',
         maintenanceSummary: item.maintenance,
       })),
@@ -100,9 +115,12 @@ function buildMaintenanceTargets(lookups: ManagementLookups, filter: Maintenance
           getGameSoftwareMasterName(item.gameSoftwareMasterId, lookups),
           item.variant == null ? null : item.variant === 0 ? 'パッケージ版' : 'ダウンロード版',
         ].filter(Boolean).join(' / '),
-        summary: buildMaintenanceSummaryText(item.maintenance),
+        summary: latestMaintenanceRecords[`game-softwares:${item.id}`]?.memo?.trim() || 'メモなし',
         health: getMaintenanceHealthStatusLabel(item.maintenance.latestHealthStatus),
         nextDate: formatMaintenanceDate(item.maintenance.nextMaintenanceDate),
+        latestDate: formatMaintenanceDate(
+          latestMaintenanceRecords[`game-softwares:${item.id}`]?.maintenanceDate ?? item.maintenance.lastMaintenanceDate,
+        ),
         edit: 'メンテナンス',
         maintenanceSummary: item.maintenance,
       })),
@@ -115,9 +133,12 @@ function buildMaintenanceTargets(lookups: ManagementLookups, filter: Maintenance
         resourceLabel: 'メモリーカード',
         name: getMemoryCardDisplay(item, lookups),
         detail: getMemoryCardEditionMasterName(item.memoryCardEditionMasterId, lookups),
-        summary: buildMaintenanceSummaryText(item.maintenance),
+        summary: latestMaintenanceRecords[`memory-cards:${item.id}`]?.memo?.trim() || 'メモなし',
         health: getMaintenanceHealthStatusLabel(item.maintenance.latestHealthStatus),
         nextDate: formatMaintenanceDate(item.maintenance.nextMaintenanceDate),
+        latestDate: formatMaintenanceDate(
+          latestMaintenanceRecords[`memory-cards:${item.id}`]?.maintenanceDate ?? item.maintenance.lastMaintenanceDate,
+        ),
         edit: 'メンテナンス',
         maintenanceSummary: item.maintenance,
       })),
@@ -140,6 +161,33 @@ function buildMaintenanceTargets(lookups: ManagementLookups, filter: Maintenance
   });
 }
 
+export function getMaintenanceTargetColumns(
+  onEdit: (row: MaintenanceTargetRow) => void,
+): DataTableColumn<MaintenanceTargetRow>[] {
+  return [
+    { key: 'resourceLabel', header: '種別', sortable: true, filterable: true, filterMode: 'select', width: '9rem' },
+    { key: 'name', header: '対象', sortable: true, filterable: true, width: '14rem' },
+    { key: 'health', header: '状態', sortable: true, filterable: true, filterMode: 'select', width: '8rem' },
+    { key: 'nextDate', header: '次回目安', sortable: true, filterable: true, filterMode: 'select', width: '8rem' },
+    { key: 'summary', header: '最新サマリー', filterable: true, width: '16rem' },
+    { key: 'latestDate', header: '最新日', sortable: true, filterable: true, filterMode: 'select', width: '9rem' },
+    {
+      key: 'edit',
+      header: '操作',
+      width: '8rem',
+      render: (_value, row) => (
+        <button
+          type="button"
+          onClick={() => onEdit(row)}
+          className="tool-inline-link"
+        >
+          メンテナンス
+        </button>
+      ),
+    },
+  ];
+}
+
 export default function MaintenanceDashboardPage() {
   const { data: session } = useSession();
   const isTrial = !session?.user;
@@ -151,6 +199,7 @@ export default function MaintenanceDashboardPage() {
   const [maintenanceHealthFilter, setMaintenanceHealthFilter] = useState<MaintenanceHealthFilter>('All');
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [dialogState, setDialogState] = useState<MaintenanceDialogState | null>(null);
+  const [latestMaintenanceRecords, setLatestMaintenanceRecords] = useState<LatestMaintenanceRecords>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -174,9 +223,57 @@ export default function MaintenanceDashboardPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!lookups || isTrial) {
+      setLatestMaintenanceRecords({});
+      return;
+    }
+
+    let cancelled = false;
+    const targets = [
+      ...lookups.gameConsoles.filter((item) => item.maintenance.hasRecord)
+        .map((item) => ({ key: `game-consoles:${item.id}`, resourceKey: 'game-consoles' as const, id: item.id })),
+      ...lookups.gameSoftwares.filter((item) => item.maintenance.hasRecord)
+        .map((item) => ({ key: `game-softwares:${item.id}`, resourceKey: 'game-softwares' as const, id: item.id })),
+      ...lookups.memoryCards.filter((item) => item.maintenance.hasRecord)
+        .map((item) => ({ key: `memory-cards:${item.id}`, resourceKey: 'memory-cards' as const, id: item.id })),
+    ];
+
+    const loadLatestMaintenanceRecords = async () => {
+      const latestRecords: LatestMaintenanceRecords = {};
+      for (let index = 0; index < targets.length; index += 6) {
+        const batch = targets.slice(index, index + 6);
+        const results = await Promise.allSettled(batch.map(async (target) => {
+          const records = await fetchMaintenanceList(target.resourceKey, target.id);
+          const latestRecord = records
+            .filter((record) => !record.isDeleted)
+            .sort((left, right) => (
+              right.maintenanceDate.localeCompare(left.maintenanceDate)
+              || right.id - left.id
+            ))[0];
+          return latestRecord ? {
+            key: target.key,
+            record: { maintenanceDate: latestRecord.maintenanceDate, memo: latestRecord.memo },
+          } : null;
+        }));
+        results.forEach((result) => {
+          if (result.status === 'fulfilled' && result.value) {
+            latestRecords[result.value.key] = result.value.record;
+          }
+        });
+      }
+      if (!cancelled) setLatestMaintenanceRecords(latestRecords);
+    };
+
+    void loadLatestMaintenanceRecords();
+    return () => {
+      cancelled = true;
+    };
+  }, [isTrial, lookups]);
+
   const rows = useMemo(
-    () => (lookups ? buildMaintenanceTargets(lookups, maintenanceHealthFilter) : []),
-    [lookups, maintenanceHealthFilter],
+    () => (lookups ? buildMaintenanceTargets(lookups, maintenanceHealthFilter, latestMaintenanceRecords) : []),
+    [lookups, maintenanceHealthFilter, latestMaintenanceRecords],
   );
 
   const rowMap = useMemo(
@@ -217,28 +314,9 @@ export default function MaintenanceDashboardPage() {
     });
   }, [load]);
 
-  const columns = useMemo<DataTableColumn<MaintenanceTargetRow>[]>(() => [
-    { key: 'resourceLabel', header: '種別', sortable: true, filterable: true, filterMode: 'select', width: '9rem' },
-    { key: 'name', header: '対象', sortable: true, filterable: true, width: '14rem' },
-    { key: 'detail', header: '詳細', filterable: true, width: '16rem' },
-    { key: 'health', header: '状態', sortable: true, filterable: true, filterMode: 'select', width: '8rem' },
-    { key: 'nextDate', header: '次回目安', sortable: true, filterable: true, filterMode: 'select', width: '8rem' },
-    { key: 'summary', header: '最新サマリー', filterable: true },
-    {
-      key: 'edit',
-      header: '操作',
-      width: '8rem',
-      render: (_value, row) => (
-        <button
-          type="button"
-          onClick={() => setDialogState({ targets: [row], index: 0, autoAdvance: false })}
-          className="tool-inline-link"
-        >
-          メンテナンス
-        </button>
-      ),
-    },
-  ], []);
+  const columns = useMemo(() => getMaintenanceTargetColumns((row) => (
+    setDialogState({ targets: [row], index: 0, autoAdvance: false })
+  )), []);
 
   return (
     <PageFrame

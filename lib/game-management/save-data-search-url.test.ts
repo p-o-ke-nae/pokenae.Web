@@ -22,6 +22,13 @@ describe('save-data search URL helpers', () => {
     expect(url.hash).toBe('#results');
   });
 
+  it('restores criteria that were percent-encoded before being added to the query string', () => {
+    const doubleEncodedCriteria = encodeURIComponent(JSON.stringify(criteria));
+    const search = new URLSearchParams({ criteria: doubleEncodedCriteria }).toString();
+
+    expect(restoreSaveDataSearchCriteria(search)).toEqual(criteria);
+  });
+
   it('restores links created with the repeated legacy parameters', () => {
     const legacySearch = new URLSearchParams();
     criteria.forEach((criterion) => {

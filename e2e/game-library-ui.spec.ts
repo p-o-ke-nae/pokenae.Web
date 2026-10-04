@@ -252,6 +252,11 @@ test.describe("ゲームライブラリ UI", () => {
     const maintenanceNavigation = page.getByRole("navigation", { name: "ゲームライブラリメニュー" });
     await expect(maintenanceNavigation).toBeVisible();
     await expect(maintenanceNavigation.locator('a[aria-current="page"]')).toHaveAttribute("href", "/game-library/maintenance");
+    const maintenanceHeaders = page.getByRole("columnheader");
+    await expect(maintenanceHeaders.filter({ hasText: "最新サマリー" })).toBeVisible();
+    await expect(maintenanceHeaders.filter({ hasText: "最新日" })).toBeVisible();
+    await expect(maintenanceHeaders.filter({ hasText: "最新日" })).toHaveCount(1);
+    await expect(maintenanceHeaders.filter({ hasText: "詳細" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "戻る" })).toHaveCount(0);
     await expectUnboxedSections(page);
 
@@ -373,11 +378,11 @@ test.describe("ゲームライブラリ UI", () => {
     });
 
     const searchParams = new URLSearchParams({
-      criteria: JSON.stringify([
+      criteria: encodeURIComponent(JSON.stringify([
         { fieldId: "custom:trainer-name", operator: "equals", value: "テスト主人公B" },
         { fieldId: "master:game-software", operator: "equals", value: "200" },
         { fieldId: "master:story-progress", operator: "equals", value: "2000" },
-      ]),
+      ])),
     });
     await page.goto(`/game-library/save-data-search?${searchParams.toString()}`);
     await expect.poll(() => schemaRequests.length).toBe(2);
