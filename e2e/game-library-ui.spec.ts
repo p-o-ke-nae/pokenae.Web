@@ -412,6 +412,97 @@ test.describe("ゲームライブラリ UI", () => {
     }).toBe("");
   });
 
+  test("ログイン済みでセッション確定が遅れても URL の検索条件で初期検索できる", async ({ page }) => {
+    await page.route("**/api/auth/session", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          user: { name: "テストユーザー", email: "test@example.com" },
+          expires: "2099-01-01T00:00:00.000Z",
+        }),
+      });
+    });
+    await page.route("**/api/services/game-library-api/**", async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      const data = path.endsWith("/api/SaveDatas") ? [{
+        id: 2,
+        ownerGoogleUserId: "google-user",
+        displayOrder: 1,
+        memo: null,
+        replacedBySaveDataId: null,
+        saveStorageType: 0,
+        gameSoftwareMasterId: 200,
+        gameSoftwareId: null,
+        gameConsoleId: null,
+        accountId: null,
+        memoryCardId: null,
+        storyProgressDefinitionId: null,
+        extendedFields: [{
+          fieldKey: "trainer-name",
+          label: "主人公名",
+          fieldType: 0,
+          isRequired: false,
+          displayOrder: 1,
+          stringValue: "ログイン主人公",
+          intValue: null,
+          decimalValue: null,
+          boolValue: null,
+          dateValue: null,
+          selectedOptionKey: null,
+        }],
+        isDeleted: false,
+        deleteReason: null,
+      }] : [];
+      await route.fulfill({ status: 200, contentType: "application/json", json: { success: true, data } });
+    });
+    await page.route("**/api/public/**", async (route) => {
+      const path = new URL(route.request().url()).pathname.replace("/api/public/", "");
+      let data: unknown[] | Record<string, unknown> = [];
+      if (path === "game-software-masters") {
+        data = [{
+          id: 200,
+          name: "テストソフト200",
+          abbreviation: "TEST200",
+          gameConsoleCategoryId: 1,
+          contentGroupId: 10,
+          displayOrder: 200,
+          isDeleted: false,
+        }];
+      } else if (path === "game-software-masters/200/save-data-schema") {
+        data = {
+          gameSoftwareMasterId: 200,
+          contentGroupId: 10,
+          fields: [{
+            fieldKey: "trainer-name",
+            label: "主人公名",
+            description: null,
+            fieldType: 0,
+            displayOrder: 1,
+            isRequired: false,
+            isDisabled: false,
+            options: [],
+          }],
+        };
+      } else if (path === "game-software-masters/200/story-progress-schema") {
+        data = { gameSoftwareMasterId: 200, contentGroupId: 10, choices: [] };
+      }
+      await route.fulfill({ status: 200, contentType: "application/json", json: { success: true, data } });
+    });
+
+    const searchParams = new URLSearchParams({
+      criteria: JSON.stringify([
+        { fieldId: "custom:trainer-name", operator: "equals", value: "ログイン主人公" },
+      ]),
+    });
+    await page.goto(`/game-library/save-data-search?${searchParams.toString()}`);
+    await expect(page.locator('[id="search-value-custom:trainer-name"]')).toHaveValue("ログイン主人公");
+    await expect(page.getByText("TEST200 — テストソフト200")).toBeVisible();
+    await expect(page.getByText("主人公名: ログイン主人公", { exact: true })).toBeVisible();
+    await expect(page.getByText(/URL内の検索条件を確認してください/)).toHaveCount(0);
+    expect(new URL(page.url()).searchParams.get("criteria")).toBe(searchParams.get("criteria"));
+  });
+
   test("ネストしたメンテナンス画面を閉じても親の詳細は開いたまま", async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem("pokenae_trial_v1:game-consoles", JSON.stringify([{

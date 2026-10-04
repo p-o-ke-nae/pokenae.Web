@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildSaveDataSearchUrl,
+  partitionRestoredSaveDataSearchCriteria,
   restoreSaveDataSearchCriteria,
+  shouldRunInitialSaveDataSearch,
+  type InitialSaveDataSearchState,
 } from './save-data-search-url';
+import type { SaveDataSearchFieldOption } from './save-data-search';
 
 const criteria = [
   { fieldId: 'custom:trainer-name', operator: 'contains' as const, value: 'A&B=#主人公' },
@@ -57,5 +61,52 @@ describe('save-data search URL helpers', () => {
     const clearedUrl = new URL(buildSaveDataSearchUrl(populatedUrl.href, []), 'https://example.test');
     expect(clearedUrl.searchParams.has('criteria')).toBe(false);
     expect(clearedUrl.searchParams.get('tab')).toBe('all');
+  });
+});
+
+describe('initial save-data search gating', () => {
+  const readyState: InitialSaveDataSearchState = {
+    pending: true,
+    sessionReady: true,
+    loading: false,
+    hasLookups: true,
+    lookupsSource: 'authenticated',
+    expectedSource: 'authenticated',
+    schemasReady: true,
+    hasSchemaErrors: false,
+  };
+
+  it('runs once the session, lookups, and schemas are ready', () => {
+    expect(shouldRunInitialSaveDataSearch(readyState)).toBe(true);
+  });
+
+  it('waits while the session is still loading', () => {
+    expect(shouldRunInitialSaveDataSearch({ ...readyState, sessionReady: false })).toBe(false);
+  });
+
+  it('waits when lookups were loaded for a different auth state', () => {
+    expect(shouldRunInitialSaveDataSearch({ ...readyState, lookupsSource: 'trial' })).toBe(false);
+    expect(shouldRunInitialSaveDataSearch({ ...readyState, lookupsSource: null })).toBe(false);
+  });
+
+  it('waits for schemas and skips when nothing is pending', () => {
+    expect(shouldRunInitialSaveDataSearch({ ...readyState, schemasReady: false })).toBe(false);
+    expect(shouldRunInitialSaveDataSearch({ ...readyState, hasSchemaErrors: true })).toBe(false);
+    expect(shouldRunInitialSaveDataSearch({ ...readyState, loading: true })).toBe(false);
+    expect(shouldRunInitialSaveDataSearch({ ...readyState, pending: false })).toBe(false);
+  });
+
+  it('separates criteria whose fields or operators are unavailable', () => {
+    const fieldMap = new Map<string, SaveDataSearchFieldOption>([
+      ['custom:trainer-name', { fieldId: 'custom:trainer-name', label: '主人公名', fieldType: 1, options: [] }],
+      ['master:story-progress', { fieldId: 'master:story-progress', label: 'ストーリー進捗', fieldType: 'master', options: [] }],
+    ]);
+    const { valid, invalid } = partitionRestoredSaveDataSearchCriteria([
+      ...criteria,
+      { fieldId: 'custom:unknown', operator: 'equals', value: 'x' },
+      { fieldId: 'master:story-progress', operator: 'greater-than', value: '1' },
+    ], fieldMap);
+    expect(valid).toEqual(criteria);
+    expect(invalid.map((criterion) => criterion.fieldId)).toEqual(['custom:unknown', 'master:story-progress']);
   });
 });

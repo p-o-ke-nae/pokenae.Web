@@ -26,7 +26,10 @@ import {
 } from '@/lib/game-management/save-data-search';
 import {
   buildSaveDataSearchUrl,
+  partitionRestoredSaveDataSearchCriteria,
   restoreSaveDataSearchCriteria,
+  shouldRunInitialSaveDataSearch,
+  type SaveDataSearchLookupsSource,
 } from '@/lib/game-management/save-data-search-url';
 import { formatSaveStorageType } from '@/lib/game-management/save-storage-type';
 import { buildTrialUserData } from '@/lib/game-management/trial';
@@ -80,10 +83,13 @@ function getFieldDefaultOperator(field: SaveDataSearchFieldOption): SaveDataSear
 }
 
 export default function SaveDataSearchPage() {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
+  const sessionReady = sessionStatus !== 'loading';
   const isTrial = !session?.user;
+  const expectedLookupsSource: SaveDataSearchLookupsSource = isTrial ? 'trial' : 'authenticated';
   const layoutMode = useResponsiveLayoutMode();
   const [lookups, setLookups] = useState<ManagementLookups | null>(null);
+  const [lookupsSource, setLookupsSource] = useState<SaveDataSearchLookupsSource | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -101,24 +107,38 @@ export default function SaveDataSearchPage() {
   const [editorRecordId, setEditorRecordId] = useState<number | null>(null);
   const [pageMode, setPageMode] = useState<'view' | 'edit'>('view');
   const schemaRequestGenerationRef = useRef(0);
+  const loadRequestRef = useRef(0);
   const saveDataDefinition = useMemo(() => getResourceDefinition('save-datas'), []);
 
   const load = useCallback(async () => {
+    if (!sessionReady) return;
+    const source: SaveDataSearchLookupsSource = isTrial ? 'trial' : 'authenticated';
+    const requestId = loadRequestRef.current + 1;
+    loadRequestRef.current = requestId;
+    schemaRequestGenerationRef.current += 1;
     setLoading(true);
     setError(null);
+    setLookupsSource(null);
+    setSaveDataSchemas({});
+    setStoryProgressSchemas({});
+    setSchemaLoadErrors({});
+    setSchemaLoadingIds([]);
     try {
       const result = isTrial
         ? { ...await fetchPublicMasterLookups(), ...buildTrialUserData() }
         : await fetchAuthenticatedUserLookups();
+      if (requestId !== loadRequestRef.current) return;
       setLookups(result);
+      setLookupsSource(source);
     } catch (loadError) {
+      if (requestId !== loadRequestRef.current) return;
       setError(getGameManagementErrorMessage(loadError, {
         fallback: resources.gameManagement.errors.listLoad,
       }));
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
-  }, [isTrial]);
+  }, [isTrial, sessionReady]);
 
   useEffect(() => {
     void load();
@@ -209,24 +229,39 @@ export default function SaveDataSearchPage() {
   const visibleCandidates = availableFields.filter((field) => field.label.toLocaleLowerCase('ja').includes(candidateQuery.trim().toLocaleLowerCase('ja')));
 
   useEffect(() => {
-    if (!urlInitialized || !initialSearchPending || loading || !lookups || !schemasReady || Object.keys(schemaLoadErrors).length > 0) return;
-    const validCriteria = criteria.filter((criterion) => {
-      const field = fieldMap.get(criterion.fieldId);
-      return Boolean(
-        field
-        && getSaveDataSearchOperators(field).some((operator) => operator.value === criterion.operator),
-      );
-    });
-    if (validCriteria.length !== criteria.length) {
-      setCriteria(validCriteria);
-      setSearchError('URL内の検索条件を確認してください。');
+    if (!shouldRunInitialSaveDataSearch({
+      pending: urlInitialized && initialSearchPending,
+      sessionReady,
+      loading,
+      hasLookups: Boolean(lookups),
+      lookupsSource,
+      expectedSource: expectedLookupsSource,
+      schemasReady,
+      hasSchemaErrors: Object.keys(schemaLoadErrors).length > 0,
+    })) return;
+    const { valid, invalid } = partitionRestoredSaveDataSearchCriteria(criteria, fieldMap);
+    if (invalid.length > 0) {
+      setCriteria(valid);
+      setSearchError(`URL内の検索条件を確認してください。（使用できない検索項目: ${invalid.map((criterion) => criterion.fieldId).join('、')}）`);
       setInitialSearchPending(false);
       return;
     }
     setSearchError(null);
     setSubmittedSearch(criteria.map((criterion) => ({ ...criterion })));
     setInitialSearchPending(false);
-  }, [criteria, fieldMap, initialSearchPending, loading, lookups, schemaLoadErrors, schemasReady, urlInitialized]);
+  }, [
+    criteria,
+    expectedLookupsSource,
+    fieldMap,
+    initialSearchPending,
+    loading,
+    lookups,
+    lookupsSource,
+    schemaLoadErrors,
+    schemasReady,
+    sessionReady,
+    urlInitialized,
+  ]);
 
   useEffect(() => {
     if (!urlInitialized) return;
@@ -251,11 +286,6 @@ export default function SaveDataSearchPage() {
   }, [criteria, schemaLoadErrors, schemaLoadingIds.length]);
 
   const handleReload = useCallback(() => {
-    schemaRequestGenerationRef.current += 1;
-    setSaveDataSchemas({});
-    setStoryProgressSchemas({});
-    setSchemaLoadErrors({});
-    setSchemaLoadingIds([]);
     setSubmittedSearch(null);
     void load();
   }, [load]);
@@ -424,7 +454,7 @@ export default function SaveDataSearchPage() {
                       </p>
                       {submittedSearch.map((criterion, index) => (
                         <p key={criterion.fieldId} className="text-sm text-[var(--color-text-muted)]">
-                          {fieldMap.get(criterion.fieldId)?.label ?? criterion.fieldId}: {criterion.value.trim() ? result.matchedValues[index] : '（空欄）'}
+                          {fieldMap.get(criterion.fieldId)?.label ?? criterion.fieldId}: {result.matchedValues[index] || '（空欄）'}
                         </p>
                       ))}
                     </div>

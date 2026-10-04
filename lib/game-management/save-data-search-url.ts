@@ -1,4 +1,50 @@
-import type { SaveDataSearchCriteria, SaveDataSearchOperator } from './save-data-search';
+import {
+  getSaveDataSearchOperators,
+  type SaveDataSearchCriteria,
+  type SaveDataSearchFieldOption,
+  type SaveDataSearchOperator,
+} from './save-data-search';
+
+export type SaveDataSearchLookupsSource = 'trial' | 'authenticated';
+
+export type InitialSaveDataSearchState = {
+  pending: boolean;
+  sessionReady: boolean;
+  loading: boolean;
+  hasLookups: boolean;
+  lookupsSource: SaveDataSearchLookupsSource | null;
+  expectedSource: SaveDataSearchLookupsSource;
+  schemasReady: boolean;
+  hasSchemaErrors: boolean;
+};
+
+// セッション確定前や認証状態切替直後の lookups で URL 条件を検証すると、
+// スキーマ由来の項目が見つからず条件を誤って破棄してしまうため待機する。
+export function shouldRunInitialSaveDataSearch(state: InitialSaveDataSearchState): boolean {
+  return state.pending
+    && state.sessionReady
+    && !state.loading
+    && state.hasLookups
+    && state.lookupsSource === state.expectedSource
+    && state.schemasReady
+    && !state.hasSchemaErrors;
+}
+
+export function partitionRestoredSaveDataSearchCriteria(
+  criteria: SaveDataSearchCriteria[],
+  fieldMap: ReadonlyMap<string, SaveDataSearchFieldOption>,
+): { valid: SaveDataSearchCriteria[]; invalid: SaveDataSearchCriteria[] } {
+  const valid: SaveDataSearchCriteria[] = [];
+  const invalid: SaveDataSearchCriteria[] = [];
+  criteria.forEach((criterion) => {
+    const field = fieldMap.get(criterion.fieldId);
+    const isValid = Boolean(
+      field && getSaveDataSearchOperators(field).some((operator) => operator.value === criterion.operator),
+    );
+    (isValid ? valid : invalid).push(criterion);
+  });
+  return { valid, invalid };
+}
 
 const SEARCH_QUERY_KEY = 'criteria';
 const LEGACY_QUERY_KEYS = {
