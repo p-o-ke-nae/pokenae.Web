@@ -34,13 +34,17 @@ export function formatMaintenanceDate(value: string | null): string {
   return value.slice(0, 10).replace(/-/g, '/');
 }
 
+export function isMaintenanceDateInFuture(value: string, today: string): boolean {
+  return value > today;
+}
+
 export function buildMaintenanceSummaryText(summary: MaintenanceSummaryDto | null | undefined): string {
   if (!summary || !summary.hasRecord) {
-    return '保守: 記録なし';
+    return 'メンテナンス: 記録なし';
   }
 
   const parts = [
-    `保守: ${getMaintenanceHealthStatusLabel(summary.latestHealthStatus)}`,
+    `メンテナンス: ${getMaintenanceHealthStatusLabel(summary.latestHealthStatus)}`,
     `最終: ${formatMaintenanceDate(summary.lastMaintenanceDate)}`,
     `次回: ${formatMaintenanceDate(summary.nextMaintenanceDate)}`,
   ];

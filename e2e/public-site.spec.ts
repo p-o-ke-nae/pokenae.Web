@@ -98,12 +98,12 @@ test("ゲームライブラリの案内とカードを既存サイトのスタ�
   await expect(pageHeader.getByRole("heading", { level: 1 })).toHaveCSS("border-left-style", "solid");
   await expect(page.getByRole("heading", { level: 2, name: "データ管理" })).toHaveCSS("border-bottom-style", "solid");
 
-  const maintenanceCard = page.getByRole("link", { name: /保守履歴/ });
+  const maintenanceCard = page.locator(".admin-card").filter({ hasText: "メンテナンス" });
   await expect(maintenanceCard).toHaveAttribute("href", "/game-library/maintenance");
   await expect(maintenanceCard).toHaveCSS("background-color", "rgb(255, 255, 255)");
   await expect(maintenanceCard).toHaveCSS("border-radius", "5.6px");
-  await expect(page.getByText("ゲーム機・ソフト・メモリーカードの保守記録を確認・管理します。")).toBeVisible();
-  await expect(page.getByRole("link", { name: /横断セーブデータ検索/ })).toHaveAttribute(
+  await expect(page.getByText("ゲーム機・ソフト・メモリーカードのメンテナンス記録を確認・管理します。")).toBeVisible();
+  await expect(page.getByRole("link", { name: /セーブデータ検索/ })).toHaveAttribute(
     "href",
     "/game-library/save-data-search",
   );

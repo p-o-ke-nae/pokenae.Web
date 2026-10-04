@@ -169,6 +169,7 @@ img { max-width: 100%; }
   border-radius: .35rem;
   background: var(--color-base-70-light);
 }
+.tool-page > .admin-content-nav { margin-block-end: -1rem; }
 .admin-content-nav a {
   display: inline-flex;
   align-items: center;

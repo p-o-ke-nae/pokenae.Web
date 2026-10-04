@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { evaluateSaveDataSearch, getSaveDataVariant, matchesSaveDataSearchGroup } from './save-data-search';
-import type { ManagementLookups, SaveDataSchemaDto } from './types';
+import { evaluateSaveDataSearch, getSaveDataSearchFields } from './save-data-search';
+import type { ManagementLookups, SaveDataSchemaDto, StoryProgressSchemaDto } from './types';
 
 const schema: SaveDataSchemaDto = {
   gameSoftwareMasterId: 100,
@@ -258,74 +258,162 @@ const lookups: ManagementLookups = {
 };
 
 describe('save-data search helpers', () => {
-  it('reads variant from linked game software', () => {
-    expect(getSaveDataVariant(lookups.saveDatas[0], lookups)).toBe(0);
-    expect(getSaveDataVariant({ ...lookups.saveDatas[0], gameSoftwareId: null }, lookups)).toBeNull();
+  const fields = getSaveDataSearchFields({ 100: schema, 200: { ...schema, gameSoftwareMasterId: 200 } }, lookups);
+
+  it('searches a custom field across saves from multiple software masters', () => {
+    const secondSchema = { ...schema, gameSoftwareMasterId: 200 };
+    const secondSaveData = {
+      ...lookups.saveDatas[1]!,
+      extendedFields: [{
+        ...lookups.saveDatas[0]!.extendedFields[0]!,
+        stringValue: 'SEARCH-TEST',
+      }],
+    };
+    const searchLookups = { ...lookups, saveDatas: [lookups.saveDatas[0]!, secondSaveData] };
+    const searchFields = getSaveDataSearchFields({ 100: schema, 200: secondSchema }, searchLookups);
+    const matches = evaluateSaveDataSearch(searchLookups, { 100: schema, 200: secondSchema }, [
+      { fieldId: 'custom:trainer-name', operator: 'contains', value: 'search-test' },
+    ], searchFields);
+
+    expect(matches.map((match) => match.saveData.id)).toEqual([2]);
+    expect(matches[0]?.matchedValues).toEqual(['SEARCH-TEST']);
   });
 
-  it('matches text contains and boolean exact conditions inside a group', () => {
-    expect(matchesSaveDataSearchGroup(
-      lookups.saveDatas[0],
-      {
-        gameSoftwareMasterId: 100,
-        storyProgressDefinitionId: 1000,
-        fieldConditions: [
-          { fieldKey: 'trainer-name', value: 'ピ' },
-          { fieldKey: 'is-cleared', value: 'true' },
-        ],
-      },
-      schema,
-    )).toBe(true);
+  it('searches empty custom values and supports not-equals against blank', () => {
+    const blankSave = {
+      ...lookups.saveDatas[0]!,
+      extendedFields: lookups.saveDatas[0]!.extendedFields.map((field) => (
+        field.fieldKey === 'trainer-name' ? { ...field, stringValue: '' } : field
+      )),
+    };
+    const populatedSave = {
+      ...lookups.saveDatas[1]!,
+      extendedFields: [{
+        ...lookups.saveDatas[0]!.extendedFields[0]!,
+        stringValue: 'ミュウ',
+      }],
+    };
+    const searchLookups = { ...lookups, saveDatas: [blankSave, populatedSave] };
+    const searchSchemas = { 100: schema, 200: { ...schema, gameSoftwareMasterId: 200 } };
+
+    expect(evaluateSaveDataSearch(searchLookups, searchSchemas, [
+      { fieldId: 'custom:trainer-name', operator: 'equals', value: '' },
+    ], fields).map((match) => match.saveData.id)).toEqual([1]);
+    expect(evaluateSaveDataSearch(searchLookups, searchSchemas, [
+      { fieldId: 'custom:trainer-name', operator: 'not-equals', value: '' },
+    ], fields).map((match) => match.saveData.id)).toEqual([2]);
   });
 
-  it('matches numeric equality by numeric value and keeps date/option exact comparisons', () => {
-    expect(matchesSaveDataSearchGroup(
-      lookups.saveDatas[0],
-      {
-        gameSoftwareMasterId: 100,
-        storyProgressDefinitionId: 1000,
-        fieldConditions: [
-          { fieldKey: 'badge-count', value: '1.0' },
-          { fieldKey: 'play-time', value: '1.00' },
-          { fieldKey: 'last-played-on', value: '2024-12-31' },
-          { fieldKey: 'starter', value: 'pikachu' },
-        ],
-      },
-      schema,
-    )).toBe(true);
+  it('combines selected search items and supports non-equality operators', () => {
+    const matches = evaluateSaveDataSearch(lookups, { 100: schema }, [
+      { fieldId: 'custom:trainer-name', operator: 'equals', value: 'ピカ' },
+      { fieldId: 'custom:badge-count', operator: 'less-than', value: '2' },
+    ], fields);
 
-    expect(matchesSaveDataSearchGroup(
-      lookups.saveDatas[0],
-      {
-        gameSoftwareMasterId: 100,
-        storyProgressDefinitionId: 1000,
-        fieldConditions: [
-          { fieldKey: 'badge-count', value: '1.5' },
-        ],
-      },
-      schema,
-    )).toBe(false);
+    expect(matches.map((match) => match.saveData.id)).toEqual([1]);
   });
 
-  it('applies variant as a common AND filter and groups as OR', () => {
-    const matches = evaluateSaveDataSearch(lookups, { 100: schema }, {
-      variant: 0,
-      groups: [
+  it('matches text, number, boolean, date, and option fields using their schema types', () => {
+    for (const [fieldKey, value] of [
+      ['trainer-name', 'ピ'],
+      ['badge-count', '1.0'],
+      ['play-time', '1.00'],
+      ['is-cleared', 'true'],
+      ['last-played-on', '2024-12-31'],
+      ['starter', 'pikachu'],
+    ]) {
+      const searchField = fields.find((field) => field.fieldKey === fieldKey)!;
+      expect(evaluateSaveDataSearch(lookups, { 100: schema }, [
         {
-          gameSoftwareMasterId: 100,
+          fieldId: searchField.fieldId,
+          operator: searchField.fieldType === 0 || searchField.fieldType === 1 ? 'contains' : 'equals',
+          value,
+        },
+      ], fields).map((match) => match.saveData.id)).toEqual([1]);
+    }
+    expect(evaluateSaveDataSearch(lookups, { 100: schema }, [
+      { fieldId: 'custom:badge-count', operator: 'equals', value: '2' },
+    ], fields)).toEqual([]);
+  });
+
+  it('lists the union of custom fields and master fields without work counts', () => {
+    const secondSchema = {
+      ...schema,
+      gameSoftwareMasterId: 200,
+      fields: schema.fields.map((field) => field.fieldKey === 'starter'
+        ? { ...field, options: [...field.options, { optionKey: 'snorlax', label: 'カビゴン', description: null, displayOrder: 3 }] }
+        : field),
+    };
+    const searchFields = getSaveDataSearchFields({ 100: schema, 200: secondSchema }, lookups);
+    expect(searchFields.find((field) => field.fieldKey === 'trainer-name')).toMatchObject({
+      fieldId: 'custom:trainer-name',
+      fieldKey: 'trainer-name',
+      label: '主人公名',
+    });
+    expect(searchFields.find((field) => field.fieldId === 'master:game-software')?.label).toBe('ゲームソフトマスタ');
+    expect(searchFields.find((field) => field.fieldKey === 'starter')?.options).toContainEqual({
+      value: 'snorlax',
+      label: 'カビゴン',
+    });
+  });
+
+  it('treats a game software master as an ordinary selectable criterion', () => {
+    expect(evaluateSaveDataSearch(lookups, {}, [
+      { fieldId: 'master:game-software', operator: 'equals', value: '100' },
+    ], fields).map((match) => match.saveData.id)).toEqual([1]);
+    expect(evaluateSaveDataSearch(lookups, {}, [
+      { fieldId: 'master:game-software', operator: 'not-equals', value: '100' },
+    ], fields).map((match) => match.saveData.id)).toEqual([2]);
+  });
+
+  it('searches story progress across software masters and shows each save data label', () => {
+    const storyProgressSchemas: Record<number, StoryProgressSchemaDto> = {
+      100: {
+        gameSoftwareMasterId: 100,
+        contentGroupId: 10,
+        choices: [{
           storyProgressDefinitionId: 1000,
-          fieldConditions: [{ fieldKey: 'trainer-name', value: 'ピカ' }],
-        },
-        {
-          gameSoftwareMasterId: 200,
+          progressKey: 'start',
+          label: '冒険開始',
+          description: null,
+          displayOrder: 1,
+          isDisabled: false,
+        }],
+      },
+      200: {
+        gameSoftwareMasterId: 200,
+        contentGroupId: 10,
+        choices: [{
           storyProgressDefinitionId: 2000,
-          fieldConditions: [],
-        },
+          progressKey: 'final',
+          label: '最終局面',
+          description: null,
+          displayOrder: 1,
+          isDisabled: false,
+        }],
+      },
+    };
+    const searchFields = getSaveDataSearchFields(
+      { 100: schema, 200: { ...schema, gameSoftwareMasterId: 200 } },
+      lookups,
+      storyProgressSchemas,
+    );
+    const matches = evaluateSaveDataSearch(
+      lookups,
+      { 100: schema, 200: { ...schema, gameSoftwareMasterId: 200 } },
+      [{ fieldId: 'master:story-progress', operator: 'equals', value: '2000' }],
+      searchFields,
+      storyProgressSchemas,
+    );
+
+    expect(searchFields.find((field) => field.fieldId === 'master:story-progress')).toMatchObject({
+      label: 'ストーリー進捗',
+      options: [
+        { value: '1000', label: '冒険開始' },
+        { value: '2000', label: '最終局面' },
       ],
     });
-
-    expect(matches).toHaveLength(1);
-    expect(matches[0]?.saveData.id).toBe(1);
-    expect(matches[0]?.matchedGroupIndexes).toEqual([0]);
+    expect(matches.map((match) => match.saveData.id)).toEqual([2]);
+    expect(matches[0]?.matchedValues).toEqual(['最終局面']);
   });
 });

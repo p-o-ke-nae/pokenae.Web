@@ -5,6 +5,7 @@ import { useId } from 'react';
 import CustomComboBox from '@/components/atoms/CustomComboBox';
 import CustomHeader from '@/components/atoms/CustomHeader';
 import CustomLabel from '@/components/atoms/CustomLabel';
+import AdminContentNavigation from '@/components/molecules/AdminContentNavigation';
 import type { LayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
 import { buildMaintenanceSummaryText } from '@/lib/game-management/maintenance';
 import { formatSaveStorageType } from '@/lib/game-management/save-storage-type';
@@ -30,6 +31,17 @@ import {
   getGameSoftwareMasterName,
 } from './helpers';
 import { shouldRenderSelectPlaceholder } from './select-utils';
+import { RESOURCE_DEFINITIONS, USER_RESOURCE_ORDER } from '@/lib/game-management/resources';
+
+const GAME_LIBRARY_NAVIGATION_ITEMS = [
+  { href: '/game-library/save-data-search', label: 'セーブデータ検索' },
+  { href: '/game-library/maintenance', label: 'メンテナンス' },
+  { href: '/game-library', label: 'ダッシュボード' },
+  ...USER_RESOURCE_ORDER.map((key) => ({
+    href: `/game-library/${key}`,
+    label: RESOURCE_DEFINITIONS[key].shortLabel,
+  })),
+];
 
 // ---------------------------------------------------------------------------
 // SelectField
@@ -133,18 +145,30 @@ export function PageFrame({
   title,
   description,
   actions,
+  stickyActions,
   layoutMode = 'desktop',
+  navigationActiveHref,
   children,
 }: {
   eyebrowLabel?: string;
   title: string;
   description: string;
   actions?: React.ReactNode;
+  stickyActions?: React.ReactNode;
   layoutMode?: LayoutMode;
+  navigationActiveHref?: string;
   children: React.ReactNode;
 }) {
   return (
-    <main className="page-container tool-page">
+    <main className={['page-container tool-page', stickyActions ? 'tool-page--has-sticky-actions' : ''].filter(Boolean).join(' ')}>
+      {navigationActiveHref ? (
+        <AdminContentNavigation
+          ariaLabel="ゲームライブラリメニュー"
+          current={navigationActiveHref}
+          homeLink={null}
+          items={GAME_LIBRARY_NAVIGATION_ITEMS}
+        />
+      ) : null}
       <header className="page-header">
         {eyebrowLabel ? <p className="tool-page__eyebrow">{eyebrowLabel}</p> : null}
         <CustomHeader level={1}>{title}</CustomHeader>
@@ -156,6 +180,51 @@ export function PageFrame({
         ) : null}
       </header>
       <div className="tool-page__body">{children}</div>
+      {stickyActions ? (
+        <div className="tool-sticky-actions" role="group" aria-label="ページ操作">
+          {stickyActions}
+        </div>
+      ) : null}
+      {stickyActions ? (
+        <style jsx global>{`
+          .tool-page--has-sticky-actions {
+            padding-block-end: 7.5rem;
+          }
+
+          .tool-sticky-actions {
+            position: fixed;
+            z-index: 20;
+            inset-inline-end: max(1rem, env(safe-area-inset-right, 0px));
+            inset-block-end: max(1rem, env(safe-area-inset-bottom, 0px));
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: 1px solid var(--color-base-70-dark);
+            border-radius: 0.75rem;
+            padding: 0.5rem;
+            background: color-mix(in srgb, white 94%, var(--color-base-70));
+            box-shadow: 0 0.5rem 1.5rem rgba(31, 31, 42, 0.18);
+          }
+
+          @media (max-width: 640px) {
+            .tool-sticky-actions {
+              inset-inline: max(0.75rem, env(safe-area-inset-left, 0px));
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              justify-content: stretch;
+            }
+
+            .tool-sticky-actions :global(.custom-button) {
+              width: 100%;
+              min-width: 0;
+            }
+
+            .tool-sticky-actions :global(.custom-button__label) {
+              overflow-wrap: anywhere;
+            }
+          }
+        `}</style>
+      ) : null}
     </main>
   );
 }
