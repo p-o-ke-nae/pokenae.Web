@@ -65,6 +65,12 @@ describe('planFooterRows', () => {
     ]);
   });
 
+  it('keeps the primary action inline when requested', () => {
+    expect(planFooterRows([action('削除'), action('キャンセル'), action('保存')], { separatePrimary: false })).toEqual([
+      { kind: 'actions', items: ['削除', 'キャンセル', '保存'], columns: 3, lastItemSpan: 1 },
+    ]);
+  });
+
   it('separates the primary action from the last group only', () => {
     expect(planFooterRows([group('削除', '読み取り専用に戻す'), group('キャンセル', '保存')], { separatePrimary: true })).toEqual([
       { kind: 'actions', items: ['削除', '読み取り専用に戻す'], columns: 2, lastItemSpan: 1 },
