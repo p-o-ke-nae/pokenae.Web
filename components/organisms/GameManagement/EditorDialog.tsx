@@ -416,25 +416,25 @@ export default function EditorDialog({
             leading={
               !isNew ? (
                 <>
-                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} aria-label="レコード移動">
+                  <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={3} aria-label="レコード移動">
                     <CustomButton
                       disabled={!canGoPrev || loading}
                       onClick={() => navigate('prev')}
+                      aria-label="前へ"
                     >
-                      ← 前へ
+                      ←
                     </CustomButton>
+                    <span className="flex items-center justify-center text-xs text-[var(--color-text-muted)]">
+                      {currentIndex >= 0 ? `${currentIndex + 1} / ${rowIds.length}` : ''}
+                    </span>
                     <CustomButton
                       disabled={!canGoNext || loading}
                       onClick={() => navigate('next')}
+                      aria-label="次へ"
                     >
-                      次へ →
+                      →
                     </CustomButton>
                   </ResponsiveActionGroup>
-                  {currentIndex >= 0 ? (
-                    <span className="text-xs text-[var(--color-text-muted)]">
-                      {currentIndex + 1} / {rowIds.length}
-                    </span>
-                  ) : null}
                 </>
               ) : null
             }

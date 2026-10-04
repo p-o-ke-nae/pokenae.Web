@@ -1,10 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import CustomButton from '@/components/atoms/CustomButton';
-import CustomCheckBox from '@/components/atoms/CustomCheckBox';
 import CustomComboBox from '@/components/atoms/CustomComboBox';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
@@ -14,21 +13,18 @@ import {
   fetchAuthenticatedUserLookups,
   fetchPublicMasterLookups,
   fetchPublicSaveDataSchema,
-  fetchPublicStoryProgressSchema,
   getGameManagementErrorMessage,
 } from '@/lib/game-management/api';
 import {
   evaluateSaveDataSearch,
-  GAME_SOFTWARE_VARIANT_OPTIONS,
-  type SaveDataSearchFieldCondition,
-  type SaveDataSearchGroup,
+  getSaveDataSearchFields,
+  type SaveDataSearchCriteria,
 } from '@/lib/game-management/save-data-search';
 import { formatSaveStorageType } from '@/lib/game-management/save-storage-type';
 import { buildTrialUserData } from '@/lib/game-management/trial';
 import type {
   ManagementLookups,
   SaveDataSchemaDto,
-  StoryProgressSchemaDto,
 } from '@/lib/game-management/types';
 import { useResponsiveLayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
 import resources from '@/lib/resources';
@@ -42,42 +38,6 @@ import {
   getMemoryCardDisplay,
 } from './helpers';
 import { PageFrame, PageSection, TrialBanner } from './shared';
-
-type SearchGroupFormState = {
-  id: string;
-  gameSoftwareMasterId: string;
-  storyProgressDefinitionId: string;
-  fieldConditions: Array<SaveDataSearchFieldCondition & { id: string }>;
-};
-
-type SubmittedSearchState = {
-  variant: string;
-  groups: SearchGroupFormState[];
-};
-
-function createFieldCondition(): SaveDataSearchFieldCondition & { id: string } {
-  return {
-    id: `condition-${Math.random().toString(36).slice(2, 10)}`,
-    fieldKey: '',
-    value: '',
-  };
-}
-
-function createSearchGroup(): SearchGroupFormState {
-  return {
-    id: `group-${Math.random().toString(36).slice(2, 10)}`,
-    gameSoftwareMasterId: '',
-    storyProgressDefinitionId: '',
-    fieldConditions: [],
-  };
-}
-
-function cloneGroups(groups: SearchGroupFormState[]): SearchGroupFormState[] {
-  return groups.map((group) => ({
-    ...group,
-    fieldConditions: group.fieldConditions.map((condition) => ({ ...condition })),
-  }));
-}
 
 function getStorageSummary(saveData: ManagementLookups['saveDatas'][number], lookups: ManagementLookups): string {
   switch (saveData.saveStorageType) {
@@ -94,7 +54,7 @@ function getStorageSummary(saveData: ManagementLookups['saveDatas'][number], loo
       const gameConsole = saveData.gameConsoleId ? lookups.gameConsoles.find((item) => item.id === saveData.gameConsoleId) : null;
       return [account ? getAccountDisplay(account, lookups) : null, gameConsole ? getGameConsoleDisplay(gameConsole, lookups) : null]
         .filter(Boolean)
-        .join(' / ');
+        .join(' ');
     }
     case 3: {
       const memoryCard = saveData.memoryCardId ? lookups.memoryCards.find((item) => item.id === saveData.memoryCardId) : null;
@@ -105,27 +65,9 @@ function getStorageSummary(saveData: ManagementLookups['saveDatas'][number], loo
   }
 }
 
-function buildSubmittedGroupSummary(
-  group: SearchGroupFormState,
-  schema: SaveDataSchemaDto | null | undefined,
-  storyProgressSchema: StoryProgressSchemaDto | null | undefined,
-  lookups: ManagementLookups,
-): string {
-  const parts = [
-    getGameSoftwareMasterName(Number(group.gameSoftwareMasterId), lookups),
-  ];
-
-  if (group.storyProgressDefinitionId) {
-    const storyProgress = storyProgressSchema?.choices.find((choice) => String(choice.storyProgressDefinitionId) === group.storyProgressDefinitionId);
-    parts.push(`進行度: ${storyProgress?.label ?? `#${group.storyProgressDefinitionId}`}`);
-  }
-
-  for (const condition of group.fieldConditions) {
-    const field = schema?.fields.find((item) => item.fieldKey === condition.fieldKey);
-    parts.push(`${field?.label ?? condition.fieldKey}: ${condition.value}`);
-  }
-
-  return parts.join(' / ');
+function getMasterDisplayName(masterId: number, lookups: ManagementLookups): string {
+  const master = lookups.gameSoftwareMasters.find((item) => item.id === masterId);
+  return master ? `${master.abbreviation || master.name} — ${master.name}` : getGameSoftwareMasterName(masterId, lookups);
 }
 
 export default function SaveDataSearchPage() {
@@ -136,52 +78,18 @@ export default function SaveDataSearchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [variant, setVariant] = useState('');
-  const [groups, setGroups] = useState<SearchGroupFormState[]>([createSearchGroup()]);
-  const [submittedSearch, setSubmittedSearch] = useState<SubmittedSearchState | null>(null);
+  const [gameSoftwareMasterId, setGameSoftwareMasterId] = useState('');
+  const [fieldKey, setFieldKey] = useState('');
+  const [value, setValue] = useState('');
+  const [submittedSearch, setSubmittedSearch] = useState<SaveDataSearchCriteria | null>(null);
   const [saveDataSchemas, setSaveDataSchemas] = useState<Record<number, SaveDataSchemaDto>>({});
-  const [storyProgressSchemas, setStoryProgressSchemas] = useState<Record<number, StoryProgressSchemaDto>>({});
   const [schemaLoadErrors, setSchemaLoadErrors] = useState<Record<number, string>>({});
   const [schemaLoadingIds, setSchemaLoadingIds] = useState<number[]>([]);
   const [editorRecordId, setEditorRecordId] = useState<number | null>(null);
   const [pageMode, setPageMode] = useState<'view' | 'edit'>('view');
+  const schemaRequestGenerationRef = useRef(0);
 
   const saveDataDefinition = useMemo(() => getResourceDefinition('save-datas'), []);
-
-  const resetSchemaState = useCallback((gameSoftwareMasterId?: number) => {
-    setSaveDataSchemas((current) => {
-      if (gameSoftwareMasterId == null) {
-        return {};
-      }
-
-      const rest = { ...current };
-      delete rest[gameSoftwareMasterId];
-      return rest;
-    });
-    setStoryProgressSchemas((current) => {
-      if (gameSoftwareMasterId == null) {
-        return {};
-      }
-
-      const rest = { ...current };
-      delete rest[gameSoftwareMasterId];
-      return rest;
-    });
-    setSchemaLoadErrors((current) => {
-      if (gameSoftwareMasterId == null) {
-        return {};
-      }
-
-      const rest = { ...current };
-      delete rest[gameSoftwareMasterId];
-      return rest;
-    });
-    setSchemaLoadingIds((current) => (
-      gameSoftwareMasterId == null
-        ? []
-        : current.filter((id) => id !== gameSoftwareMasterId)
-    ));
-  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -205,148 +113,117 @@ export default function SaveDataSearchPage() {
     void load();
   }, [load]);
 
-  const handleReload = useCallback(() => {
-    resetSchemaState();
-    void load();
-  }, [load, resetSchemaState]);
-
   const requestedMasterIds = useMemo(() => Array.from(new Set(
-    groups
-      .map((group) => Number(group.gameSoftwareMasterId))
-      .filter((value) => Number.isInteger(value) && value > 0),
-  )), [groups]);
+    (lookups?.saveDatas ?? [])
+      .map((saveData) => saveData.gameSoftwareMasterId)
+      .filter((masterId) => Number.isInteger(masterId) && masterId > 0),
+  )), [lookups]);
 
   useEffect(() => {
-    const pendingIds = requestedMasterIds.filter((id) => !saveDataSchemas[id] && !schemaLoadingIds.includes(id) && !schemaLoadErrors[id]);
+    if (loading || !lookups) {
+      return;
+    }
+
+    const pendingIds = requestedMasterIds.filter((id) => (
+      !saveDataSchemas[id] && !schemaLoadingIds.includes(id) && !schemaLoadErrors[id]
+    ));
     if (pendingIds.length === 0) {
       return;
     }
 
+    const generation = schemaRequestGenerationRef.current;
+    setSchemaLoadingIds((current) => Array.from(new Set([...current, ...pendingIds])));
+
     const loadSchemas = async () => {
-      setSchemaLoadingIds((current) => Array.from(new Set([...current, ...pendingIds])));
-
-      const results = await Promise.allSettled(pendingIds.map(async (gameSoftwareMasterId) => ({
-        gameSoftwareMasterId,
-        saveDataSchema: await fetchPublicSaveDataSchema(gameSoftwareMasterId),
-        storyProgressSchema: await fetchPublicStoryProgressSchema(gameSoftwareMasterId),
-      })));
-
-      const nextSchemaErrors: Record<number, string> = {};
-      const nextSaveDataSchemas: Record<number, SaveDataSchemaDto> = {};
-      const nextStoryProgressSchemas: Record<number, StoryProgressSchemaDto> = {};
-
-      for (const result of results) {
-        if (result.status === 'fulfilled') {
-          nextSaveDataSchemas[result.value.gameSoftwareMasterId] = result.value.saveDataSchema;
-          nextStoryProgressSchemas[result.value.gameSoftwareMasterId] = result.value.storyProgressSchema;
-          continue;
+      const results: PromiseSettledResult<{ masterId: number; schema: SaveDataSchemaDto }>[] = [];
+      for (let index = 0; index < pendingIds.length; index += 8) {
+        const batch = pendingIds.slice(index, index + 8);
+        const batchResults = await Promise.allSettled(batch.map(async (masterId) => ({
+          masterId,
+          schema: await fetchPublicSaveDataSchema(masterId),
+        })));
+        if (generation !== schemaRequestGenerationRef.current) {
+          return;
         }
-
-        const rejectedId = pendingIds[results.indexOf(result)];
-        nextSchemaErrors[rejectedId] = getGameManagementErrorMessage(result.reason, {
-          fallback: resources.gameManagement.errors.schemaLoad,
-        });
+        results.push(...batchResults);
       }
 
-      setSaveDataSchemas((current) => ({ ...current, ...nextSaveDataSchemas }));
-      setStoryProgressSchemas((current) => ({ ...current, ...nextStoryProgressSchemas }));
-      setSchemaLoadErrors((current) => ({ ...current, ...nextSchemaErrors }));
+      const nextSchemas: Record<number, SaveDataSchemaDto> = {};
+      const nextErrors: Record<number, string> = {};
+      results.forEach((result, index) => {
+        const masterId = pendingIds[index]!;
+        if (result.status === 'fulfilled') {
+          nextSchemas[masterId] = result.value.schema;
+        } else {
+          nextErrors[masterId] = getGameManagementErrorMessage(result.reason, {
+            fallback: resources.gameManagement.errors.schemaLoad,
+          });
+        }
+      });
+      setSaveDataSchemas((current) => ({ ...current, ...nextSchemas }));
+      setSchemaLoadErrors((current) => ({ ...current, ...nextErrors }));
       setSchemaLoadingIds((current) => current.filter((id) => !pendingIds.includes(id)));
     };
 
     void loadSchemas();
-  }, [requestedMasterIds, saveDataSchemas, schemaLoadErrors, schemaLoadingIds]);
+  }, [loading, lookups, requestedMasterIds, saveDataSchemas, schemaLoadErrors, schemaLoadingIds]);
 
-  const submittedCriteria = useMemo(() => {
-    if (!submittedSearch) {
-      return null;
-    }
-
-    const criteriaGroups: SaveDataSearchGroup[] = submittedSearch.groups.map((group) => ({
-      gameSoftwareMasterId: Number(group.gameSoftwareMasterId),
-      storyProgressDefinitionId: group.storyProgressDefinitionId ? Number(group.storyProgressDefinitionId) : null,
-      fieldConditions: group.fieldConditions.map((condition) => ({
-        fieldKey: condition.fieldKey,
-        value: condition.value,
-      })),
-    }));
-
-    return {
-      variant: submittedSearch.variant === '' ? null : Number(submittedSearch.variant) as 0 | 1,
-      groups: criteriaGroups,
-    };
-  }, [submittedSearch]);
-
-  const results = useMemo(() => {
-    if (!lookups || !submittedCriteria) {
-      return [];
-    }
-
-    return evaluateSaveDataSearch(lookups, saveDataSchemas, submittedCriteria);
-  }, [lookups, saveDataSchemas, submittedCriteria]);
-
+  const searchableFields = useMemo(() => getSaveDataSearchFields(saveDataSchemas), [saveDataSchemas]);
+  const results = useMemo(() => (
+    lookups && submittedSearch
+      ? evaluateSaveDataSearch(lookups, saveDataSchemas, submittedSearch)
+      : []
+  ), [lookups, saveDataSchemas, submittedSearch]);
   const resultIds = useMemo(() => results.map((result) => result.saveData.id), [results]);
-
-  const validateSearch = useCallback(() => {
-    const errors: string[] = [];
-
-    groups.forEach((group, index) => {
-      if (!group.gameSoftwareMasterId) {
-        errors.push(`条件グループ ${index + 1}: ゲームソフトマスタを選択してください。`);
-      }
-
-      if (group.gameSoftwareMasterId) {
-        const masterId = Number(group.gameSoftwareMasterId);
-        if (schemaLoadingIds.includes(masterId)) {
-          errors.push(`条件グループ ${index + 1}: スキーマ読込が完了してから検索してください。`);
-        }
-        if (schemaLoadErrors[masterId]) {
-          errors.push(`条件グループ ${index + 1}: ${schemaLoadErrors[masterId]}`);
-        }
-      }
-
-      group.fieldConditions.forEach((condition) => {
-        if (!condition.fieldKey) {
-          errors.push(`条件グループ ${index + 1}: schema 項目を選択してください。`);
-          return;
-        }
-
-        if (!condition.value.trim()) {
-          errors.push(`条件グループ ${index + 1}: schema 条件の値を入力してください。`);
-        }
-      });
-    });
-
-    return errors;
-  }, [groups, schemaLoadErrors, schemaLoadingIds]);
+  const schemasPending = schemaLoadingIds.length > 0 || Object.keys(schemaLoadErrors).length > 0;
+  const canSearch = Boolean(
+    !loading
+    && lookups
+    && !schemasPending
+    && fieldKey
+    && value.trim(),
+  );
 
   const handleSearch = useCallback(() => {
-    const validationErrors = validateSearch();
-    if (validationErrors.length > 0) {
-      setSearchError(validationErrors.join('\n'));
+    if (!fieldKey || !value.trim()) {
+      setSearchError('検索項目と値を指定してください。');
+      return;
+    }
+    if (schemaLoadingIds.length > 0 || Object.keys(schemaLoadErrors).length > 0) {
+      setSearchError('すべての検索スキーマを読み込んでから検索してください。');
       return;
     }
 
     setSearchError(null);
     setSubmittedSearch({
-      variant,
-      groups: cloneGroups(groups),
+      gameSoftwareMasterId: gameSoftwareMasterId ? Number(gameSoftwareMasterId) : null,
+      fieldKey,
+      value: value.trim(),
     });
-  }, [groups, validateSearch, variant]);
+  }, [fieldKey, gameSoftwareMasterId, schemaLoadErrors, schemaLoadingIds.length, value]);
 
-  const updateGroup = useCallback((groupId: string, updater: (group: SearchGroupFormState) => SearchGroupFormState) => {
-    setGroups((current) => current.map((group) => (group.id === groupId ? updater(group) : group)));
+  const handleReload = useCallback(() => {
+    schemaRequestGenerationRef.current += 1;
+    setSaveDataSchemas({});
+    setSchemaLoadErrors({});
+    setSchemaLoadingIds([]);
+    setSubmittedSearch(null);
+    void load();
+  }, [load]);
+
+  const handleRetrySchemas = useCallback(() => {
+    setSchemaLoadErrors({});
   }, []);
 
   return (
     <PageFrame
       eyebrowLabel=""
       title="セーブデータ検索"
-      description="複数の条件グループを組み合わせて、セーブデータを検索します。"
+      description="セーブデータのカスタム項目を1つ選び、所有データを横断して検索します。"
       layoutMode={layoutMode}
       navigationActiveHref="/game-library/save-data-search"
       stickyActions={(
-        <CustomButton variant="accent" onClick={handleSearch} disabled={schemaLoadingIds.length > 0}>
+        <CustomButton variant="accent" onClick={handleSearch} disabled={!canSearch}>
           検索
         </CustomButton>
       )}
@@ -365,304 +242,124 @@ export default function SaveDataSearchPage() {
         <div className="tool-page__notices">
           {isTrial ? <TrialBanner /> : null}
           {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
-          {searchError ? <CustomMessageArea variant="error" className="whitespace-pre-line">{searchError}</CustomMessageArea> : null}
+          {searchError ? <CustomMessageArea variant="error">{searchError}</CustomMessageArea> : null}
         </div>
       ) : null}
       {loading ? (
         <p className="tool-muted text-sm" role="status">検索対象を読み込んでいます...</p>
       ) : !lookups ? null : (
-          <>
-            <PageSection title="共通フィルタ">
-            <div className="tool-filter">
+        <>
+          <PageSection title="検索条件" description="テキスト項目は部分一致、数値・日付・選択肢は値で照合します。">
+            {schemaLoadingIds.length > 0 ? (
+              <p className="tool-muted text-sm" role="status">
+                {schemaLoadingIds.length} 件のスキーマを読み込んでいます...
+              </p>
+            ) : null}
+            {Object.keys(schemaLoadErrors).length > 0 ? (
+              <CustomMessageArea variant="error">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <span>一部のセーブデータスキーマを読み込めませんでした。完全な横断検索のため、再試行してください。</span>
+                  <CustomButton variant="ghost" onClick={handleRetrySchemas}>再試行</CustomButton>
+                </div>
+              </CustomMessageArea>
+            ) : null}
+            <div className="grid gap-4 lg:grid-cols-3">
               <div className="space-y-2">
-                <CustomLabel htmlFor="save-data-search-variant">共通フィルタ: variant</CustomLabel>
+                <CustomLabel htmlFor="save-data-search-master">ゲームソフトマスタ（任意）</CustomLabel>
                 <CustomComboBox
-                  id="save-data-search-variant"
-                  value={variant}
-                  onChange={(event) => setVariant(event.target.value)}
+                  id="save-data-search-master"
+                  value={gameSoftwareMasterId}
+                  onChange={(event) => setGameSoftwareMasterId(event.target.value)}
                 >
-                  {GAME_SOFTWARE_VARIANT_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
+                  <option value="">すべて</option>
+                  {lookups.gameSoftwareMasters.map((master) => (
+                    <option key={master.id} value={String(master.id)}>{master.abbreviation || master.name}</option>
                   ))}
                 </CustomComboBox>
               </div>
-              <p className="m-0 text-sm leading-6 text-[var(--color-text-muted)]">
-                variant は全条件グループへ AND で適用されます。条件グループ同士は OR、各グループ内はゲームソフトマスタ / 進行度 / schema 項目を AND で評価します。
-              </p>
-            </div>
-            </PageSection>
-
-            <PageSection
-              title="条件グループ"
-              description="異なるゲームソフトマスタをまたいだ OR 検索を定義できます。"
-              actions={(
-                <CustomButton onClick={() => setGroups((current) => [...current, createSearchGroup()])}>
-                  条件グループを追加
-                </CustomButton>
-              )}
-            >
-
-              {groups.map((group, index) => {
-                const selectedMasterId = Number(group.gameSoftwareMasterId);
-                const schema = Number.isInteger(selectedMasterId) && selectedMasterId > 0 ? saveDataSchemas[selectedMasterId] : undefined;
-                const storyProgressSchema = Number.isInteger(selectedMasterId) && selectedMasterId > 0 ? storyProgressSchemas[selectedMasterId] : undefined;
-                const schemaError = Number.isInteger(selectedMasterId) && selectedMasterId > 0 ? schemaLoadErrors[selectedMasterId] : undefined;
-                const schemaLoading = Number.isInteger(selectedMasterId) && selectedMasterId > 0 ? schemaLoadingIds.includes(selectedMasterId) : false;
-
-                return (
-                  <article key={group.id} className="space-y-4 border-l-4 border-[var(--color-accent-25)] py-1 pl-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h3 className="text-base font-semibold text-[var(--color-text-strong)]">条件グループ {index + 1}</h3>
-                        <p className="text-sm text-[var(--color-text-muted)]">このグループ内の条件はすべて AND で評価されます。</p>
-                      </div>
-                      {groups.length > 1 ? (
-                        <CustomButton
-                          variant="ghost"
-                          onClick={() => setGroups((current) => current.filter((item) => item.id !== group.id))}
-                        >
-                          このグループを削除
-                        </CustomButton>
-                      ) : null}
-                    </div>
-
-                    <div className="grid gap-4 lg:grid-cols-2">
-                      <div className="space-y-2">
-                        <CustomLabel htmlFor={`${group.id}-master`}>ゲームソフトマスタ</CustomLabel>
-                        <CustomComboBox
-                          id={`${group.id}-master`}
-                          value={group.gameSoftwareMasterId}
-                          onChange={(event) => updateGroup(group.id, () => ({
-                            ...group,
-                            gameSoftwareMasterId: event.target.value,
-                            storyProgressDefinitionId: '',
-                            fieldConditions: [],
-                          }))}
-                        >
-                          <option value="">選択してください</option>
-                          {lookups.gameSoftwareMasters.map((master) => (
-                            <option key={master.id} value={String(master.id)}>
-                              {master.name}
-                            </option>
-                          ))}
-                        </CustomComboBox>
-                      </div>
-                      <div className="space-y-2">
-                        <CustomLabel htmlFor={`${group.id}-story-progress`}>ストーリー進行度（任意）</CustomLabel>
-                        <CustomComboBox
-                          id={`${group.id}-story-progress`}
-                          value={group.storyProgressDefinitionId}
-                          onChange={(event) => updateGroup(group.id, (current) => ({ ...current, storyProgressDefinitionId: event.target.value }))}
-                          disabled={!group.gameSoftwareMasterId || schemaLoading || Boolean(schemaError)}
-                        >
-                          <option value="">すべて</option>
-                          {(storyProgressSchema?.choices ?? []).map((choice) => (
-                            <option key={choice.storyProgressDefinitionId} value={String(choice.storyProgressDefinitionId)} disabled={choice.isDisabled}>
-                              {choice.label}
-                            </option>
-                          ))}
-                        </CustomComboBox>
-                      </div>
-                    </div>
-
-                    {schemaLoading ? <CustomMessageArea variant="info">スキーマを読み込んでいます...</CustomMessageArea> : null}
-                    {schemaError ? (
-                      <CustomMessageArea variant="error">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <span>{schemaError}</span>
-                          <CustomButton
-                            variant="ghost"
-                            onClick={() => resetSchemaState(selectedMasterId)}
-                          >
-                            スキーマを再試行
-                          </CustomButton>
-                        </div>
-                      </CustomMessageArea>
-                    ) : null}
-
-                    <div className="space-y-3">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-[var(--color-text-strong)]">schema 条件</p>
-                          <p className="text-sm text-[var(--color-text-muted)]">0 件以上追加できます。</p>
-                        </div>
-                        <CustomButton
-                          disabled={!schema || schema.fields.filter((field) => !field.isDisabled).length === 0}
-                          onClick={() => updateGroup(group.id, (current) => ({
-                            ...current,
-                            fieldConditions: [...current.fieldConditions, createFieldCondition()],
-                          }))}
-                        >
-                          条件を追加
-                        </CustomButton>
-                      </div>
-
-                      {group.fieldConditions.length === 0 ? (
-                        <p className="text-sm text-[var(--color-text-muted)]">schema 条件なしでも検索できます。</p>
-                      ) : group.fieldConditions.map((condition) => {
-                        const selectedField = schema?.fields.find((field) => field.fieldKey === condition.fieldKey && !field.isDisabled);
-
-                        return (
-                          <div key={condition.id} className="grid gap-3 border-t border-[var(--color-base-70)] pt-3 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_auto] lg:items-end">
-                            <div className="space-y-2">
-                              <CustomLabel htmlFor={`${condition.id}-field`}>項目</CustomLabel>
-                              <CustomComboBox
-                                id={`${condition.id}-field`}
-                                value={condition.fieldKey}
-                                onChange={(event) => updateGroup(group.id, (current) => ({
-                                  ...current,
-                                  fieldConditions: current.fieldConditions.map((item) => (
-                                    item.id === condition.id
-                                      ? { ...item, fieldKey: event.target.value, value: '' }
-                                      : item
-                                  )),
-                                }))}
-                              >
-                                <option value="">選択してください</option>
-                                {(schema?.fields ?? []).filter((field) => !field.isDisabled).map((field) => (
-                                  <option key={field.fieldKey} value={field.fieldKey}>{field.label}</option>
-                                ))}
-                              </CustomComboBox>
-                            </div>
-                            <div className="space-y-2">
-                              <CustomLabel htmlFor={`${condition.id}-value`}>値</CustomLabel>
-                              {selectedField?.fieldType === 4 ? (
-                                <div className="flex items-center gap-3 rounded-[0.35rem] border border-[var(--color-base-70)] px-3 py-2">
-                                  <CustomCheckBox
-                                    checked={condition.value === 'true'}
-                                    onChange={(event) => updateGroup(group.id, (current) => ({
-                                      ...current,
-                                      fieldConditions: current.fieldConditions.map((item) => (
-                                        item.id === condition.id
-                                          ? { ...item, value: String(event.target.checked) }
-                                          : item
-                                      )),
-                                    }))}
-                                  />
-                                  <span className="text-sm text-[var(--foreground)]">はい</span>
-                                </div>
-                              ) : selectedField?.fieldType === 6 ? (
-                                <CustomComboBox
-                                  id={`${condition.id}-value`}
-                                  value={condition.value}
-                                  onChange={(event) => updateGroup(group.id, (current) => ({
-                                    ...current,
-                                    fieldConditions: current.fieldConditions.map((item) => (
-                                      item.id === condition.id
-                                        ? { ...item, value: event.target.value }
-                                        : item
-                                    )),
-                                  }))}
-                                >
-                                  <option value="">選択してください</option>
-                                  {selectedField.options.map((option) => (
-                                    <option key={option.optionKey} value={option.optionKey}>{option.label}</option>
-                                  ))}
-                                </CustomComboBox>
-                              ) : (
-                                <CustomTextBox
-                                  id={`${condition.id}-value`}
-                                  type={selectedField?.fieldType === 5 ? 'date' : selectedField?.fieldType === 2 || selectedField?.fieldType === 3 ? 'number' : 'text'}
-                                  step={selectedField?.fieldType === 3 ? 'any' : undefined}
-                                  value={condition.value}
-                                  onChange={(event) => updateGroup(group.id, (current) => ({
-                                    ...current,
-                                    fieldConditions: current.fieldConditions.map((item) => (
-                                      item.id === condition.id
-                                        ? { ...item, value: event.target.value }
-                                        : item
-                                    )),
-                                  }))}
-                                  placeholder={selectedField?.fieldType === 0 || selectedField?.fieldType === 1 ? '部分一致' : '一致条件'}
-                                />
-                              )}
-                            </div>
-                            <CustomButton
-                              variant="ghost"
-                              onClick={() => updateGroup(group.id, (current) => ({
-                                ...current,
-                                fieldConditions: current.fieldConditions.filter((item) => item.id !== condition.id),
-                              }))}
-                            >
-                              条件を削除
-                            </CustomButton>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </article>
-                );
-              })}
-            </PageSection>
-
-            <PageSection
-              title="検索結果"
-              description={submittedSearch ? `${results.length} 件ヒットしました。` : '条件を入力して検索してください。'}
-              actions={submittedSearch ? (
-                <span className="text-sm text-[var(--color-text-muted)]">
-                  共通 variant: {GAME_SOFTWARE_VARIANT_OPTIONS.find((option) => option.value === submittedSearch.variant)?.label ?? 'すべて'}
-                </span>
-              ) : null}
-            >
-
-              {submittedSearch && results.length === 0 ? (
-                <p className="text-sm text-[var(--color-text-muted)]">一致するセーブデータはありませんでした。</p>
-              ) : null}
-
-              <div className="space-y-3">
-                {submittedSearch ? results.map((result) => {
-                  const schema = saveDataSchemas[result.saveData.gameSoftwareMasterId];
-                  const storyProgressSchema = storyProgressSchemas[result.saveData.gameSoftwareMasterId];
-                  const matchedSummary = result.matchedGroupIndexes.map((groupIndex) => buildSubmittedGroupSummary(
-                    submittedSearch.groups[groupIndex]!,
-                    schema,
-                    storyProgressSchema,
-                    lookups,
-                  ));
-
-                  return (
-                    <article key={result.saveData.id} className="space-y-3 rounded-[0.35rem] border border-[var(--color-base-70)] bg-white p-4">
-                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div className="space-y-2">
-                          <p className="text-base font-semibold text-[var(--color-text-strong)]">
-                            SaveData #{result.saveData.id} / {getGameSoftwareMasterName(result.saveData.gameSoftwareMasterId, lookups)}
-                          </p>
-                          <p className="text-sm text-[var(--color-text-muted)]">
-                            保存方式: {formatSaveStorageType(result.saveData.saveStorageType)} / 保存先: {getStorageSummary(result.saveData, lookups) || '未設定'}
-                          </p>
-                          <p className="text-sm text-[var(--color-text-muted)]">
-                            進行度: {result.saveData.storyProgressDefinitionId
-                              ? storyProgressSchema?.choices.find((choice) => choice.storyProgressDefinitionId === result.saveData.storyProgressDefinitionId)?.label ?? `#${result.saveData.storyProgressDefinitionId}`
-                              : '未設定'}
-                          </p>
-                          {result.saveData.memo ? (
-                            <p className="text-sm leading-6 text-[var(--color-text-muted)]">{result.saveData.memo}</p>
-                          ) : null}
-                        </div>
-                        <CustomButton
-                          variant="neutral"
-                          onClick={() => {
-                            setPageMode('view');
-                            setEditorRecordId(result.saveData.id);
-                          }}
-                        >
-                          詳細を見る
-                        </CustomButton>
-                      </div>
-                      <div className="border-t border-[var(--color-base-70)] pt-3 text-sm text-[var(--color-text-muted)]">
-                        <p className="m-0 font-semibold text-[var(--color-text-strong)]">一致条件</p>
-                        <ul className="mt-2 space-y-1">
-                          {matchedSummary.map((summary, index) => (
-                            <li key={`${result.saveData.id}-${index}`}>- {summary}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </article>
-                  );
-                }) : null}
+              <div className="space-y-2">
+                <CustomLabel htmlFor="save-data-search-field">カスタム項目</CustomLabel>
+                <CustomComboBox
+                  id="save-data-search-field"
+                  value={fieldKey}
+                  onChange={(event) => {
+                    setFieldKey(event.target.value);
+                    setSubmittedSearch(null);
+                  }}
+                  disabled={searchableFields.length === 0 || schemaLoadingIds.length > 0}
+                >
+                  <option value="">項目を選択</option>
+                  {searchableFields.map((field) => (
+                    <option key={field.fieldKey} value={field.fieldKey}>
+                      {field.label}（{field.availableIn}作品）
+                    </option>
+                  ))}
+                </CustomComboBox>
               </div>
-            </PageSection>
-          </>
+              <div className="space-y-2">
+                <CustomLabel htmlFor="save-data-search-value">値</CustomLabel>
+                <CustomTextBox
+                  id="save-data-search-value"
+                  value={value}
+                  onChange={(event) => {
+                    setValue(event.target.value);
+                    setSubmittedSearch(null);
+                  }}
+                  placeholder="例: oza"
+                  disabled={!fieldKey || schemaLoadingIds.length > 0}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && canSearch) {
+                      handleSearch();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            {searchableFields.length === 0 && schemaLoadingIds.length === 0 && Object.keys(schemaLoadErrors).length === 0 ? (
+              <p className="text-sm text-[var(--color-text-muted)]">検索できるカスタム項目がありません。</p>
+            ) : null}
+          </PageSection>
+
+          <PageSection
+            title="検索結果"
+            description={submittedSearch ? `${results.length} 件ヒットしました。` : '条件を入力して検索してください。'}
+          >
+            {submittedSearch && results.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-muted)]">一致するセーブデータはありませんでした。</p>
+            ) : null}
+            <div className="space-y-3">
+              {submittedSearch ? results.map((result) => (
+                <article key={result.saveData.id} className="space-y-3 rounded-[0.35rem] border border-[var(--color-base-70)] bg-white p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="space-y-2">
+                      <p className="text-base font-semibold text-[var(--color-text-strong)]">
+                        セーブデータ #{result.saveData.id} — {getMasterDisplayName(result.saveData.gameSoftwareMasterId, lookups)}
+                      </p>
+                      <p className="text-sm text-[var(--color-text-muted)]">
+                        保存方式: {formatSaveStorageType(result.saveData.saveStorageType)}
+                      </p>
+                      <p className="text-sm text-[var(--color-text-muted)]">
+                        保存先: {getStorageSummary(result.saveData, lookups) || '未設定'}
+                      </p>
+                      <p className="text-sm text-[var(--color-text-muted)]">
+                        {searchableFields.find((field) => field.fieldKey === submittedSearch.fieldKey)?.label ?? submittedSearch.fieldKey}: {result.matchedFieldValue}
+                      </p>
+                    </div>
+                    <CustomButton
+                      variant="neutral"
+                      onClick={() => {
+                        setPageMode('view');
+                        setEditorRecordId(result.saveData.id);
+                      }}
+                    >
+                      詳細
+                    </CustomButton>
+                  </div>
+                </article>
+              )) : null}
+            </div>
+          </PageSection>
+        </>
       )}
       {lookups && editorRecordId != null ? (
         <EditorDialog

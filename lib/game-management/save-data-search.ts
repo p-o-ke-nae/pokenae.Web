@@ -1,152 +1,97 @@
-import { mergeSchemaWithSaveData } from './save-data-fields';
+import { formatMergedFieldValue, mergeSchemaWithSaveData } from './save-data-fields';
 import type {
-  GameSoftwareVariant,
   ManagementLookups,
   SaveDataDto,
-  SaveDataFieldType,
   SaveDataSchemaDto,
 } from './types';
 
-export const GAME_SOFTWARE_VARIANT_OPTIONS = [
-  { value: '', label: 'すべて' },
-  { value: '0', label: 'パッケージ版' },
-  { value: '1', label: 'ダウンロード版' },
-] as const;
-
-export type SaveDataSearchFieldCondition = {
+export type SaveDataSearchCriteria = {
+  gameSoftwareMasterId: number | null;
   fieldKey: string;
   value: string;
 };
 
-export type SaveDataSearchGroup = {
-  gameSoftwareMasterId: number;
-  storyProgressDefinitionId?: number | null;
-  fieldConditions: SaveDataSearchFieldCondition[];
-};
-
-export type SaveDataSearchCriteria = {
-  variant?: GameSoftwareVariant | null;
-  groups: SaveDataSearchGroup[];
+export type SaveDataSearchFieldOption = {
+  fieldKey: string;
+  label: string;
+  availableIn: number;
 };
 
 export type SaveDataSearchMatch = {
   saveData: SaveDataDto;
-  matchedGroupIndexes: number[];
+  matchedFieldValue: string;
 };
 
 function normalizeText(value: string): string {
   return value.trim().toLocaleLowerCase('ja');
 }
 
-function parseNumericValue(value: string | null): number | null {
-  if (value == null || value.trim().length === 0) {
-    return null;
-  }
-
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function matchesFieldConditionByType(
-  fieldType: SaveDataFieldType,
-  actualValue: string | null,
+function fieldValueMatches(
+  saveData: SaveDataDto,
+  schema: SaveDataSchemaDto | undefined,
+  fieldKey: string,
   expectedValue: string,
 ): boolean {
-  const normalizedExpected = expectedValue.trim();
+  if (!schema || !expectedValue.trim()) {
+    return false;
+  }
 
-  switch (fieldType) {
+  const field = mergeSchemaWithSaveData(schema, saveData)
+    .find((item) => item.fieldKey === fieldKey && !item.isDisabled);
+  if (!field) {
+    return false;
+  }
+
+  const expected = expectedValue.trim();
+  switch (field.fieldType) {
     case 0:
     case 1:
-      return normalizeText(actualValue ?? '').includes(normalizeText(normalizedExpected));
-    case 2: {
-      const actualNumber = parseNumericValue(actualValue);
-      const expectedNumber = parseNumericValue(normalizedExpected);
-      return actualNumber != null
-        && expectedNumber != null
-        && Number.isInteger(actualNumber)
-        && Number.isInteger(expectedNumber)
-        && actualNumber === expectedNumber;
-    }
-    case 3: {
-      const actualNumber = parseNumericValue(actualValue);
-      const expectedNumber = parseNumericValue(normalizedExpected);
-      return actualNumber != null && expectedNumber != null && actualNumber === expectedNumber;
-    }
+      return normalizeText(field.stringValue ?? '').includes(normalizeText(expected));
+    case 2:
+      return field.intValue != null && Number(expected) === field.intValue;
+    case 3:
+      return field.decimalValue != null && Number(expected) === field.decimalValue;
     case 4:
-      return (actualValue ?? 'false') === normalizedExpected;
+      return String(field.boolValue ?? false) === (expected === 'はい' ? 'true' : expected === 'いいえ' ? 'false' : expected);
+    case 6: {
+      const selectedKey = field.selectedOptionKey ?? '';
+      const selectedLabel = schema.fields
+        .find((definition) => definition.fieldKey === fieldKey)
+        ?.options.find((option) => option.optionKey === selectedKey)?.label;
+      return selectedKey === expected || (selectedLabel != null && normalizeText(selectedLabel) === normalizeText(expected));
+    }
     default:
-      return (actualValue ?? '') === normalizedExpected;
+      return (field.dateValue ?? '') === expected;
   }
 }
 
-export function getSaveDataVariant(
-  saveData: SaveDataDto,
-  lookups: Pick<ManagementLookups, 'gameSoftwares'>,
-): GameSoftwareVariant | null {
-  if (!saveData.gameSoftwareId) {
-    return null;
-  }
-
-  return lookups.gameSoftwares.find((item) => item.id === saveData.gameSoftwareId)?.variant ?? null;
-}
-
-export function matchesSaveDataSearchGroup(
-  saveData: SaveDataDto,
-  group: SaveDataSearchGroup,
-  schema: SaveDataSchemaDto | null | undefined,
-): boolean {
-  if (saveData.gameSoftwareMasterId !== group.gameSoftwareMasterId) {
-    return false;
-  }
-
-  if (group.storyProgressDefinitionId != null && saveData.storyProgressDefinitionId !== group.storyProgressDefinitionId) {
-    return false;
-  }
-
-  if (group.fieldConditions.length === 0) {
-    return true;
-  }
-
-  if (!schema) {
-    return false;
-  }
-
-  const mergedFields = mergeSchemaWithSaveData(schema, saveData);
-
-  return group.fieldConditions.every((condition) => {
-    const field = mergedFields.find((item) => item.fieldKey === condition.fieldKey && !item.isDisabled);
-    if (!field) {
-      return false;
-    }
-
-    let actualValue: string | null;
-    switch (field.fieldType) {
-      case 0:
-      case 1:
-        actualValue = field.stringValue;
-        break;
-      case 2:
-        actualValue = field.intValue == null ? null : String(field.intValue);
-        break;
-      case 3:
-        actualValue = field.decimalValue == null ? null : String(field.decimalValue);
-        break;
-      case 4:
-        actualValue = String(field.boolValue ?? false);
-        break;
-      case 5:
-        actualValue = field.dateValue;
-        break;
-      case 6:
-        actualValue = field.selectedOptionKey;
-        break;
-      default:
-        actualValue = null;
-        break;
-    }
-
-    return matchesFieldConditionByType(field.fieldType, actualValue, condition.value);
+export function getSaveDataSearchFields(
+  schemaMap: Record<number, SaveDataSchemaDto>,
+): SaveDataSearchFieldOption[] {
+  const fields = new Map<string, SaveDataSearchFieldOption>();
+  Object.values(schemaMap).forEach((schema) => {
+    const seenInSchema = new Set<string>();
+    schema.fields.filter((field) => !field.isDisabled).forEach((field) => {
+      if (seenInSchema.has(field.fieldKey)) {
+        return;
+      }
+      seenInSchema.add(field.fieldKey);
+      const existing = fields.get(field.fieldKey);
+      if (existing) {
+        existing.availableIn += 1;
+      } else {
+        fields.set(field.fieldKey, {
+          fieldKey: field.fieldKey,
+          label: field.label,
+          availableIn: 1,
+        });
+      }
+    });
   });
+
+  return Array.from(fields.values()).sort((left, right) => (
+    left.label.localeCompare(right.label, 'ja') || left.fieldKey.localeCompare(right.fieldKey)
+  ));
 }
 
 export function evaluateSaveDataSearch(
@@ -154,33 +99,28 @@ export function evaluateSaveDataSearch(
   schemaMap: Record<number, SaveDataSchemaDto>,
   criteria: SaveDataSearchCriteria,
 ): SaveDataSearchMatch[] {
-  if (criteria.groups.length === 0) {
+  if (!criteria.fieldKey || !criteria.value.trim()) {
     return [];
   }
 
   return lookups.saveDatas
+    .filter((saveData) => (
+      (criteria.gameSoftwareMasterId == null || saveData.gameSoftwareMasterId === criteria.gameSoftwareMasterId)
+      && fieldValueMatches(
+        saveData,
+        schemaMap[saveData.gameSoftwareMasterId],
+        criteria.fieldKey,
+        criteria.value,
+      )
+    ))
     .map((saveData) => {
-      if (criteria.variant != null && getSaveDataVariant(saveData, lookups) !== criteria.variant) {
-        return null;
-      }
-
-      const matchedGroupIndexes = criteria.groups.reduce<number[]>((result, group, index) => {
-        if (matchesSaveDataSearchGroup(saveData, group, schemaMap[group.gameSoftwareMasterId])) {
-          result.push(index);
-        }
-        return result;
-      }, []);
-
-      if (matchedGroupIndexes.length === 0) {
-        return null;
-      }
-
+      const field = mergeSchemaWithSaveData(schemaMap[saveData.gameSoftwareMasterId], saveData)
+        .find((item) => item.fieldKey === criteria.fieldKey && !item.isDisabled);
       return {
         saveData,
-        matchedGroupIndexes,
-      } satisfies SaveDataSearchMatch;
+        matchedFieldValue: field ? formatMergedFieldValue(field) : '',
+      };
     })
-    .filter((item): item is SaveDataSearchMatch => item !== null)
     .sort((left, right) => (
       left.saveData.displayOrder - right.saveData.displayOrder
       || left.saveData.id - right.saveData.id

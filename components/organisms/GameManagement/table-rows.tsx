@@ -1,6 +1,6 @@
 import { formatSaveStorageType } from '@/lib/game-management/save-storage-type';
 import { formatMergedFieldValue, formatSaveDataFieldValueForList, mergeSchemaWithSaveData } from '@/lib/game-management/save-data-fields';
-import { buildMaintenanceSummaryText } from '@/lib/game-management/maintenance';
+import { getMaintenanceHealthStatusLabel } from '@/lib/game-management/maintenance';
 import {
   formatDeletedState,
   getAccountDisplay,
@@ -10,7 +10,6 @@ import {
   getGameConsoleMasterName,
   getGameSoftwareContentGroupName,
   getGameSoftwareDisplay,
-  getGameSoftwareMasterName,
   getMemoryCardDisplay,
   getMemoryCardEditionMasterName,
   getSaveDataGameSoftwareMasterId,
@@ -82,10 +81,40 @@ const GAME_SOFTWARE_CONTENT_GROUP_TABLE_COLUMNS: DataTableColumn<ManagementTable
   },
 ];
 
+const GAME_CONSOLE_TABLE_COLUMNS: DataTableColumn<ManagementTableRow>[] = [
+  { key: 'primary', header: '名称', sortable: true, filterable: true, width: '14rem' },
+  { key: 'maintenance', header: 'メンテナンス', sortable: true, filterable: true, filterMode: 'select', width: '9rem' },
+  { key: 'memo', header: 'メモ', filterable: true },
+  { key: 'edit', header: '操作', width: '7rem' },
+];
+
+const GAME_SOFTWARE_TABLE_COLUMNS: DataTableColumn<ManagementTableRow>[] = [
+  { key: 'primary', header: '名称', sortable: true, filterable: true, width: '14rem' },
+  { key: 'maintenance', header: 'メンテナンス', sortable: true, filterable: true, filterMode: 'select', width: '9rem' },
+  { key: 'variant', header: '種類', sortable: true, filterable: true, filterMode: 'select', width: '9rem' },
+  { key: 'memo', header: 'メモ', filterable: true },
+  { key: 'edit', header: '操作', width: '7rem' },
+];
+
+const ACCOUNT_TABLE_COLUMNS: DataTableColumn<ManagementTableRow>[] = [
+  { key: 'primary', header: '名称', sortable: true, filterable: true, width: '14rem' },
+  { key: 'relation', header: 'アカウント種類', filterable: true, filterMode: 'select', width: '10rem' },
+  { key: 'note', header: 'メモ', filterable: true },
+  { key: 'status', header: '状態', width: '9rem', sortable: true, filterable: true, filterMode: 'select' },
+  { key: 'edit', header: '操作', width: '7rem' },
+];
+
+const MEMORY_CARD_TABLE_COLUMNS: DataTableColumn<ManagementTableRow>[] = [
+  { key: 'primary', header: '名称', sortable: true, filterable: true, width: '14rem' },
+  { key: 'relation', header: '種類', filterable: true, filterMode: 'select', width: '10rem' },
+  { key: 'maintenance', header: 'メンテナンス', sortable: true, filterable: true, filterMode: 'select', width: '9rem' },
+  { key: 'memo', header: 'メモ', filterable: true },
+  { key: 'edit', header: '操作', width: '7rem' },
+];
+
 const SAVE_DATA_TABLE_COLUMNS: DataTableColumn<ManagementTableRow>[] = [
-  { key: 'hard', header: 'ハード', sortable: true, filterable: true, filterMode: 'select', width: '7rem' },
-  { key: 'name', header: '名称', sortable: true, filterable: true, width: '8rem' },
-  { key: 'save', header: '保存', sortable: true, filterable: true, width: '24rem' },
+  { key: 'title', header: 'タイトル', sortable: true, filterable: true, width: '12rem' },
+  { key: 'save', header: '保存先', sortable: true, filterable: true, width: '24rem' },
   { key: 'storyProgress', header: 'ストーリー進行度', sortable: true, filterable: true, filterMode: 'select', width: '12rem' },
   { key: 'operation', header: '操作', width: '4.5rem' },
   { key: 'edit', header: '編集', width: '6rem' },
@@ -98,18 +127,6 @@ const GAME_SOFTWARE_MASTER_CHILD_TABLE_COLUMNS: DataTableColumn<ManagementTableR
   { key: 'status', header: '状態', sortable: true, filterable: true, filterMode: 'select', width: '8rem' },
   { key: 'edit', header: '操作', width: '9rem' },
 ];
-
-function getGameConsoleCategoryAbbreviation(
-  gameConsoleCategoryId: number | null | undefined,
-  lookups: ManagementLookups,
-): string {
-  if (!gameConsoleCategoryId) {
-    return '未設定';
-  }
-
-  const category = lookups.gameConsoleCategories.find((item) => item.id === gameConsoleCategoryId);
-  return category?.abbreviation || category?.name || `#${gameConsoleCategoryId}`;
-}
 
 function getSaveDataStorageParts(item: ManagementLookups['saveDatas'][number], lookups: ManagementLookups): string[] {
   switch (item.saveStorageType) {
@@ -171,6 +188,19 @@ function formatSaveDataDynamicFieldValue(
 export function getTableColumns(resourceKey: ResourceKey): DataTableColumn<ManagementTableRow>[] {
   if (resourceKey === 'save-datas') {
     return SAVE_DATA_TABLE_COLUMNS;
+  }
+
+  if (resourceKey === 'game-consoles') {
+    return GAME_CONSOLE_TABLE_COLUMNS;
+  }
+  if (resourceKey === 'game-softwares') {
+    return GAME_SOFTWARE_TABLE_COLUMNS;
+  }
+  if (resourceKey === 'accounts') {
+    return ACCOUNT_TABLE_COLUMNS;
+  }
+  if (resourceKey === 'memory-cards') {
+    return MEMORY_CARD_TABLE_COLUMNS;
   }
 
   if (resourceKey === 'game-software-content-groups') {
@@ -237,16 +267,21 @@ export function buildTableRows(
         edit: '編集',
       }));
     case 'game-consoles':
-      return lookups.gameConsoles.map((item) => ({
-        tableRowKey: createTableRowKey(resourceKey, item.id),
-        id: item.id,
-        displayOrder: item.displayOrder,
-        primary: getGameConsoleDisplay(item, lookups),
-        relation: getGameConsoleMasterName(item.gameConsoleMasterId, lookups),
-        note: [buildMaintenanceSummaryText(item.maintenance), item.memo].filter(Boolean).join(' / '),
-        status: formatDeletedState(item.isDeleted),
-        edit: '編集',
-      }));
+      return lookups.gameConsoles.map((item) => {
+        const master = lookups.gameConsoleMasters.find((candidate) => candidate.id === item.gameConsoleMasterId);
+        const edition = item.gameConsoleEditionMasterId
+          ? lookups.gameConsoleEditionMasters.find((candidate) => candidate.id === item.gameConsoleEditionMasterId)
+          : null;
+        return {
+          tableRowKey: createTableRowKey(resourceKey, item.id),
+          id: item.id,
+          displayOrder: item.displayOrder,
+          primary: [master?.abbreviation || master?.name, edition?.abbreviation || edition?.name, item.label].filter(Boolean).join(' '),
+          maintenance: item.maintenance.hasRecord ? getMaintenanceHealthStatusLabel(item.maintenance.latestHealthStatus) : '記録なし',
+          memo: item.memo ?? '',
+          edit: '編集',
+        };
+      });
     case 'game-console-edition-masters':
       return lookups.gameConsoleEditionMasters.map((item) => ({
         tableRowKey: createTableRowKey(resourceKey, item.id),
@@ -287,26 +322,15 @@ export function buildTableRows(
       }));
     case 'game-softwares':
       return lookups.gameSoftwares.map((item) => {
-        const noteParts: string[] = [];
-        if (item.variant != null) {
-          noteParts.push(`種類: ${item.variant === 0 ? 'パッケージ版' : 'ダウンロード版'}`);
-        }
-        if (item.variant === 1) {
-          const account = item.accountId != null ? lookups.accounts.find((a) => a.id === item.accountId) : undefined;
-          if (account) noteParts.push(`アカウント: ${getAccountDisplay(account, lookups)}`);
-          const console = item.installedGameConsoleId != null ? lookups.gameConsoles.find((c) => c.id === item.installedGameConsoleId) : undefined;
-          if (console) noteParts.push(`インストール先: ${getGameConsoleDisplay(console, lookups)}`);
-        }
-        noteParts.unshift(buildMaintenanceSummaryText(item.maintenance));
-        if (item.memo) noteParts.push(item.memo);
+        const master = lookups.gameSoftwareMasters.find((candidate) => candidate.id === item.gameSoftwareMasterId);
         return {
           tableRowKey: createTableRowKey(resourceKey, item.id),
           id: item.id,
           displayOrder: item.displayOrder,
-          primary: getGameSoftwareDisplay(item, lookups),
-          relation: getGameSoftwareMasterName(item.gameSoftwareMasterId, lookups),
-          note: noteParts.join(' / '),
-          status: formatDeletedState(item.isDeleted),
+          primary: [master?.abbreviation || master?.name, item.label].filter(Boolean).join(' '),
+          maintenance: item.maintenance.hasRecord ? getMaintenanceHealthStatusLabel(item.maintenance.latestHealthStatus) : '記録なし',
+          variant: item.variant === 0 ? 'パッケージ' : item.variant === 1 ? 'ダウンロード' : '未設定',
+          memo: item.memo ?? '',
           edit: '編集',
         };
       });
@@ -317,8 +341,8 @@ export function buildTableRows(
         displayOrder: item.displayOrder,
         primary: item.label || `MemoryCard #${item.id}`,
         relation: getMemoryCardEditionMasterName(item.memoryCardEditionMasterId, lookups),
-        note: [buildMaintenanceSummaryText(item.maintenance), item.memo].filter(Boolean).join(' / '),
-        status: formatDeletedState(item.isDeleted),
+        maintenance: item.maintenance.hasRecord ? getMaintenanceHealthStatusLabel(item.maintenance.latestHealthStatus) : '記録なし',
+        memo: item.memo ?? '',
         edit: '詳細',
       }));
     case 'memory-card-edition-masters':
@@ -350,9 +374,8 @@ export function buildTableRows(
           tableRowKey: createTableRowKey(resourceKey, item.id),
           id: item.id,
           displayOrder: item.displayOrder,
-          hard: getGameConsoleCategoryAbbreviation(master?.gameConsoleCategoryId, lookups),
-          name: master?.abbreviation || master?.name || '未設定',
-          save: storageParts.join('-'),
+          title: master?.abbreviation || master?.name || '未設定',
+          save: storageParts.join(' '),
           storyProgress: item.storyProgressDefinitionId
             ? (getStoryProgressLabel(masterId, item.storyProgressDefinitionId, storyProgressLabels) ?? '')
             : '',

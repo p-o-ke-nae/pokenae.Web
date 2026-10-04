@@ -238,7 +238,7 @@ test.describe("ゲームライブラリ UI", () => {
 
     await page.goto("/game-library/save-data-search");
     await expect(page.getByText("Game Library", { exact: true })).toHaveCount(0);
-    await expect(page.getByRole("heading", { level: 2, name: "条件グループ" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "検索条件" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "検索結果" })).toBeVisible();
     await expect(page.getByRole("link", { name: "戻る" })).toHaveAttribute("href", "/game-library");
     await expectUnboxedSections(page);
@@ -257,25 +257,61 @@ test.describe("ゲームライブラリ UI", () => {
     await expectFooterLayout(dialog, isMobile, "保存", false);
   });
 
-  test("横断セーブ検索のスキーマ読込が完了する", async ({ page }) => {
+  test("1つのカスタム項目で全セーブデータを横断検索できる", async ({ page }) => {
+    await page.addInitScript(() => {
+      const createSave = (id: number, masterId: number, trainerName: string) => ({
+        id,
+        ownerGoogleUserId: "trial-user",
+        displayOrder: id,
+        memo: null,
+        replacedBySaveDataId: null,
+        saveStorageType: 0,
+        gameSoftwareMasterId: masterId,
+        gameSoftwareId: null,
+        gameConsoleId: null,
+        accountId: null,
+        memoryCardId: null,
+        storyProgressDefinitionId: null,
+        extendedFields: [{
+          fieldKey: "trainer-name",
+          label: "主人公名",
+          fieldType: 0,
+          isRequired: false,
+          displayOrder: 1,
+          stringValue: trainerName,
+          intValue: null,
+          decimalValue: null,
+          boolValue: null,
+          dateValue: null,
+          selectedOptionKey: null,
+        }],
+        isDeleted: false,
+        deleteReason: null,
+      });
+      localStorage.setItem("pokenae_trial_v1:save-datas", JSON.stringify([
+        createSave(1, 100, "ピカ"),
+        createSave(2, 200, "Oza"),
+      ]));
+    });
     const schemaRequests: string[] = [];
     await page.route("**/api/public/**", async (route) => {
       const path = new URL(route.request().url()).pathname.replace("/api/public/", "");
       let data: unknown[] | Record<string, unknown> = [];
       if (path === "game-software-masters") {
-        data = [{
-          id: 100,
-          name: "テストソフト",
-          abbreviation: "TEST",
+        data = [100, 200].map((id) => ({
+          id,
+          name: `テストソフト${id}`,
+          abbreviation: `TEST${id}`,
           gameConsoleCategoryId: 1,
           contentGroupId: 10,
-          displayOrder: 1,
+          displayOrder: id,
           isDeleted: false,
-        }];
-      } else if (path === "game-software-masters/100/save-data-schema") {
+        }));
+      } else if (path === "game-software-masters/100/save-data-schema" || path === "game-software-masters/200/save-data-schema") {
         schemaRequests.push(path);
+        const gameSoftwareMasterId = Number(path.split("/")[1]);
         data = {
-          gameSoftwareMasterId: 100,
+          gameSoftwareMasterId,
           contentGroupId: 10,
           fields: [{
             fieldKey: "trainer-name",
@@ -288,19 +324,21 @@ test.describe("ゲームライブラリ UI", () => {
             options: [],
           }],
         };
-      } else if (path === "game-software-masters/100/story-progress-schema") {
-        schemaRequests.push(path);
-        data = { gameSoftwareMasterId: 100, contentGroupId: 10, choices: [] };
       }
 
       await route.fulfill({ status: 200, contentType: "application/json", json: { success: true, data } });
     });
 
     await page.goto("/game-library/save-data-search");
-    await page.getByLabel("ゲームソフトマスタ").selectOption("100");
-    await expect(page.getByRole("button", { name: "条件を追加" })).toBeEnabled();
     await expect.poll(() => schemaRequests.length).toBe(2);
-    await expect(page.getByText("スキーマを読み込んでいます...")).toHaveCount(0);
+    await page.getByLabel("カスタム項目").selectOption("trainer-name");
+    await page.getByLabel("値").fill("oza");
+    await page.getByRole("button", { name: "検索", exact: true }).click();
+    await expect(page.getByText(/セーブデータ #2/)).toBeVisible();
+    await expect(page.getByText(/セーブデータ #1/)).toHaveCount(0);
+    await page.getByLabel("ゲームソフトマスタ（任意）").selectOption("100");
+    await page.getByRole("button", { name: "検索", exact: true }).click();
+    await expect(page.getByText("一致するセーブデータはありませんでした。")).toBeVisible();
   });
 
   test("ネストしたメンテナンス画面を閉じても親の詳細は開いたまま", async ({ page }) => {
@@ -329,6 +367,10 @@ test.describe("ゲームライブラリ UI", () => {
     await page.getByRole("button", { name: "編集" }).first().click();
     const parentDialog = page.getByRole("dialog", { name: "ゲーム機詳細" });
     await expect(parentDialog).toBeVisible();
+    const navigationRow = parentDialog.locator(".dialog-footer-layout__leading .dialog-footer-layout__row");
+    await expect(navigationRow).toContainText("1 / 1");
+    await expect(navigationRow.getByRole("button", { name: "前へ" })).toBeDisabled();
+    await expect(navigationRow.getByRole("button", { name: "次へ" })).toBeDisabled();
     await parentDialog.getByRole("button", { name: "メンテナンス" }).click();
     const maintenanceDialog = page.getByRole("dialog", { name: "ゲーム機のメンテナンス" });
     await expect(maintenanceDialog).toBeVisible();

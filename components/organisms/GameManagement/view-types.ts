@@ -12,7 +12,12 @@ export type ManagementTableRow = {
   gameSoftwareCount?: number;
   hard?: string;
   name?: string;
+  title?: string;
   save?: string;
+  maintenance?: string;
+  variant?: string;
+  memo?: string;
+  accountType?: string;
   gameSoftware?: string;
   storyProgress?: string;
   operation?: string;

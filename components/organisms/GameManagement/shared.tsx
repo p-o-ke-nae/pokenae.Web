@@ -34,13 +34,14 @@ import { shouldRenderSelectPlaceholder } from './select-utils';
 import { RESOURCE_DEFINITIONS, USER_RESOURCE_ORDER } from '@/lib/game-management/resources';
 
 const GAME_LIBRARY_NAVIGATION_ITEMS = [
-  { href: '/game-library', label: 'ダッシュボード' },
+  { href: '/game-library', label: 'ダッシュボード', description: 'ライブラリ全体の概要' },
   ...USER_RESOURCE_ORDER.map((key) => ({
     href: `/game-library/${key}`,
     label: RESOURCE_DEFINITIONS[key].shortLabel,
+    description: RESOURCE_DEFINITIONS[key].description,
   })),
-  { href: '/game-library/maintenance', label: 'メンテナンス' },
-  { href: '/game-library/save-data-search', label: 'セーブ検索' },
+  { href: '/game-library/maintenance', label: 'メンテナンス', description: '状態確認と記録' },
+  { href: '/game-library/save-data-search', label: 'セーブ検索', description: '全セーブデータから検索' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -178,7 +179,8 @@ export function PageFrame({
                 href={item.href}
                 aria-current={item.href === navigationActiveHref ? 'page' : undefined}
               >
-                {item.label}
+                <span className="game-library-navigation__label">{item.label}</span>
+                <span className="game-library-navigation__description">{item.description}</span>
               </Link>
             ))}
           </nav>
@@ -194,29 +196,48 @@ export function PageFrame({
         <style jsx>{`
           .game-library-navigation {
             display: flex;
-            gap: 0.5rem;
+            gap: 0.625rem;
             margin-top: 1rem;
             overflow-x: auto;
-            padding: 0.125rem 0 0.5rem;
+            padding: 0.25rem 0.125rem 0.625rem;
             scrollbar-width: thin;
             -webkit-overflow-scrolling: touch;
           }
 
           .game-library-navigation a {
-            flex: 0 0 auto;
+            display: flex;
+            flex: 0 0 11rem;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0.2rem;
+            min-height: 4.25rem;
             border: 1px solid var(--color-base-70-dark);
-            border-radius: 999px;
-            padding: 0.375rem 0.75rem;
+            border-radius: 0.75rem;
+            padding: 0.625rem 0.75rem;
             color: var(--color-text-strong);
-            font-size: 0.8125rem;
             text-decoration: none;
-            white-space: nowrap;
+            background: color-mix(in srgb, white 82%, var(--color-base-70));
           }
 
           .game-library-navigation a[aria-current='page'] {
             border-color: var(--color-accent-25);
-            background: color-mix(in srgb, var(--color-accent-25) 12%, white);
+            background: color-mix(in srgb, var(--color-accent-25) 10%, white);
+            box-shadow: inset 0 0 0 1px var(--color-accent-25);
+          }
+
+          .game-library-navigation__label {
+            font-size: 0.875rem;
             font-weight: 700;
+            white-space: nowrap;
+          }
+
+          .game-library-navigation__description {
+            overflow: hidden;
+            color: var(--color-text-muted);
+            font-size: 0.6875rem;
+            line-height: 1.35;
+            text-overflow: ellipsis;
+            white-space: nowrap;
           }
 
           .game-library-navigation a:focus-visible {
