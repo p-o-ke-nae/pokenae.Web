@@ -92,15 +92,16 @@ Variables、認証情報は Secrets に同じキー名で登録します。
 Web 経由で本番 game-library API へ到達できることを検証します（API はゼロスケールのためリトライ付き）。
 
 ACA の min replicas 0 構成では、コールドスタート中に game-library API が一時的に
-502/503/504 またはタイムアウトを返すことがあります。Next.js 側は GET のみ最大
-90 秒の範囲で再試行し、復帰待ちの最終応答は `API_STARTING`（503）として返します。
-VPS のリバースプロキシは Next.js の待機時間より短く切らないよう、少なくとも次を
-設定してください。
+502/503/504 またはタイムアウトを返すことがあります。Next.js 側は 1 リクエストあたり
+最大 45 秒の範囲で GET のみ再試行し、復帰待ちの最終応答は `API_STARTING`（503）として返します。
+そのため nginx の既定 `proxy_read_timeout 60s` でも、通常は Next 側の応答が先に返ります。
+ブラウザ側の GET 再試行と UI の自動再読込で、45 秒を超えるコールドスタートを継続して待機します。
+VPS のリバースプロキシには安全余裕として次を推奨します。
 
 ```nginx
 proxy_connect_timeout 10s;
-proxy_read_timeout 120s;
-proxy_send_timeout 120s;
+proxy_read_timeout 90s;
+proxy_send_timeout 90s;
 ```
 
 Next コンテナ自体の再起動中にリバースプロキシが返す 502 は、API コールドスタート

@@ -4,7 +4,11 @@
  */
 
 import type { ApiServiceConfig } from '../config/api-config';
-import { BACKEND_API_DEFAULT_TIMEOUT_MS, BACKEND_API_GET_RETRY_DEADLINE_MS } from '../config/api-config';
+import {
+  BACKEND_API_DEFAULT_TIMEOUT_MS,
+  BACKEND_API_GET_RETRY_DEADLINE_MS,
+  BACKEND_API_SINGLE_REQUEST_MAX_TIMEOUT_MS,
+} from '../config/api-config';
 import type { ApiResponse, ApiRequestOptions } from '../types/api';
 import resources from '../resources';
 
@@ -107,7 +111,10 @@ export class ApiClient {
     const url = `${this.baseUrl}${endpoint}`;
     const method = options.method || 'GET';
     const headers = { ...this.defaultHeaders, ...options.headers };
-    const timeout = timeoutOverride ?? options.timeout ?? this.timeout;
+    const timeoutBase = timeoutOverride ?? options.timeout ?? this.timeout;
+    const timeout = method === 'GET'
+      ? timeoutBase
+      : Math.min(timeoutBase, BACKEND_API_SINGLE_REQUEST_MAX_TIMEOUT_MS);
 
     // タイムアウト用のAbortController
     const controller = new AbortController();
