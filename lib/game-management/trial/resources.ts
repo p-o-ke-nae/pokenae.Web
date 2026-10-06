@@ -341,7 +341,7 @@ export function trialUpdateSaveData(
   saveStorageType: SaveStorageType,
   schema: SaveDataSchemaDto | null,
 ): SaveDataDto {
-  const items = trialListSaveDatas();
+  const items = trialListSaveDatas({ includeDeleted: true });
   const idx = items.findIndex((item) => item.id === id);
   if (idx === -1) throw new Error(`SaveData #${id} not found`);
   items[idx] = {
