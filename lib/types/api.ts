@@ -42,4 +42,5 @@ export interface ApiRequestOptions {
   body?: unknown;
   timeout?: number;
   signal?: AbortSignal;
+  retry?: boolean;
 }

@@ -107,6 +107,10 @@ export function getGameManagementErrorMessage(error: unknown, options: GameManag
 
   const serverDetail = extractServerDetail(error.details);
 
+  if (error.code === 'API_STARTING') {
+    return resources.apiError.generic.apiStarting;
+  }
+
   if ((error.statusCode === 400 || error.statusCode === 422) && hasDisplayOrderConflict(error.details)) {
     return formatMessageParts(
       options.fallback.title,

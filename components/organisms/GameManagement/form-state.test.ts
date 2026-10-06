@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildInitialFormState, createContinueFormState } from './form-state';
+import { buildInitialFormState, createContinueFormState, createSaveDataPrefillFormState } from './form-state';
 
 describe('createContinueFormState', () => {
   it('keeps only game software master and variant for game-softwares', () => {
@@ -29,7 +29,6 @@ describe('createContinueFormState', () => {
       installedGameConsoleId: '301',
       memoryCardId: '',
       storyProgressDefinitionId: '',
-      replacedBySaveDataId: '',
       deleteReason: '',
       dynamicFieldValues: { progress: 'late-game' },
     }, {
@@ -37,6 +36,54 @@ describe('createContinueFormState', () => {
       accountId: '999',
       gameSoftwareMasterId: '55',
       variant: '0',
+    });
+
+    describe('createSaveDataPrefillFormState', () => {
+      it('initializes save-data create fields from delete-and-new query parameters', () => {
+        const state = createSaveDataPrefillFormState(new URLSearchParams({
+          gameSoftwareMasterId: '101',
+          gameSoftwareId: '201',
+          gameConsoleId: '301',
+          accountId: '401',
+          memoryCardId: '501',
+          memo: 'ignored',
+        }));
+
+        expect(state).toMatchObject({
+          gameSoftwareMasterId: '101',
+          gameSoftwareId: '201',
+          gameConsoleId: '301',
+          accountId: '401',
+          memoryCardId: '501',
+          memo: '',
+          storyProgressDefinitionId: '',
+          dynamicFieldValues: {},
+        });
+      });
+    });
+
+    describe('createSaveDataPrefillFormState', () => {
+      it('initializes save-data create fields from delete-and-new query parameters', () => {
+        const state = createSaveDataPrefillFormState(new URLSearchParams({
+          gameSoftwareMasterId: '101',
+          gameSoftwareId: '201',
+          gameConsoleId: '301',
+          accountId: '401',
+          memoryCardId: '501',
+          memo: 'ignored',
+        }));
+
+        expect(state).toMatchObject({
+          gameSoftwareMasterId: '101',
+          gameSoftwareId: '201',
+          gameConsoleId: '301',
+          accountId: '401',
+          memoryCardId: '501',
+          memo: '',
+          storyProgressDefinitionId: '',
+          dynamicFieldValues: {},
+        });
+      });
     });
 
     expect(continued.gameSoftwareMasterId).toBe('101');
@@ -75,7 +122,6 @@ describe('createContinueFormState', () => {
       installedGameConsoleId: '999',
       memoryCardId: '',
       storyProgressDefinitionId: '',
-      replacedBySaveDataId: '',
       deleteReason: '',
       dynamicFieldValues: {},
     });
@@ -112,7 +158,6 @@ describe('createContinueFormState', () => {
       installedGameConsoleId: '',
       memoryCardId: '3',
       storyProgressDefinitionId: '',
-      replacedBySaveDataId: '',
       deleteReason: '',
       dynamicFieldValues: { key: 'value' },
     }, {
@@ -133,7 +178,7 @@ describe('createContinueFormState', () => {
       ownerGoogleUserId: 'google-user-1',
       displayOrder: 3,
       memo: null,
-      replacedBySaveDataId: null,
+      deletedAt: null,
       saveStorageType: 1,
       gameSoftwareMasterId: 100,
       gameSoftwareId: null,

@@ -59,6 +59,7 @@ describe('game-library user resource table columns', () => {
       ['save', '保存先'],
       ['storyProgress', 'ストーリー進行度'],
       ['memo', 'メモ'],
+      ['status', '状態'],
       ['operation', '操作'],
       ['edit', '編集'],
     ]);
@@ -78,7 +79,7 @@ describe('game-library user resource table columns', () => {
         ownerGoogleUserId: 'test',
         displayOrder: 1,
         memo: '保存データのメモ',
-        replacedBySaveDataId: null,
+        deletedAt: null,
         saveStorageType: 0,
         gameSoftwareMasterId: 1,
         gameSoftwareId: null,

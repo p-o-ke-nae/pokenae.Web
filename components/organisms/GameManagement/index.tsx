@@ -1,9 +1,11 @@
 ﻿'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import CustomButton from '@/components/atoms/CustomButton';
+import CustomCheckBox from '@/components/atoms/CustomCheckBox';
 import PageModeToggle from '@/components/atoms/PageModeToggle';
 import CustomComboBox from '@/components/atoms/CustomComboBox';
 import CustomLabel from '@/components/atoms/CustomLabel';
@@ -20,6 +22,7 @@ import {
   fetchMasterLookups,
   fetchPublicMasterLookups,
   fetchAuthenticatedUserLookups,
+  ApiError,
   getGameManagementErrorMessage,
   reorderResource,
 } from '@/lib/game-management/api';
@@ -55,6 +58,7 @@ import {
 import AccountMoveDialog from './AccountMoveDialog';
 import EditorDialog from './EditorDialog';
 import BulkEditorDialog from './BulkEditorDialog';
+import { createSaveDataPrefillFormState } from './form-state';
 import { TrialBanner, PageFrame, PageSection } from './shared';
 import type { DashboardExtraCard, EditorDialogContext, ManagementTableRow, StoryProgressLabelMap } from './view-types';
 import type { AccountDto } from '@/lib/game-management/types';
@@ -514,14 +518,17 @@ export function GameManagementDashboard({
     scope?: 'admin' | 'user';
   }) {
     const { data: session } = useSession();
+    const searchParams = useSearchParams();
     const isTrial = scope === 'user' && !session?.user;
     const definition = getResourceDefinition(resourceKey);
     const [lookups, setLookups] = useState<ManagementLookups | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [errorCode, setErrorCode] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [authLoading, setAuthLoading] = useState(scope === 'admin' && Boolean(session?.user));
     const [storyProgressLabels, setStoryProgressLabels] = useState<StoryProgressLabelMap>({});
     const [selectedContentGroupId, setSelectedContentGroupId] = useState('');
+    const [includeDeletedSaveDatas, setIncludeDeletedSaveDatas] = useState(false);
     const [saveDataSchemas, setSaveDataSchemas] = useState<Record<number, SaveDataSchemaDto>>({});
     const [saveDataFieldHeaders, setSaveDataFieldHeaders] = useState<SaveDataListFieldHeader[]>([]);
     const [saveDataSchemaLoading, setSaveDataSchemaLoading] = useState(false);
@@ -545,6 +552,8 @@ export function GameManagementDashboard({
     const [bulkEditorOpen, setBulkEditorOpen] = useState(false);
     const [bulkEditorTargetIds, setBulkEditorTargetIds] = useState<number[]>([]);
     const [accountMoveTarget, setAccountMoveTarget] = useState<AccountDto | null>(null);
+    const prefillAppliedRef = useRef(false);
+    const apiStartingReloadCountRef = useRef(0);
 
     const softwareMasterDefinition = useMemo(() => getResourceDefinition('game-software-masters'), []);
 
@@ -552,6 +561,7 @@ export function GameManagementDashboard({
     setLoading(true);
     setAuthLoading(scope === 'admin' && Boolean(session?.user));
     setError(null);
+    setErrorCode(null);
     setSaveError(null);
     setIsDirty(false);
     setLocalRowOrder(null);
@@ -569,11 +579,12 @@ export function GameManagementDashboard({
         result = { ...masters, accounts: [], gameConsoles: [], gameSoftwares: [], memoryCards: [], saveDatas: [] };
       } else if (isTrial) {
         const masters = await fetchPublicMasterLookups();
-        const userData = buildTrialUserData();
+        const userData = buildTrialUserData({ includeDeletedSaveDatas: resourceKey === 'save-datas' && includeDeletedSaveDatas });
         result = { ...masters, ...userData };
       } else {
         result = await fetchAuthenticatedUserLookups({
           maintenanceHealthFilter: supportsMaintenance(resourceKey) ? maintenanceHealthFilter : 'All',
+          includeDeletedSaveDatas: resourceKey === 'save-datas' && includeDeletedSaveDatas,
         });
       }
       setLookups(result);
@@ -582,15 +593,27 @@ export function GameManagementDashboard({
         fallback: resources.gameManagement.errors.listLoad,
         adminFallback: resources.gameManagement.errors.adminRequired,
       }));
+      setErrorCode(loadError instanceof ApiError ? loadError.code : null);
     } finally {
       setLoading(false);
       setAuthLoading(false);
     }
-  }, [isTrial, maintenanceHealthFilter, resourceKey, scope, session?.user]);
+  }, [includeDeletedSaveDatas, isTrial, maintenanceHealthFilter, resourceKey, scope, session?.user]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (errorCode !== 'API_STARTING') {
+      apiStartingReloadCountRef.current = 0;
+      return;
+    }
+    if (apiStartingReloadCountRef.current >= 3) return;
+    apiStartingReloadCountRef.current += 1;
+    const timeoutId = window.setTimeout(() => void load(), 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [errorCode, load]);
 
   useEffect(() => {
     if (resourceKey !== 'game-software-content-groups') {
@@ -878,6 +901,17 @@ export function GameManagementDashboard({
       parentContentGroupId: options?.parentContentGroupId ?? null,
     });
   }, [resourceKey]);
+
+  useEffect(() => {
+    if (prefillAppliedRef.current || resourceKey !== 'save-datas') return;
+    const initialFormState = createSaveDataPrefillFormState(searchParams);
+    const hasPrefill = ['gameSoftwareMasterId', 'gameSoftwareId', 'gameConsoleId', 'accountId', 'memoryCardId']
+      .some((key) => Boolean(initialFormState[key as keyof typeof initialFormState]));
+    if (!hasPrefill) return;
+    prefillAppliedRef.current = true;
+    setPageMode('edit');
+    openEditorDialog({ initialFormState });
+  }, [openEditorDialog, resourceKey, searchParams]);
 
   const closeEditorDialog = useCallback(() => {
     setEditorContext(null);
@@ -1268,7 +1302,14 @@ export function GameManagementDashboard({
     >
       {error || saveError || isTrial ? (
         <div className="tool-page__notices">
-          {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
+          {error ? (
+            <CustomMessageArea variant="error">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span className="whitespace-pre-line">{errorCode === 'API_STARTING' ? 'APIを起動しています…' : error}</span>
+                <CustomButton variant="ghost" onClick={() => void load()}>再試行</CustomButton>
+              </div>
+            </CustomMessageArea>
+          ) : null}
           {saveError ? <CustomMessageArea variant="error">{saveError}</CustomMessageArea> : null}
           {isTrial && <TrialBanner />}
         </div>
@@ -1300,6 +1341,13 @@ export function GameManagementDashboard({
             ) : null}
             {resourceKey === 'save-datas' ? (
               <>
+                <label className="flex items-center gap-2 text-sm text-[var(--color-text-strong)]">
+                  <CustomCheckBox
+                    checked={includeDeletedSaveDatas}
+                    onChange={(event) => setIncludeDeletedSaveDatas(event.target.checked)}
+                  />
+                  <span>削除済みデータを含む</span>
+                </label>
                 <div className="tool-filter">
                   <div className="space-y-2">
                     <CustomLabel htmlFor="save-data-content-group-filter">ゲームソフト分類</CustomLabel>

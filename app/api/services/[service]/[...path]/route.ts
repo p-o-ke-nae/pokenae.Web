@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { getAuthOptions } from "@/lib/auth/auth-options";
 import { getApiClient } from "@/lib/api/client-factory";
 import { getAvailableServices, type ApiServiceName } from "@/lib/config/api-config";
-import { createSuccessResponse, createErrorResponse, createSafeErrorResponse, parseRequestBody } from "@/lib/api/route-helpers";
+import { createSuccessResponse, createErrorResponse, createSafeErrorResponse, parseRequestBody, createApiStartingResponse, isApiStartingCode } from "@/lib/api/route-helpers";
 
 interface RouteParams {
   params: Promise<{ service: string; path: string[] }>;
@@ -58,6 +58,7 @@ async function handleRequest(request: NextRequest, context: RouteParams, method:
       null;
     if (!response) return createSafeErrorResponse("METHOD_NOT_ALLOWED", 405);
     if (response.success) return createSuccessResponse(response.data);
+    if (isApiStartingCode(response.error.code)) return createApiStartingResponse(response.error.details);
     const statusCode = response.error.code.startsWith("HTTP_") ? Number.parseInt(response.error.code.replace("HTTP_", ""), 10) : 500;
     return createSafeErrorResponse(response.error.code, statusCode, response.error.details);
   } catch (error) {

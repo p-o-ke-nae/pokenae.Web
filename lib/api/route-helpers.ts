@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { ApiResponse } from '@/lib/types/api';
 import resources from '@/lib/resources';
 
+const API_STARTING_CODES = new Set(['TIMEOUT', 'NETWORK_ERROR', 'HTTP_502', 'HTTP_503', 'HTTP_504']);
+
 /**
  * 成功レスポンスを作成
  */
@@ -64,6 +66,8 @@ export function getSafeRouteErrorMessage(code: string, status: number = 500): st
       return serverMessages.timeout;
     case 'NETWORK_ERROR':
       return serverMessages.network;
+    case 'API_STARTING':
+      return serverMessages.apiStarting;
     case 'UNKNOWN_ERROR':
       return serverMessages.unknown;
     case 'INTERNAL_ERROR':
@@ -71,6 +75,17 @@ export function getSafeRouteErrorMessage(code: string, status: number = 500): st
     default:
       return resources.apiError.status[status] ?? serverMessages.internalError;
   }
+}
+
+export function isApiStartingCode(code: string): boolean {
+  return API_STARTING_CODES.has(code);
+}
+
+export function createApiStartingResponse(details?: unknown): NextResponse<ApiResponse> {
+  const response = createErrorResponse('API_STARTING', resources.apiError.server.apiStarting, 503, details);
+  response.headers.set('Retry-After', '5');
+  response.headers.set('Cache-Control', 'no-store');
+  return response;
 }
 
 export function createSafeErrorResponse(

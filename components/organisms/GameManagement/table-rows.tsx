@@ -116,6 +116,7 @@ const SAVE_DATA_TABLE_COLUMNS: DataTableColumn<ManagementTableRow>[] = [
   { key: 'save', header: '保存先', sortable: true, filterable: true, width: '24rem' },
   { key: 'storyProgress', header: 'ストーリー進行度', sortable: true, filterable: true, filterMode: 'select', width: '12rem' },
   { key: 'memo', header: 'メモ', filterable: true, width: '32rem' },
+  { key: 'status', header: '状態', width: '9rem', sortable: true, filterable: true, filterMode: 'select' },
   { key: 'operation', header: '操作', width: '4.5rem' },
   { key: 'edit', header: '編集', width: '6rem' },
 ];
@@ -380,6 +381,7 @@ export function buildTableRows(
             ? (getStoryProgressLabel(masterId, item.storyProgressDefinitionId, storyProgressLabels) ?? '')
             : '',
           memo: item.memo ?? '',
+          status: formatDeletedState(item.isDeleted),
           saveDataContentGroupId: getSaveDataContentGroupId(item, lookups),
           saveDataGameSoftwareMasterId: masterId,
           saveDataDynamicFieldLabels: dynamicFieldLabels,
