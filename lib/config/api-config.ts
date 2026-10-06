@@ -14,6 +14,7 @@ export interface ApiServiceConfig {
 export type ApiServiceName = 'user-api' | 'service1' | 'service2' | 'service3' | (string & {});
 
 export const BACKEND_API_DEFAULT_TIMEOUT_MS = 60000;
+export const BACKEND_API_GET_RETRY_DEADLINE_MS = Number(process.env.BACKEND_API_GET_RETRY_DEADLINE_MS ?? 90000);
 
 const BUILTIN_SERVICE_CONFIG: Record<string, { baseUrlEnv: string; apiKeyEnv?: string; defaultPath?: string }> = {
   service1: {

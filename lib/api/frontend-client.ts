@@ -8,6 +8,33 @@ import type { ApiServiceName } from '@/lib/config/api-config';
 import { getSession } from 'next-auth/react';
 import resources from '@/lib/resources';
 
+const RETRYABLE_CODES = new Set(['API_STARTING', 'HTTP_502', 'HTTP_503', 'HTTP_504']);
+
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(resolve, ms);
+    if (!signal) return;
+    if (signal.aborted) {
+      clearTimeout(timeoutId);
+      reject(signal.reason);
+      return;
+    }
+    signal.addEventListener('abort', () => {
+      clearTimeout(timeoutId);
+      reject(signal.reason);
+    }, { once: true });
+  });
+}
+
+function getRetryDelay(response: Response, attempt: number): number {
+  const retryAfter = response.headers.get('retry-after');
+  const retryAfterSeconds = retryAfter ? Number(retryAfter) : Number.NaN;
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    return retryAfterSeconds * 1000;
+  }
+  return [1000, 2000, 4000][attempt] ?? 4000;
+}
+
 export interface FrontendApiClientOptions {
   method?: HttpMethod;
   body?: unknown;
@@ -57,7 +84,10 @@ export class FrontendApiClient {
       }
     }
 
-    try {
+    const maxAttempts = method === 'GET' ? 4 : 1;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
       const fetchOptions: RequestInit = {
         method,
         headers,
@@ -73,20 +103,52 @@ export class FrontendApiClient {
       // Next.js API Routes経由でリクエスト
       const url = `/api/services/${this.serviceName}${endpoint}`;
       const response = await fetch(url, fetchOptions);
+      const contentType = response.headers.get('content-type') ?? '';
+      const data = contentType.includes('application/json')
+        ? await response.json()
+        : {
+          success: false,
+          error: {
+            code: response.status ? `HTTP_${response.status}` : 'INVALID_RESPONSE',
+            message: resources.apiError.generic.invalidResponse,
+            details: await response.text(),
+          },
+        };
 
-      const data = await response.json();
-
-      return data as ApiResponse<T>;
-    } catch (error) {
-      return {
+      const apiResponse = data as ApiResponse<T>;
+      if (
+        method === 'GET'
+        && attempt < maxAttempts - 1
+        && !apiResponse.success
+        && RETRYABLE_CODES.has(apiResponse.error.code)
+      ) {
+        await delay(getRetryDelay(response, attempt), options.signal);
+        continue;
+      }
+      return apiResponse;
+      } catch (error) {
+        if (method === 'GET' && attempt < maxAttempts - 1 && !options.signal?.aborted) {
+          await delay([1000, 2000, 4000][attempt] ?? 4000, options.signal).catch(() => undefined);
+          continue;
+        }
+        return {
         success: false,
         error: {
           code: 'FETCH_ERROR',
           message: resources.apiError.generic.network,
           details: error,
         },
-      };
+        };
+      }
     }
+
+    return {
+      success: false,
+      error: {
+        code: 'FETCH_ERROR',
+        message: resources.apiError.generic.network,
+      },
+    };
   }
 
   /**

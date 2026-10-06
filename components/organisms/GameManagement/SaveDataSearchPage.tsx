@@ -16,6 +16,7 @@ import {
   fetchPublicSaveDataSchema,
   fetchPublicStoryProgressSchema,
   getGameManagementErrorMessage,
+  ApiError,
 } from '@/lib/game-management/api';
 import {
   evaluateSaveDataSearch,
@@ -93,6 +94,7 @@ export default function SaveDataSearchPage() {
   const [lookupsSource, setLookupsSource] = useState<SaveDataSearchLookupsSource | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [criteria, setCriteria] = useState<SaveDataSearchCriteria[]>([]);
   const [includeDeleted, setIncludeDeleted] = useState(false);
@@ -110,6 +112,7 @@ export default function SaveDataSearchPage() {
   const [pageMode, setPageMode] = useState<'view' | 'edit'>('view');
   const schemaRequestGenerationRef = useRef(0);
   const loadRequestRef = useRef(0);
+  const apiStartingReloadCountRef = useRef(0);
   const saveDataDefinition = useMemo(() => getResourceDefinition('save-datas'), []);
 
   const load = useCallback(async () => {
@@ -120,6 +123,7 @@ export default function SaveDataSearchPage() {
     schemaRequestGenerationRef.current += 1;
     setLoading(true);
     setError(null);
+    setErrorCode(null);
     setLookupsSource(null);
     setSaveDataSchemas({});
     setStoryProgressSchemas({});
@@ -137,10 +141,22 @@ export default function SaveDataSearchPage() {
       setError(getGameManagementErrorMessage(loadError, {
         fallback: resources.gameManagement.errors.listLoad,
       }));
+      setErrorCode(loadError instanceof ApiError ? loadError.code : null);
     } finally {
       if (requestId === loadRequestRef.current) setLoading(false);
     }
   }, [includeDeleted, isTrial, sessionReady]);
+
+  useEffect(() => {
+    if (errorCode !== 'API_STARTING') {
+      apiStartingReloadCountRef.current = 0;
+      return;
+    }
+    if (apiStartingReloadCountRef.current >= 3) return;
+    apiStartingReloadCountRef.current += 1;
+    const timeoutId = window.setTimeout(() => void load(), 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [errorCode, load]);
 
   useEffect(() => {
     void load();
@@ -339,7 +355,14 @@ export default function SaveDataSearchPage() {
       {isTrial || error || searchError ? (
         <div className="tool-page__notices">
           {isTrial ? <TrialBanner /> : null}
-          {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
+          {error ? (
+            <CustomMessageArea variant="error">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span className="whitespace-pre-line">{errorCode === 'API_STARTING' ? 'APIを起動しています…' : error}</span>
+                <CustomButton variant="ghost" onClick={handleReload}>再試行</CustomButton>
+              </div>
+            </CustomMessageArea>
+          ) : null}
           {searchError ? <CustomMessageArea variant="error">{searchError}</CustomMessageArea> : null}
         </div>
       ) : null}

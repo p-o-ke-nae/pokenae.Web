@@ -22,6 +22,7 @@ import {
   fetchMasterLookups,
   fetchPublicMasterLookups,
   fetchAuthenticatedUserLookups,
+  ApiError,
   getGameManagementErrorMessage,
   reorderResource,
 } from '@/lib/game-management/api';
@@ -522,6 +523,7 @@ export function GameManagementDashboard({
     const definition = getResourceDefinition(resourceKey);
     const [lookups, setLookups] = useState<ManagementLookups | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [errorCode, setErrorCode] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [authLoading, setAuthLoading] = useState(scope === 'admin' && Boolean(session?.user));
     const [storyProgressLabels, setStoryProgressLabels] = useState<StoryProgressLabelMap>({});
@@ -551,6 +553,7 @@ export function GameManagementDashboard({
     const [bulkEditorTargetIds, setBulkEditorTargetIds] = useState<number[]>([]);
     const [accountMoveTarget, setAccountMoveTarget] = useState<AccountDto | null>(null);
     const prefillAppliedRef = useRef(false);
+    const apiStartingReloadCountRef = useRef(0);
 
     const softwareMasterDefinition = useMemo(() => getResourceDefinition('game-software-masters'), []);
 
@@ -558,6 +561,7 @@ export function GameManagementDashboard({
     setLoading(true);
     setAuthLoading(scope === 'admin' && Boolean(session?.user));
     setError(null);
+    setErrorCode(null);
     setSaveError(null);
     setIsDirty(false);
     setLocalRowOrder(null);
@@ -589,6 +593,7 @@ export function GameManagementDashboard({
         fallback: resources.gameManagement.errors.listLoad,
         adminFallback: resources.gameManagement.errors.adminRequired,
       }));
+      setErrorCode(loadError instanceof ApiError ? loadError.code : null);
     } finally {
       setLoading(false);
       setAuthLoading(false);
@@ -598,6 +603,17 @@ export function GameManagementDashboard({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (errorCode !== 'API_STARTING') {
+      apiStartingReloadCountRef.current = 0;
+      return;
+    }
+    if (apiStartingReloadCountRef.current >= 3) return;
+    apiStartingReloadCountRef.current += 1;
+    const timeoutId = window.setTimeout(() => void load(), 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [errorCode, load]);
 
   useEffect(() => {
     if (resourceKey !== 'game-software-content-groups') {
@@ -1286,7 +1302,14 @@ export function GameManagementDashboard({
     >
       {error || saveError || isTrial ? (
         <div className="tool-page__notices">
-          {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
+          {error ? (
+            <CustomMessageArea variant="error">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span className="whitespace-pre-line">{errorCode === 'API_STARTING' ? 'APIを起動しています…' : error}</span>
+                <CustomButton variant="ghost" onClick={() => void load()}>再試行</CustomButton>
+              </div>
+            </CustomMessageArea>
+          ) : null}
           {saveError ? <CustomMessageArea variant="error">{saveError}</CustomMessageArea> : null}
           {isTrial && <TrialBanner />}
         </div>

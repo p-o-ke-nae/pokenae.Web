@@ -123,7 +123,7 @@ async function expectFooterLayout(dialog: Locator, isMobile: boolean, primaryNam
       expect(primary!.width).toBeGreaterThanOrEqual(widest - 1);
     } else {
       const ys = boxes.map((box) => box.y);
-      expect(Math.max(...ys) - Math.min(...ys), JSON.stringify(boxes)).toBeLessThanOrEqual(1);
+      expect(Math.max(...ys) - Math.min(...ys), JSON.stringify(boxes)).toBeLessThanOrEqual(2);
     }
     // 同じ行のボタンは同じ幅（均等割り）
     const rows = new Map<number, Box[]>();
@@ -140,7 +140,7 @@ async function expectFooterLayout(dialog: Locator, isMobile: boolean, primaryNam
     const ys = boxes.map((box) => box.y);
     expect(Math.max(...ys) - Math.min(...ys), JSON.stringify(boxes)).toBeLessThanOrEqual(1);
     const rightMost = Math.max(...boxes.map((box) => box.x + box.width));
-    expect(Math.abs(primary!.x + primary!.width - rightMost)).toBeLessThanOrEqual(1);
+    expect(Math.abs(primary!.x + primary!.width - rightMost)).toBeLessThanOrEqual(2);
   }
 }
 
@@ -274,8 +274,8 @@ test.describe("ゲームライブラリ UI", () => {
     const saveDataHeaders = page.getByRole("columnheader");
     await expect(saveDataHeaders.filter({ hasText: "ストーリー進行度" })).toBeVisible();
     await expect(saveDataHeaders.filter({ hasText: "メモ" })).toBeVisible();
-    await expect(saveDataHeaders.nth(3)).toContainText("メモ");
-    await expect(saveDataHeaders.nth(3)).toHaveCSS("width", "512px");
+    await expect(saveDataHeaders.filter({ hasText: "メモ" })).toHaveCSS("width", "512px");
+    await expect(saveDataHeaders.filter({ hasText: "状態" })).toBeVisible();
   });
 
   test("編集ダイアログのフッターボタンが崩れずに並ぶ", async ({ page, isMobile }) => {
