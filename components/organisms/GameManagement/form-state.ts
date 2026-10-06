@@ -42,10 +42,39 @@ export function createEmptyFormState(): FormState {
     installedGameConsoleId: '',
     memoryCardId: '',
     storyProgressDefinitionId: '',
-    replacedBySaveDataId: '',
     deleteReason: '',
     dynamicFieldValues: {},
   };
+}
+
+const SAVE_DATA_PREFILL_KEYS = [
+  'gameSoftwareMasterId',
+  'gameSoftwareId',
+  'gameConsoleId',
+  'accountId',
+  'memoryCardId',
+] as const;
+
+function getPositiveIntegerParam(params: URLSearchParams, key: string): string {
+  const value = params.get(key);
+  if (!value || !/^\d+$/.test(value) || Number(value) <= 0) {
+    return '';
+  }
+  return value;
+}
+
+export function createSaveDataPrefillFormState(params: URLSearchParams): Partial<FormState> {
+  return SAVE_DATA_PREFILL_KEYS.reduce<Partial<FormState>>((acc, key) => {
+    const value = getPositiveIntegerParam(params, key);
+    if (value) {
+      acc[key] = value;
+    }
+    return acc;
+  }, {
+    memo: '',
+    storyProgressDefinitionId: '',
+    dynamicFieldValues: {},
+  });
 }
 
 export function createSeededFormState(initialValues?: Partial<FormState>): FormState {
@@ -209,7 +238,6 @@ export function buildInitialFormState(resourceKey: ResourceKey, record: unknown)
         accountId: item.accountId ? String(item.accountId) : '',
         memoryCardId: item.memoryCardId ? String(item.memoryCardId) : '',
         storyProgressDefinitionId: item.storyProgressDefinitionId ? String(item.storyProgressDefinitionId) : '',
-        replacedBySaveDataId: item.replacedBySaveDataId ? String(item.replacedBySaveDataId) : '',
         deleteReason: item.deleteReason ?? '',
         dynamicFieldValues: createDynamicFieldValueMapFromSaveData(item),
       };

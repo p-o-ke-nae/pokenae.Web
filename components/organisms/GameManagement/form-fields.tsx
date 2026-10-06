@@ -575,16 +575,6 @@ export function FormFields({
               displayOnly={displayOnly}
             />
           )}
-          {!isNew ? (
-            <SelectField
-              id="replacedBySaveDataId"
-              label="置換先 SaveData"
-              value={formState.replacedBySaveDataId}
-              options={optionize(options.saveDatas.filter((option) => option.value !== formState.replacedBySaveDataId), true)}
-              onChange={(value) => onChange({ replacedBySaveDataId: value })}
-              displayOnly={displayOnly}
-            />
-          ) : null}
           <SaveDataDynamicFields
             schema={saveDataSchema}
             values={formState.dynamicFieldValues}

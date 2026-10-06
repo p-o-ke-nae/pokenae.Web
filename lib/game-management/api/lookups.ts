@@ -21,6 +21,7 @@ import { fetchPublicMasterLookups } from './public';
 
 type UserLookupOptions = {
   maintenanceHealthFilter?: MaintenanceHealthFilter;
+  includeDeletedSaveDatas?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -65,7 +66,7 @@ export async function fetchUserLookups(options: UserLookupOptions = {}): Promise
     fetchResourceList<GameConsoleDto>('game-consoles', { query: { maintenanceHealthFilter } }),
     fetchResourceList<GameSoftwareDto>('game-softwares', { query: { maintenanceHealthFilter } }),
     fetchResourceList<MemoryCardDto>('memory-cards', { query: { maintenanceHealthFilter } }),
-    fetchResourceList<SaveDataDto>('save-datas'),
+    fetchResourceList<SaveDataDto>('save-datas', { includeDeleted: options.includeDeletedSaveDatas }),
   ]);
   return {
     ...masterLookups,
@@ -96,7 +97,7 @@ export async function fetchAuthenticatedUserLookups(options: UserLookupOptions =
     fetchResourceList<GameConsoleDto>('game-consoles', { query: { maintenanceHealthFilter } }),
     fetchResourceList<GameSoftwareDto>('game-softwares', { query: { maintenanceHealthFilter } }),
     fetchResourceList<MemoryCardDto>('memory-cards', { query: { maintenanceHealthFilter } }),
-    fetchResourceList<SaveDataDto>('save-datas'),
+    fetchResourceList<SaveDataDto>('save-datas', { includeDeleted: options.includeDeletedSaveDatas }),
   ]);
   return {
     ...masterLookups,

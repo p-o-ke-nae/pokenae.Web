@@ -50,12 +50,13 @@ Issue #94 の Phase 3 実装差分に合わせて、Game Library 向けの新規
 
 ## 3. 横断セーブデータ検索
 
-- 検索条件は `variant` の共通フィルタと、1 件以上の条件グループで構成する
-- 評価式は `variant AND (group1 OR group2 OR ...)`
-- 各グループは `gameSoftwareMasterId` 必須、`storyProgressDefinitionId` 任意、schema 条件 0 件以上
-- schema / story progress schema は、選択された `gameSoftwareMasterId` のみ遅延読込する
-- 検索結果はカード表示し、各結果に一致した条件グループ要約を表示する
+- 検索条件は URL の `criteria` JSON に保存し、共有 URL から復元する
+- 「削除済みデータを含む」をオンにした場合のみ、`includeDeleted=1` を URL に保存し、API へ `includeDeleted=true` を渡す
+- 既定では削除済みセーブデータを検索対象に含めない
+- schema / story progress schema は、読み込んだセーブデータの `gameSoftwareMasterId` に応じて遅延読込する
+- 検索結果はカード表示し、削除済みレコードには「削除済み」バッジを表示する
 - 結果から `SaveData` 詳細ダイアログを **view mode** で開ける
+- 削除済み `SaveData` は詳細・編集ダイアログで削除日時と削除理由のバナーを表示し、通常項目は編集可能とする
 
 ### schema 条件の評価
 
@@ -64,6 +65,16 @@ Issue #94 の Phase 3 実装差分に合わせて、Game Library 向けの新規
 | 文字列 / 複数行文字列 | 部分一致 |
 | 真偽値 | `true` / `false` の完全一致 |
 | 数値 / 小数 / 日付 / 選択肢 | 完全一致 |
+
+---
+
+## 3.1 セーブデータ一覧・削除
+
+- `/game-library/save-datas` の一覧も「削除済みデータを含む」をオンにした場合のみ削除済みを取得する
+- 一覧の「状態」列で有効 / 削除済みを確認できる
+- 削除済みレコードの削除ボタンは非表示とする
+- 削除確認では置換先 SaveData の指定を廃止し、削除理由のみ送信する
+- 「削除して新規作成」は削除成功後に `/game-library/save-datas/new` へ遷移し、保存先関連 ID をクエリから新規フォームへ引き継ぐ
 
 ---
 

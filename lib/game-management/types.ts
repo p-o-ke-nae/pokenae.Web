@@ -507,7 +507,7 @@ export type SaveDataDto = {
   ownerGoogleUserId: string;
   displayOrder: number;
   memo: string | null;
-  replacedBySaveDataId: number | null;
+  deletedAt: string | null;
   saveStorageType: SaveStorageType;
   gameSoftwareMasterId: number;
   gameSoftwareId: number | null;
@@ -532,21 +532,10 @@ export type CreateSaveDataRequest = {
   extendedFields: SaveDataFieldInputDto[] | null;
 };
 
-export type UpdateSaveDataRequest = {
-  gameSoftwareMasterId: number;
-  gameSoftwareId: number | null;
-  gameConsoleId: number | null;
-  accountId: number | null;
-  memoryCardId: number | null;
-  storyProgressDefinitionId: number | null;
-  replacedBySaveDataId: number | null;
-  memo: string | null;
-  extendedFields: SaveDataFieldInputDto[] | null;
-};
+export type UpdateSaveDataRequest = CreateSaveDataRequest;
 
 export type DeleteSaveDataRequest = {
   deleteReason: string | null;
-  replacedBySaveDataId: number | null;
 };
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import CustomButton from '@/components/atoms/CustomButton';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
@@ -40,11 +41,20 @@ import { numberOrNull, getStoryProgressLabel } from './helpers';
 import { createContinueFormState, createSeededFormState, buildInitialFormState } from './form-state';
 import MaintenanceRecordsSection from './MaintenanceRecordsSection';
 import { validateForm } from './validation';
-import { selectOptionsFromLookups, optionize } from './options';
 import { FormFields } from './form-fields';
 import { dispatchSave, dispatchDelete } from './repository';
-import { SelectField, ResourceSummary } from './shared';
+import { ResourceSummary } from './shared';
 import type { FormState } from './view-types';
+
+function formatDeletedAt(value: string | null): string {
+  if (!value) return '不明';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('ja-JP', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
+}
 
 export type EditorDialogProps = {
   open: boolean;
@@ -87,12 +97,14 @@ export default function EditorDialog({
   layoutMode = 'desktop',
 }: EditorDialogProps) {
   const { isPending, startLoading } = useLoadingOverlay();
+  const router = useRouter();
   const isNew = recordId === null;
   const isViewMode = pageMode === 'view' && !isNew;
   const bodyRef = useRef<HTMLDivElement | null>(null);
 
   const [formState, setFormState] = useState<FormState>(createSeededFormState(initialFormState));
   const [record, setRecord] = useState<unknown>(null);
+  const isDeletedSaveData = resourceKey === 'save-datas' && !isNew && Boolean((record as SaveDataDto | null)?.isDeleted);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -234,8 +246,6 @@ export default function EditorDialog({
     setFormState((current) => ({ ...current, ...patch }));
   }, []);
 
-  const options = useMemo(() => selectOptionsFromLookups(lookups), [lookups]);
-
   const focusFirstField = useCallback(() => {
     requestAnimationFrame(() => {
       const firstField = bodyRef.current?.querySelector<HTMLElement>(
@@ -357,8 +367,9 @@ export default function EditorDialog({
   // Delete
   // ---------------------------------------------------------------------------
 
-  const handleDelete = useCallback(async () => {
+  const handleDelete = useCallback(async (createNew = false) => {
     if (recordId == null) return;
+    const saveData = resourceKey === 'save-datas' ? record as SaveDataDto | null : null;
     try {
       await startLoading(async () => {
         await dispatchDelete(resourceKey, String(recordId), formState, isTrial);
@@ -367,11 +378,24 @@ export default function EditorDialog({
       setDeleteDialogOpen(false);
       onDataChanged();
       onClose();
+      if (createNew && saveData) {
+        const params = new URLSearchParams();
+        [
+          ['gameSoftwareMasterId', saveData.gameSoftwareMasterId],
+          ['gameSoftwareId', saveData.gameSoftwareId],
+          ['gameConsoleId', saveData.gameConsoleId],
+          ['accountId', saveData.accountId],
+          ['memoryCardId', saveData.memoryCardId],
+        ].forEach(([key, value]) => {
+          if (typeof value === 'number' && value > 0) params.set(key as string, String(value));
+        });
+        router.push(`/game-library/save-datas/new?${params.toString()}`);
+      }
     } catch (err) {
       setDeleteDialogOpen(false);
       setError(getGameManagementErrorMessage(err, { fallback: resources.gameManagement.errors.delete }));
     }
-  }, [formState, isTrial, onClose, onDataChanged, recordId, resourceKey, startLoading]);
+  }, [formState, isTrial, onClose, onDataChanged, record, recordId, resourceKey, router, startLoading]);
 
   // ---------------------------------------------------------------------------
   // Prev / Next navigation
@@ -444,7 +468,7 @@ export default function EditorDialog({
                 mobileColumns={3}
                 align="end"
               >
-                {!isNew && !isViewMode && definition.canDelete ? (
+                {!isNew && !isViewMode && definition.canDelete && !isDeletedSaveData ? (
                   <CustomButton variant="ghost" onClick={() => setDeleteDialogOpen(true)}>
                     削除
                   </CustomButton>
@@ -487,6 +511,18 @@ export default function EditorDialog({
             <p className="text-sm text-[var(--color-text-muted)]">読み込んでいます...</p>
           ) : (
             <>
+              {isDeletedSaveData ? (() => {
+                const saveData = record as SaveDataDto;
+                return (
+                  <CustomMessageArea variant="warning">
+                    <div className="space-y-1">
+                      <p className="font-semibold">削除済みのセーブデータです。</p>
+                      <p>削除日時: {formatDeletedAt(saveData.deletedAt)}</p>
+                      <p>削除理由: {saveData.deleteReason || '未設定'}</p>
+                    </div>
+                  </CustomMessageArea>
+                );
+              })() : null}
               <FormFields
                 resourceKey={resourceKey}
                 formState={formState}
@@ -609,6 +645,11 @@ export default function EditorDialog({
             trailing={
               <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={2} align="end">
                 <CustomButton onClick={() => setDeleteDialogOpen(false)} disabled={isPending}>キャンセル</CustomButton>
+                {resourceKey === 'save-datas' ? (
+                  <CustomButton variant="accent" disabled={isPending} onClick={() => void handleDelete(true)}>
+                    削除して新規作成
+                  </CustomButton>
+                ) : null}
                 <CustomButton variant="accent" disabled={isPending} onClick={() => void handleDelete()}>
                   削除
                 </CustomButton>
@@ -621,13 +662,6 @@ export default function EditorDialog({
           <p className="text-sm leading-6 text-[var(--color-text-muted)]">このレコードを削除します。操作は元に戻せない場合があります。</p>
           {resourceKey === 'save-datas' ? (
             <div className="space-y-4">
-              <SelectField
-                id="replacedBySaveDataId-delete-dialog"
-                label="置換先 SaveData"
-                value={formState.replacedBySaveDataId}
-                options={optionize(options.saveDatas.filter((option) => option.value !== String(recordId)), true)}
-                onChange={(value) => applyPatch({ replacedBySaveDataId: value })}
-              />
               <div className="space-y-2">
                 <CustomLabel htmlFor="deleteReason-delete-dialog">削除理由</CustomLabel>
                 <CustomTextArea id="deleteReason-delete-dialog" value={formState.deleteReason} onChange={(event) => applyPatch({ deleteReason: event.target.value })} placeholder="任意の削除理由" />

@@ -28,6 +28,7 @@ import {
   buildSaveDataSearchUrl,
   partitionRestoredSaveDataSearchCriteria,
   restoreSaveDataSearchCriteria,
+  restoreSaveDataSearchIncludeDeleted,
   shouldRunInitialSaveDataSearch,
   type SaveDataSearchLookupsSource,
 } from '@/lib/game-management/save-data-search-url';
@@ -94,6 +95,7 @@ export default function SaveDataSearchPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [criteria, setCriteria] = useState<SaveDataSearchCriteria[]>([]);
+  const [includeDeleted, setIncludeDeleted] = useState(false);
   const [submittedSearch, setSubmittedSearch] = useState<SaveDataSearchCriteria[] | null>(null);
   const [urlInitialized, setUrlInitialized] = useState(false);
   const [initialSearchPending, setInitialSearchPending] = useState(false);
@@ -125,8 +127,8 @@ export default function SaveDataSearchPage() {
     setSchemaLoadingIds([]);
     try {
       const result = isTrial
-        ? { ...await fetchPublicMasterLookups(), ...buildTrialUserData() }
-        : await fetchAuthenticatedUserLookups();
+        ? { ...await fetchPublicMasterLookups(), ...buildTrialUserData({ includeDeletedSaveDatas: includeDeleted }) }
+        : await fetchAuthenticatedUserLookups({ includeDeletedSaveDatas: includeDeleted });
       if (requestId !== loadRequestRef.current) return;
       setLookups(result);
       setLookupsSource(source);
@@ -138,7 +140,7 @@ export default function SaveDataSearchPage() {
     } finally {
       if (requestId === loadRequestRef.current) setLoading(false);
     }
-  }, [isTrial, sessionReady]);
+  }, [includeDeleted, isTrial, sessionReady]);
 
   useEffect(() => {
     void load();
@@ -146,7 +148,9 @@ export default function SaveDataSearchPage() {
 
   useEffect(() => {
     const restoredCriteria = restoreSaveDataSearchCriteria(window.location.search);
+    const restoredIncludeDeleted = restoreSaveDataSearchIncludeDeleted(window.location.search);
     setCriteria(restoredCriteria);
+    setIncludeDeleted(restoredIncludeDeleted);
     setInitialSearchPending(restoredCriteria.length > 0);
     setUrlInitialized(true);
   }, []);
@@ -268,9 +272,9 @@ export default function SaveDataSearchPage() {
     window.history.replaceState(
       window.history.state,
       '',
-      buildSaveDataSearchUrl(window.location.href, criteria),
+      buildSaveDataSearchUrl(window.location.href, criteria, includeDeleted),
     );
-  }, [criteria, urlInitialized]);
+  }, [criteria, includeDeleted, urlInitialized]);
 
   const handleSearch = useCallback(() => {
     if (criteria.length === 0) {
@@ -344,6 +348,16 @@ export default function SaveDataSearchPage() {
       ) : !lookups ? null : (
         <>
           <PageSection title="検索条件" description="複数の検索項目を追加すると、すべての条件に一致するデータを検索します。">
+            <label className="flex items-center gap-2 text-sm text-[var(--color-text-strong)]">
+              <CustomCheckBox
+                checked={includeDeleted}
+                onChange={(event) => {
+                  setIncludeDeleted(event.target.checked);
+                  setSubmittedSearch(null);
+                }}
+              />
+              <span>削除済みデータを含む</span>
+            </label>
             {schemaLoadingIds.length > 0 ? (
               <p className="tool-muted text-sm" role="status">{schemaLoadingIds.length} 件のスキーマを読み込んでいます...</p>
             ) : null}
@@ -445,6 +459,9 @@ export default function SaveDataSearchPage() {
                     <div className="space-y-2">
                       <p className="text-base font-semibold text-[var(--color-text-strong)]">
                         {getMasterDisplayName(result.saveData.gameSoftwareMasterId, lookups)}
+                        {result.saveData.isDeleted ? (
+                          <span className="ml-2 rounded-full bg-[var(--color-warning-light)] px-2 py-0.5 text-xs text-[var(--color-warning)]">削除済み</span>
+                        ) : null}
                       </p>
                       <p className="text-sm text-[var(--color-text-muted)]">
                         保存方式: {formatSaveStorageType(result.saveData.saveStorageType)}

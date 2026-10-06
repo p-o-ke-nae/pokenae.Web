@@ -3,6 +3,7 @@ import {
   buildSaveDataSearchUrl,
   partitionRestoredSaveDataSearchCriteria,
   restoreSaveDataSearchCriteria,
+  restoreSaveDataSearchIncludeDeleted,
   shouldRunInitialSaveDataSearch,
   type InitialSaveDataSearchState,
 } from './save-data-search-url';
@@ -18,10 +19,13 @@ describe('save-data search URL helpers', () => {
     const searchUrl = buildSaveDataSearchUrl(
       'https://example.test/game-library/save-data-search?source=dashboard#results',
       criteria,
+      true,
     );
     const url = new URL(searchUrl, 'https://example.test');
 
     expect(url.searchParams.get('source')).toBe('dashboard');
+    expect(url.searchParams.get('includeDeleted')).toBe('1');
+    expect(restoreSaveDataSearchIncludeDeleted(url.search)).toBe(true);
     expect(restoreSaveDataSearchCriteria(url.search)).toEqual(criteria);
     expect(url.hash).toBe('#results');
   });
@@ -60,7 +64,13 @@ describe('save-data search URL helpers', () => {
 
     const clearedUrl = new URL(buildSaveDataSearchUrl(populatedUrl.href, []), 'https://example.test');
     expect(clearedUrl.searchParams.has('criteria')).toBe(false);
+    expect(clearedUrl.searchParams.has('includeDeleted')).toBe(false);
     expect(clearedUrl.searchParams.get('tab')).toBe('all');
+  });
+
+  it('restores includeDeleted independently from legacy criteria', () => {
+    expect(restoreSaveDataSearchIncludeDeleted('?includeDeleted=1&field=x&operator=equals&value=y')).toBe(true);
+    expect(restoreSaveDataSearchIncludeDeleted('?includeDeleted=true')).toBe(false);
   });
 });
 

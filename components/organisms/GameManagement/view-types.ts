@@ -52,7 +52,6 @@ export type FormState = {
   installedGameConsoleId: string;
   memoryCardId: string;
   storyProgressDefinitionId: string;
-  replacedBySaveDataId: string;
   deleteReason: string;
   dynamicFieldValues: Record<string, string>;
 };
@@ -86,5 +85,4 @@ export type LookupSelectOptions = {
   accounts: SelectOption[];
   memoryCardEditionMasters: SelectOption[];
   memoryCards: SelectOption[];
-  saveDatas: SelectOption[];
 };
