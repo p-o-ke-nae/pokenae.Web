@@ -38,6 +38,5 @@ export function selectOptionsFromLookups(lookups: ManagementLookups): LookupSele
     accounts: lookups.accounts.map((item) => ({ value: String(item.id), label: getAccountDisplay(item, lookups) })),
     memoryCardEditionMasters: lookups.memoryCardEditionMasters.map((item) => ({ value: String(item.id), label: `${item.name}（${item.blockCount}ブロック）` })),
     memoryCards: lookups.memoryCards.map((item) => ({ value: String(item.id), label: getMemoryCardDisplay(item, lookups) })),
-    saveDatas: lookups.saveDatas.map((item) => ({ value: String(item.id), label: `SaveData #${item.id}` })),
   };
 }

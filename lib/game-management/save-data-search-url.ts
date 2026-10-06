@@ -47,6 +47,7 @@ export function partitionRestoredSaveDataSearchCriteria(
 }
 
 const SEARCH_QUERY_KEY = 'criteria';
+const INCLUDE_DELETED_QUERY_KEY = 'includeDeleted';
 const LEGACY_QUERY_KEYS = {
   field: 'field',
   operator: 'operator',
@@ -138,7 +139,11 @@ export function restoreSaveDataSearchCriteria(search: string): SaveDataSearchCri
   })));
 }
 
-export function buildSaveDataSearchUrl(currentUrl: string, criteria: SaveDataSearchCriteria[]): string {
+export function restoreSaveDataSearchIncludeDeleted(search: string): boolean {
+  return new URLSearchParams(search).get(INCLUDE_DELETED_QUERY_KEY) === '1';
+}
+
+export function buildSaveDataSearchUrl(currentUrl: string, criteria: SaveDataSearchCriteria[], includeDeleted = false): string {
   const url = new URL(currentUrl);
   url.searchParams.delete(LEGACY_QUERY_KEYS.field);
   url.searchParams.delete(LEGACY_QUERY_KEYS.operator);
@@ -147,6 +152,11 @@ export function buildSaveDataSearchUrl(currentUrl: string, criteria: SaveDataSea
     url.searchParams.set(SEARCH_QUERY_KEY, JSON.stringify(criteria));
   } else {
     url.searchParams.delete(SEARCH_QUERY_KEY);
+  }
+  if (includeDeleted) {
+    url.searchParams.set(INCLUDE_DELETED_QUERY_KEY, '1');
+  } else {
+    url.searchParams.delete(INCLUDE_DELETED_QUERY_KEY);
   }
   return `${url.pathname}${url.search}${url.hash}`;
 }

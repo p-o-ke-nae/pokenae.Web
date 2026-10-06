@@ -39,6 +39,7 @@ export const apiErrorResources = {
   generic: {
     network: 'サーバーに接続できませんでした。',
     networkDetail: 'しばらく待ってから再試行してください。',
+    apiStarting: 'APIを起動しています。しばらくしてから再試行してください。',
     timeout: 'サーバーの応答がありませんでした。',
     timeoutDetail: 'しばらく待ってから再試行してください。',
     invalidResponse: 'サーバーからの応答を確認できませんでした。',
@@ -54,6 +55,7 @@ export const apiErrorResources = {
     internalError: 'サーバー内部で問題が発生しました。',
     timeout: 'バックエンドサービスの応答がタイムアウトしました。',
     network: 'バックエンドサービスに接続できませんでした。',
+    apiStarting: 'APIを起動しています。しばらくしてから再試行してください。',
     unknown: '予期しないエラーが発生しました。',
   },
   fallback: 'エラーが発生しました。',

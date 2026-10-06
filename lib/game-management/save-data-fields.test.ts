@@ -25,7 +25,7 @@ const saveDataWithoutBooleanField: SaveDataDto = {
   ownerGoogleUserId: 'google-user-1',
   displayOrder: 1,
   memo: null,
-  replacedBySaveDataId: null,
+  deletedAt: null,
   saveStorageType: 1,
   gameSoftwareMasterId: 1,
   gameSoftwareId: null,

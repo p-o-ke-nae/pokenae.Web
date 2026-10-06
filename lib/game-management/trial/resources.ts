@@ -283,12 +283,13 @@ type TrialSaveDataStorageRecord = Omit<SaveDataDto, 'gameSoftwareMasterId' | 'ga
   displayOrder?: number | null;
 };
 
-export function trialListSaveDatas(): SaveDataDto[] {
+export function trialListSaveDatas(options: { includeDeleted?: boolean } = {}): SaveDataDto[] {
   const gameSoftwares = trialListGameSoftwares();
   return sortByDisplayOrder(
-    readList<TrialSaveDataStorageRecord>('save-datas').map((item) => {
+    readList<TrialSaveDataStorageRecord>('save-datas').filter((item) => options.includeDeleted || !item.isDeleted).map((item) => {
       const normalized = {
         ...item,
+        deletedAt: item.deletedAt ?? null,
         displayOrder: typeof item.displayOrder === 'number' && Number.isInteger(item.displayOrder) && item.displayOrder > 0
           ? item.displayOrder
           : item.id,
@@ -303,7 +304,7 @@ export function trialListSaveDatas(): SaveDataDto[] {
 }
 
 export function trialGetSaveData(id: number): SaveDataDto | undefined {
-  return trialListSaveDatas().find((item) => item.id === id);
+  return trialListSaveDatas({ includeDeleted: true }).find((item) => item.id === id);
 }
 
 export function trialCreateSaveData(
@@ -311,14 +312,14 @@ export function trialCreateSaveData(
   saveStorageType: SaveStorageType,
   schema: SaveDataSchemaDto | null,
 ): number {
-  const items = trialListSaveDatas();
+  const items = trialListSaveDatas({ includeDeleted: true });
   const newId = getNextId('save-datas');
   items.push({
     id: newId,
     ownerGoogleUserId: TRIAL_OWNER,
     displayOrder: resolveDisplayOrder(payload.displayOrder, newId),
     memo: payload.memo,
-    replacedBySaveDataId: null,
+    deletedAt: null,
     saveStorageType,
     gameSoftwareMasterId: payload.gameSoftwareMasterId,
     gameSoftwareId: payload.gameSoftwareId,
@@ -340,7 +341,7 @@ export function trialUpdateSaveData(
   saveStorageType: SaveStorageType,
   schema: SaveDataSchemaDto | null,
 ): SaveDataDto {
-  const items = trialListSaveDatas();
+  const items = trialListSaveDatas({ includeDeleted: true });
   const idx = items.findIndex((item) => item.id === id);
   if (idx === -1) throw new Error(`SaveData #${id} not found`);
   items[idx] = {
@@ -353,7 +354,6 @@ export function trialUpdateSaveData(
     accountId: payload.accountId,
     memoryCardId: payload.memoryCardId,
     storyProgressDefinitionId: payload.storyProgressDefinitionId,
-    replacedBySaveDataId: payload.replacedBySaveDataId,
     extendedFields: createTrialExtendedFields(schema, payload.extendedFields),
   };
   writeList('save-datas', items);
@@ -362,16 +362,15 @@ export function trialUpdateSaveData(
 
 export function trialDeleteSaveData(id: number, payload: {
   deleteReason: string | null;
-  replacedBySaveDataId: number | null;
 }): void {
-  const items = trialListSaveDatas();
+  const items = trialListSaveDatas({ includeDeleted: true });
   const idx = items.findIndex((item) => item.id === id);
-  if (idx === -1) throw new Error(`SaveData #${id} not found`);
+  if (idx === -1 || items[idx].isDeleted) throw new Error(`SaveData #${id} not found`);
   items[idx] = {
     ...items[idx],
     isDeleted: true,
+    deletedAt: new Date().toISOString(),
     deleteReason: payload.deleteReason,
-    replacedBySaveDataId: payload.replacedBySaveDataId,
   };
   writeList('save-datas', items);
 }
@@ -380,13 +379,13 @@ export function trialDeleteSaveData(id: number, payload: {
 // 一括 lookup 構築（トライアル用）
 // ---------------------------------------------------------------------------
 
-export function buildTrialUserData(): Omit<ManagementLookups, keyof MasterLookups> {
+export function buildTrialUserData(options: { includeDeletedSaveDatas?: boolean } = {}): Omit<ManagementLookups, keyof MasterLookups> {
   return {
     accounts: trialListAccounts(),
     gameConsoles: trialListGameConsoles(),
     gameSoftwares: trialListGameSoftwares(),
     memoryCards: trialListMemoryCards(),
-    saveDatas: trialListSaveDatas(),
+    saveDatas: trialListSaveDatas({ includeDeleted: options.includeDeletedSaveDatas }),
   };
 }
 

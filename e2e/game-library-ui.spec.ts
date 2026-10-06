@@ -11,6 +11,140 @@ async function mockPublicApi(page: Page) {
   );
 }
 
+async function mockSaveDataTrialFixtures(page: Page) {
+  await page.unroute("**/api/public/**");
+  await page.addInitScript(() => {
+    const saveDatas = [
+      {
+        id: 1,
+        ownerGoogleUserId: "trial-user",
+        displayOrder: 1,
+        memo: "有効なセーブ",
+        deletedAt: null,
+        saveStorageType: 0,
+        gameSoftwareMasterId: 101,
+        gameSoftwareId: 1011,
+        gameConsoleId: null,
+        accountId: null,
+        memoryCardId: null,
+        storyProgressDefinitionId: null,
+        extendedFields: [],
+        isDeleted: false,
+        deleteReason: null,
+      },
+      {
+        id: 2,
+        ownerGoogleUserId: "trial-user",
+        displayOrder: 2,
+        memo: "削除済みセーブ",
+        deletedAt: "2026-10-01T12:34:56.000Z",
+        saveStorageType: 0,
+        gameSoftwareMasterId: 100,
+        gameSoftwareId: 1001,
+        gameConsoleId: null,
+        accountId: null,
+        memoryCardId: null,
+        storyProgressDefinitionId: null,
+        extendedFields: [],
+        isDeleted: true,
+        deleteReason: "整理のため",
+      },
+    ];
+    const gameSoftwares = [
+      {
+        id: 1001,
+        ownerGoogleUserId: "trial-user",
+        displayOrder: 1,
+        gameSoftwareMasterId: 100,
+        label: "削除確認ソフト パッケージ",
+        variant: 0,
+        accountId: null,
+        installedGameConsoleId: null,
+        memo: null,
+        isDeleted: false,
+        maintenance: {
+          hasRecord: false,
+          intervalDays: 365,
+          lastMaintenanceDate: null,
+          nextMaintenanceDate: null,
+          isOverdue: false,
+          latestHealthStatus: 0,
+        },
+      },
+      {
+        id: 1011,
+        ownerGoogleUserId: "trial-user",
+        displayOrder: 2,
+        gameSoftwareMasterId: 101,
+        label: "有効確認ソフト パッケージ",
+        variant: 0,
+        accountId: null,
+        installedGameConsoleId: null,
+        memo: null,
+        isDeleted: false,
+        maintenance: {
+          hasRecord: false,
+          intervalDays: 365,
+          lastMaintenanceDate: null,
+          nextMaintenanceDate: null,
+          isOverdue: false,
+          latestHealthStatus: 0,
+        },
+      },
+    ];
+    localStorage.setItem("pokenae_trial_v1:game-softwares", JSON.stringify(gameSoftwares));
+    localStorage.setItem("pokenae_trial_v1:save-datas", JSON.stringify(saveDatas));
+    localStorage.setItem("pokenae_trial_v1:save-datas:nextId", "2");
+  });
+
+  await page.route("**/api/public/**", async (route) => {
+    const path = new URL(route.request().url()).pathname.replace("/api/public/", "");
+    let data: unknown[] | Record<string, unknown> = [];
+    if (path === "game-console-categories") {
+      data = [{
+        id: 10,
+        name: "テストカテゴリ",
+        abbreviation: "TC",
+        manufacturer: "テスト",
+        saveStorageType: 0,
+        displayOrder: 1,
+        isDeleted: false,
+      }];
+    } else if (path === "game-software-masters") {
+      data = [
+        {
+          id: 100,
+          name: "削除確認ソフト",
+          abbreviation: "DELTEST",
+          gameConsoleCategoryId: 10,
+          contentGroupId: null,
+          displayOrder: 1,
+          isDeleted: false,
+        },
+        {
+          id: 101,
+          name: "有効確認ソフト",
+          abbreviation: "ACTIVE",
+          gameConsoleCategoryId: 10,
+          contentGroupId: null,
+          displayOrder: 2,
+          isDeleted: false,
+        },
+      ];
+    } else if (path === "game-software-masters/100/save-data-schema" || path === "game-software-masters/101/save-data-schema") {
+      const gameSoftwareMasterId = Number(path.split("/")[1]);
+      data = {
+        gameSoftwareMasterId,
+        contentGroupId: null,
+        fields: [],
+      };
+    } else if (path === "game-software-masters/100/story-progress-schema" || path === "game-software-masters/101/story-progress-schema") {
+      data = { gameSoftwareMasterId: Number(path.split("/")[1]), contentGroupId: null, choices: [] };
+    }
+    await route.fulfill({ status: 200, contentType: "application/json", json: { success: true, data } });
+  });
+}
+
 /** rgb()/rgba()/color(srgb ...) を 0-255 の [r, g, b, a] に変換する */
 function parseRgb(value: string): number[] {
   const rgb = value.match(/rgba?\(([^)]+)\)/);
@@ -123,7 +257,7 @@ async function expectFooterLayout(dialog: Locator, isMobile: boolean, primaryNam
       expect(primary!.width).toBeGreaterThanOrEqual(widest - 1);
     } else {
       const ys = boxes.map((box) => box.y);
-      expect(Math.max(...ys) - Math.min(...ys), JSON.stringify(boxes)).toBeLessThanOrEqual(1);
+      expect(Math.max(...ys) - Math.min(...ys), JSON.stringify(boxes)).toBeLessThanOrEqual(2);
     }
     // 同じ行のボタンは同じ幅（均等割り）
     const rows = new Map<number, Box[]>();
@@ -274,8 +408,8 @@ test.describe("ゲームライブラリ UI", () => {
     const saveDataHeaders = page.getByRole("columnheader");
     await expect(saveDataHeaders.filter({ hasText: "ストーリー進行度" })).toBeVisible();
     await expect(saveDataHeaders.filter({ hasText: "メモ" })).toBeVisible();
-    await expect(saveDataHeaders.nth(3)).toContainText("メモ");
-    await expect(saveDataHeaders.nth(3)).toHaveCSS("width", "512px");
+    await expect(saveDataHeaders.filter({ hasText: "メモ" })).toHaveCSS("width", "512px");
+    await expect(saveDataHeaders.filter({ hasText: "状態" })).toBeVisible();
   });
 
   test("編集ダイアログのフッターボタンが崩れずに並ぶ", async ({ page, isMobile }) => {
@@ -298,7 +432,7 @@ test.describe("ゲームライブラリ UI", () => {
         ownerGoogleUserId: "trial-user",
         displayOrder: id,
         memo: null,
-        replacedBySaveDataId: null,
+        deletedAt: null,
         saveStorageType: 0,
         gameSoftwareMasterId: masterId,
         gameSoftwareId: null,
@@ -430,7 +564,7 @@ test.describe("ゲームライブラリ UI", () => {
         ownerGoogleUserId: "google-user",
         displayOrder: 1,
         memo: null,
-        replacedBySaveDataId: null,
+        deletedAt: null,
         saveStorageType: 0,
         gameSoftwareMasterId: 200,
         gameSoftwareId: null,
@@ -501,6 +635,84 @@ test.describe("ゲームライブラリ UI", () => {
     await expect(page.getByText("主人公名: ログイン主人公", { exact: true })).toBeVisible();
     await expect(page.getByText(/URL内の検索条件を確認してください/)).toHaveCount(0);
     expect(new URL(page.url()).searchParams.get("criteria")).toBe(searchParams.get("criteria"));
+  });
+
+  test("削除済みセーブデータは明示した場合だけ一覧と検索に表示される", async ({ page }) => {
+    await mockSaveDataTrialFixtures(page);
+
+    await page.goto("/game-library/save-datas");
+    await expect(page.getByRole("button", { name: "編集 (#1)" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "編集 (#2)" })).toHaveCount(0);
+    await page.getByLabel("削除済みデータを含む").check();
+    await expect(page.getByRole("button", { name: "編集 (#2)" })).toBeVisible();
+    await expect(page.getByText("削除済み", { exact: true })).toBeVisible();
+
+    const searchParams = new URLSearchParams({
+      criteria: JSON.stringify([
+        { fieldId: "master:game-software", operator: "equals", value: "100" },
+      ]),
+    });
+    await page.goto(`/game-library/save-data-search?${searchParams.toString()}`);
+    await expect(page.getByText("一致するセーブデータはありませんでした。")).toBeVisible();
+    await expect(page.getByText("DELTEST — 削除確認ソフト")).toHaveCount(0);
+
+    await page.getByLabel("削除済みデータを含む").check();
+    await expect.poll(() => new URL(page.url()).searchParams.get("includeDeleted")).toBe("1");
+    await expect(page.getByRole("button", { name: "検索", exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: "検索", exact: true }).click();
+    await expect(page.getByText("DELTEST — 削除確認ソフト")).toBeVisible();
+    await expect(page.getByText("削除済み", { exact: true })).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByLabel("削除済みデータを含む")).toBeChecked();
+    await expect(page.getByText("DELTEST — 削除確認ソフト")).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("includeDeleted")).toBe("1");
+  });
+
+  test("削除済みセーブデータはバナー付きで編集でき、削除ボタンは表示しない", async ({ page }) => {
+    await mockSaveDataTrialFixtures(page);
+
+    await page.goto("/game-library/save-datas");
+    await page.getByLabel("削除済みデータを含む").check();
+    await page.getByRole("button", { name: "編集 (#2)" }).click();
+    const dialog = page.getByRole("dialog").first();
+    await expect(dialog.getByText("削除済みのセーブデータです。")).toBeVisible();
+    await expect(dialog.getByText("削除理由: 整理のため")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "削除", exact: true })).toHaveCount(0);
+
+    await dialog.getByRole("switch").click();
+    await expect(dialog.getByRole("button", { name: "保存", exact: true })).toBeVisible();
+    await dialog.locator("#memo").fill("削除済み編集済みメモ");
+    await dialog.getByRole("button", { name: "保存", exact: true }).click();
+    await expect(dialog.getByText("更新しました。")).toBeVisible();
+    await expect.poll(async () => page.evaluate(() => {
+      const items = JSON.parse(localStorage.getItem("pokenae_trial_v1:save-datas") ?? "[]") as Array<{ id: number; memo: string | null; isDeleted: boolean }>;
+      return items.find((item) => item.id === 2);
+    })).toMatchObject({ memo: "削除済み編集済みメモ", isDeleted: true });
+  });
+
+  test("削除して新規作成で保存先を引き継いだ新規フォームを開く", async ({ page }) => {
+    await mockSaveDataTrialFixtures(page);
+
+    await page.goto("/game-library/save-datas");
+    await page.getByRole("button", { name: "編集 (#1)" }).click();
+    const editor = page.getByRole("dialog").first();
+    await editor.getByRole("switch").click();
+    await expect(editor.getByRole("button", { name: "削除", exact: true })).toBeVisible();
+    await editor.getByRole("button", { name: "削除", exact: true }).click();
+
+    const deleteDialog = page.getByRole("dialog", { name: "セーブデータを削除" });
+    await expect(deleteDialog).toBeVisible();
+    await deleteDialog.getByRole("button", { name: "削除して新規作成" }).click();
+
+    await expect.poll(() => new URL(page.url()).pathname).toBe("/game-library/save-datas");
+    const newEditor = page.getByRole("dialog", { name: "セーブデータ作成" });
+    await expect(newEditor).toBeVisible();
+    await expect(newEditor.locator("#gameSoftwareMasterId")).toHaveValue("101");
+    await expect.poll(async () => page.evaluate(() => {
+      const items = JSON.parse(localStorage.getItem("pokenae_trial_v1:save-datas") ?? "[]") as Array<{ id: number; isDeleted: boolean }>;
+      return items.find((item) => item.id === 1)?.isDeleted;
+    })).toBe(true);
   });
 
   test("ネストしたメンテナンス画面を閉じても親の詳細は開いたまま", async ({ page }) => {

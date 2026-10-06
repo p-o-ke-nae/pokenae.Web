@@ -9,7 +9,7 @@
 
 import { NextRequest } from 'next/server';
 import { getApiClient } from '@/lib/api/client-factory';
-import { createSuccessResponse, createSafeErrorResponse } from '@/lib/api/route-helpers';
+import { createSuccessResponse, createSafeErrorResponse, createApiStartingResponse, isApiStartingCode } from '@/lib/api/route-helpers';
 
 /** 許可するパスプレフィックス（先頭スラッシュなし） */
 const ALLOWED_PREFIXES = [
@@ -69,6 +69,10 @@ export async function GET(request: NextRequest, context: RouteParams) {
 
     if (response.success) {
       return createSuccessResponse(response.data);
+    }
+
+    if (isApiStartingCode(response.error.code)) {
+      return createApiStartingResponse(response.error.details);
     }
 
     const statusCode = response.error.code.startsWith('HTTP_')

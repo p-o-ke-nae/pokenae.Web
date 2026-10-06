@@ -144,10 +144,7 @@ function dispatchSaveTrial(
       if (isNew) {
         return trialCreateSaveData(savePayloadBase, derivedType ?? 0, saveDataSchema);
       }
-      trialUpdateSaveData(Number(recordId), {
-        ...savePayloadBase,
-        replacedBySaveDataId: numberOrNull(formState.replacedBySaveDataId),
-      }, derivedType ?? 0, saveDataSchema);
+      trialUpdateSaveData(Number(recordId), savePayloadBase, derivedType ?? 0, saveDataSchema);
       return null;
     }
     default:
@@ -325,10 +322,7 @@ async function dispatchSaveApi(
     case 'save-datas': {
       const savePayloadBase = buildSaveDataPayload(formState, lookups, saveDataSchema, isNew ? displayOrder : null);
       if (isNew) return await createResource('save-datas', savePayloadBase);
-      await updateResource('save-datas', id, {
-        ...savePayloadBase,
-        replacedBySaveDataId: numberOrNull(formState.replacedBySaveDataId),
-      });
+      await updateResource('save-datas', id, savePayloadBase);
       return null;
     }
     default:
@@ -374,7 +368,6 @@ function dispatchDeleteTrial(
     case 'save-datas':
       trialDeleteSaveData(Number(recordId), {
         deleteReason: nullIfBlank(formState.deleteReason),
-        replacedBySaveDataId: numberOrNull(formState.replacedBySaveDataId),
       });
       break;
   }
@@ -389,7 +382,6 @@ async function dispatchDeleteApi(
   if (resourceKey === 'save-datas') {
     await deleteResource('save-datas', id, {
       deleteReason: nullIfBlank(formState.deleteReason),
-      replacedBySaveDataId: numberOrNull(formState.replacedBySaveDataId),
     });
   } else {
     await deleteResource(resourceKey, id);
