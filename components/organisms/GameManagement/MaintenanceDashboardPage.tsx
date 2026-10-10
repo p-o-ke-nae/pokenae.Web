@@ -189,7 +189,8 @@ export function getMaintenanceTargetColumns(
 }
 
 export default function MaintenanceDashboardPage() {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
+  const sessionReady = sessionStatus !== 'loading';
   const isTrial = !session?.user;
   const layoutMode = useResponsiveLayoutMode();
   const [lookups, setLookups] = useState<ManagementLookups | null>(null);
@@ -220,8 +221,9 @@ export default function MaintenanceDashboardPage() {
   }, [isTrial, maintenanceHealthFilter]);
 
   useEffect(() => {
+    if (!sessionReady) return;
     void load();
-  }, [load]);
+  }, [load, sessionReady]);
 
   useEffect(() => {
     if (!lookups || isTrial) {

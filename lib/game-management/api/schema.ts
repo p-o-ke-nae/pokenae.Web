@@ -23,7 +23,6 @@ import type {
   UpsertSaveDataFieldOverrideRequest,
   UpsertStoryProgressOverrideRequest,
 } from '@/lib/game-management/types';
-import { getSession } from 'next-auth/react';
 import { ApiError, client, getErrorMessage, unwrap } from './core';
 
 type BatchUpdateSaveDataFieldDefinitionTypesResponse = {
@@ -88,16 +87,8 @@ export async function batchUpdateSaveDataFieldDefinitionTypes(
     return { updatedCount: 0 };
   }
 
+  // 認証トークンは API Route がサーバーセッションから付与する。
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  try {
-    const session = await getSession();
-    if (session?.accessToken) {
-      headers.Authorization = `Bearer ${session.accessToken}`;
-      headers['X-Google-Access-Token'] = session.accessToken;
-    }
-  } catch {
-    // セッション取得失敗時はヘッダーなしで続行する。
-  }
 
   const response = await fetch('/api/batch-save-data-field-definition-types', {
     method: 'POST',

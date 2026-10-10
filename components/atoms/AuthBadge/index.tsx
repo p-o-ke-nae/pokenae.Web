@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useState } from 'react';
 import { signOut, signIn } from 'next-auth/react';
+import { clearSessionCache } from '@/lib/session-cache';
 
 export interface AuthBadgeProps {
   isAuthenticated: boolean;
@@ -96,6 +97,7 @@ export default function AuthBadge({
           type="button"
           onClick={async () => {
             onMenuClose();
+            clearSessionCache();
             await signOut({ callbackUrl: '/' });
           }}
         >

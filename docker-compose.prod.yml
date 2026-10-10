@@ -50,8 +50,22 @@ services:
           cpus: '0.25'
           memory: 256M
     # IPv6 の ::1 ではなく、Next.js が待ち受ける IPv4 ループバックを明示する。
+    # Docker は unhealthy になってもコンテナを再起動しないため、連続 4 回失敗（約 2 分）した場合は
+    # healthcheck 自身が Node.js プロセスを停止し、restart: always で自動復旧させる（ハング時の 502 継続対策）。
+    # イメージ側のスクリプトに依存させないことで、旧イメージへのロールバック時も同じ挙動を保つ。
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --output-document=/dev/null http://127.0.0.1:3000/api/health || exit 1"]
+      test:
+        - CMD-SHELL
+        - >-
+          f=/tmp/.pokenae-health-failures;
+          if wget --quiet --tries=1 --timeout=5 --output-document=/dev/null http://127.0.0.1:3000/api/health; then rm -f $$f; exit 0; fi;
+          n=$$(( $$(cat $$f 2>/dev/null || echo 0) + 1 )); echo $$n > $$f;
+          if [ $$n -ge 4 ]; then
+          rm -f $$f;
+          echo "[healthcheck] $$n consecutive failures; restarting Node.js process" > /proc/1/fd/2 2>/dev/null;
+          kill -TERM -1; sleep 3; kill -KILL -1;
+          fi;
+          exit 1
       interval: 30s
       timeout: 10s
       retries: 3

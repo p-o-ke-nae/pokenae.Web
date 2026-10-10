@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useSessionState } from '@/lib/hooks/useSessionState';
 import type { DataTableColumn, SortState } from './index';
 
 function getCellComparableValue<T extends Record<string, unknown>>(
@@ -119,18 +120,29 @@ export function useDataTableProcessing<T extends Record<string, unknown>>({
   sortStateProp,
   onSortChange,
   onFilteredDataChange,
+  persistStateKey,
 }: {
   data: T[];
   columns: DataTableColumn<T>[];
   sortStateProp?: SortState | null;
   onSortChange?: (sort: SortState | null) => void;
   onFilteredDataChange?: (data: T[]) => void;
+  persistStateKey?: string;
 }) {
-  const [internalSortState, setInternalSortState] = useState<SortState | null>(null);
+  const [internalSortState, setInternalSortState] = useSessionState<SortState | null>(
+    persistStateKey ? `${persistStateKey}:sort` : undefined,
+    null,
+  );
   const effectiveSortState = sortStateProp !== undefined ? sortStateProp : internalSortState;
 
-  const [filters, setFilters] = useState<Record<string, string>>({});
-  const [selectFilters, setSelectFilters] = useState<Partial<Record<string, string[]>>>({});
+  const [filters, setFilters] = useSessionState<Record<string, string>>(
+    persistStateKey ? `${persistStateKey}:filters` : undefined,
+    {},
+  );
+  const [selectFilters, setSelectFilters] = useSessionState<Partial<Record<string, string[]>>>(
+    persistStateKey ? `${persistStateKey}:selectFilters` : undefined,
+    {},
+  );
 
   const onFilteredDataChangeRef = useRef(onFilteredDataChange);
   useEffect(() => { onFilteredDataChangeRef.current = onFilteredDataChange; });
@@ -171,7 +183,7 @@ export function useDataTableProcessing<T extends Record<string, unknown>>({
         setInternalSortState(next);
       }
     },
-    [effectiveSortState, onSortChange, columns],
+    [effectiveSortState, onSortChange, columns, setInternalSortState],
   );
 
   return {
