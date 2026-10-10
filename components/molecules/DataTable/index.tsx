@@ -16,6 +16,8 @@ import CustomCheckBox from "@/components/atoms/CustomCheckBox";
 import CustomHeader from "@/components/atoms/CustomHeader";
 import CustomLabel from "@/components/atoms/CustomLabel";
 import resources from "@/lib/resources";
+import { useSessionState } from "@/lib/hooks/useSessionState";
+import { readSessionCache, writeSessionCache } from "@/lib/session-cache";
 import { buildSelectFilterOptions, useDataTableProcessing } from "./useDataTableProcessing";
 import { useColumnOrder } from "./useColumnOrder";
 import { useColumnResize } from "./useColumnResize";
@@ -182,6 +184,10 @@ maxHeight?: string;
   paginated?: boolean;
   /** 1ページあたりの表示行数（デフォルト: 50） */
   pageSize?: number;
+  /**
+   * 指定するとフィルタ・ソート・ページ位置を sessionStorage に保持する（画面ごとに一意なキー）
+   */
+  persistStateKey?: string;
   /** ページサイズ選択肢（デフォルト: [20, 50, 100]） */
   pageSizeOptions?: number[];
   className?: string;
@@ -282,6 +288,7 @@ maxHeight,
 paginated = false,
 pageSize: pageSizeProp = 50,
 pageSizeOptions = [20, 50, 100],
+persistStateKey,
 className = "",
 }: DataTableProps<T>) {
 const tableRootRef = useRef<HTMLDivElement>(null);
@@ -291,7 +298,10 @@ const filterScrollRef = useRef<HTMLDivElement>(null);
 const recordsRef = useRef<HTMLDivElement>(null);
 const [scrollbarOffset, setScrollbarOffset] = useState(0);
 const [currentPage, setCurrentPage] = useState(0);
-const [internalPageSize, setInternalPageSize] = useState(pageSizeProp);
+const [internalPageSize, setInternalPageSize] = useSessionState(
+  persistStateKey ? `${persistStateKey}:pageSize` : undefined,
+  pageSizeProp,
+);
 // --- Hooks ---
 const {
   orderedColumns,
@@ -316,6 +326,7 @@ const {
   sortStateProp,
   onSortChange,
   onFilteredDataChange,
+  persistStateKey,
 });
 
 const {
@@ -516,11 +527,38 @@ selectFilters,
 }), [effectiveSortState, filters, selectFilters]);
 
 // ページリセット: フィルタ・ソート変更時（React 推奨パターン: render 中の setState）
+// 保存済みページは、復元したフィルタ・ソートと一致した時点で適用する
+const pageStorageKey = persistStateKey ? `${persistStateKey}:page` : undefined;
+const pendingPageRestoreRef = useRef<{ signature: string; page: number } | null>(null);
 const [prevResetSignature, setPrevResetSignature] = useState(selectionResetSignature);
 if (prevResetSignature !== selectionResetSignature) {
 setPrevResetSignature(selectionResetSignature);
-if (currentPage !== 0) setCurrentPage(0);
+const pending = pendingPageRestoreRef.current;
+pendingPageRestoreRef.current = null;
+if (pending && pending.signature === selectionResetSignature) {
+  if (currentPage !== pending.page) setCurrentPage(pending.page);
+} else if (currentPage !== 0) {
+  setCurrentPage(0);
 }
+}
+
+useEffect(() => {
+if (!pageStorageKey) return;
+const stored = readSessionCache<{ signature: string; page: number }>(pageStorageKey, '');
+if (!stored) return;
+if (stored.signature === selectionResetSignature) {
+  setCurrentPage(stored.page);
+} else {
+  pendingPageRestoreRef.current = stored;
+}
+// マウント時のみ復元する
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [pageStorageKey]);
+
+useEffect(() => {
+if (!pageStorageKey || pendingPageRestoreRef.current) return;
+writeSessionCache(pageStorageKey, '', { signature: selectionResetSignature, page: currentPage });
+}, [currentPage, pageStorageKey, selectionResetSignature]);
 
 const previousSelectionResetSignature = useRef(selectionResetSignature);
 

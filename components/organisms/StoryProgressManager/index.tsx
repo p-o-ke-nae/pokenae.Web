@@ -5,7 +5,6 @@ import Link from 'next/link';
 import CustomButton from '@/components/atoms/CustomButton';
 import PageModeToggle from '@/components/atoms/PageModeToggle';
 import CustomCheckBox from '@/components/atoms/CustomCheckBox';
-import CustomComboBox from '@/components/atoms/CustomComboBox';
 import CustomHeader from '@/components/atoms/CustomHeader';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
@@ -16,7 +15,7 @@ import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup'
 import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
 import { moveSelectedItemsByOne, moveSelectedItemsToTarget } from '@/components/molecules/DataTable/selection-utils';
 import RowMoveButtons from '@/components/organisms/GameManagement/RowMoveButtons';
-import { PageFrame } from '@/components/organisms/GameManagement/shared';
+import { PageFrame, SelectField } from '@/components/organisms/GameManagement/shared';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import {
   fetchMasterLookups,
@@ -125,22 +124,22 @@ type OverrideFormState = {
 
 const definitionColumns: DataTableColumn<DefinitionRow>[] = [
   { key: 'id', header: 'ID', width: '5rem', sortable: true, sortValue: (value) => Number(value ?? 0) },
-  { key: 'progressKey', header: 'progressKey', sortable: true, filterable: true },
+  { key: 'progressKey', header: '進行度キー', sortable: true, filterable: true },
   { key: 'label', header: '表示名', sortable: true, filterable: true },
   { key: 'displayOrder', header: '順序', sortable: true, sortValue: (value) => Number(value ?? 0) },
   { key: 'status', header: '状態' },
 ];
 
 const overrideColumns: DataTableColumn<OverrideRow>[] = [
-  { key: 'progressKey', header: 'progressKey', sortable: true, filterable: true },
-  { key: 'baseLabel', header: '基本ラベル', sortable: true, filterable: true },
-  { key: 'overrideLabel', header: 'override ラベル', filterable: true },
+  { key: 'progressKey', header: '進行度キー', sortable: true, filterable: true },
+  { key: 'baseLabel', header: '基本の表示名', sortable: true, filterable: true },
+  { key: 'overrideLabel', header: '上書きする表示名', filterable: true },
   { key: 'disabled', header: '無効化' },
   { key: 'status', header: '状態' },
 ];
 
 const previewColumns: DataTableColumn<PreviewRow>[] = [
-  { key: 'progressKey', header: 'progressKey', sortable: true, filterable: true },
+  { key: 'progressKey', header: '進行度キー', sortable: true, filterable: true },
   { key: 'label', header: '表示名', sortable: true, filterable: true },
   { key: 'displayOrder', header: '順序', sortable: true, sortValue: (value) => Number(value ?? 0) },
   { key: 'disabled', header: '無効化' },
@@ -216,35 +215,13 @@ function createOverrideRequest(formState: OverrideFormState): UpsertStoryProgres
   };
 }
 
-function SelectField({
-  id,
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  options: Array<{ value: string; label: string }>;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="space-y-2">
-      <CustomLabel htmlFor={id}>{label}</CustomLabel>
-      <CustomComboBox id={id} value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">選択してください</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </CustomComboBox>
-    </div>
-  );
-}
+const SELECT_PLACEHOLDER = '選択してください';
 
-function SectionCard({ title, description, actions, layoutMode, children }: { title: string; description: string; actions?: React.ReactNode; layoutMode: LayoutMode; children: React.ReactNode }) {
+/**
+ * 絞り込み用のプルダウンは見出しの操作ボタン列に置くと、選択した表示名の長さで
+ * 幅が変わってレイアウトが崩れるため、一覧画面と同じ tool-filter 枠に配置する。
+ */
+function SectionCard({ title, description, actions, filters, layoutMode, children }: { title: string; description: string; actions?: React.ReactNode; filters?: React.ReactNode; layoutMode: LayoutMode; children: React.ReactNode }) {
   const headerLayoutClasses = 'tool-section__header';
 
   return (
@@ -260,6 +237,7 @@ function SectionCard({ title, description, actions, layoutMode, children }: { ti
           </ResponsiveActionGroup>
         ) : null}
       </div>
+      {filters ? <div className="tool-filter">{filters}</div> : null}
       {children}
     </section>
   );
@@ -679,7 +657,7 @@ export default function StoryProgressManager() {
         );
         await loadOverrides();
       }, '保存中...');
-      setOverrideDialogSuccess('override を保存しました。');
+      setOverrideDialogSuccess('作品別設定を保存しました。');
     } catch (saveError) {
       setOverrideDialogError(getGameManagementErrorMessage(saveError, { fallback: resources.gameManagement.errors.save }));
     }
@@ -692,7 +670,7 @@ export default function StoryProgressManager() {
     try {
       await startLoading(async () => {
         await deleteStoryProgressOverride(Number(selectedGameSoftwareMasterId), definitionId);
-        setSuccess('override を削除しました。');
+        setSuccess('作品別設定を削除しました。');
         await loadOverrides();
       }, '削除中...');
     } catch (deleteError) {
@@ -707,9 +685,9 @@ export default function StoryProgressManager() {
   if (pageLoading) {
     return (
       <PageFrame
-        eyebrowLabel="Story Progress Management"
+        eyebrowLabel=""
         title="ストーリー進行度管理"
-        description="StoryProgressDefinitions、StoryProgressOverrides、公開 story-progress-schema の resolved 結果を 1 画面で管理します。"
+        description="ストーリー進行度の定義、作品別設定、最終的な表示結果を 1 画面で管理します。"
         layoutMode={layoutMode}
       >
         <p className="tool-muted text-sm" role="status">管理画面を読み込んでいます...</p>
@@ -719,9 +697,9 @@ export default function StoryProgressManager() {
 
   return (
     <PageFrame
-      eyebrowLabel="Story Progress Management"
+      eyebrowLabel=""
       title="ストーリー進行度管理"
-      description="StoryProgressDefinitions、StoryProgressOverrides、公開 story-progress-schema の resolved 結果を 1 画面で管理します。"
+      description="ストーリー進行度の定義、作品別設定、最終的な表示結果を 1 画面で管理します。"
       layoutMode={layoutMode}
       actions={(
         <>
@@ -740,16 +718,22 @@ export default function StoryProgressManager() {
         <SectionCard
           layoutMode={layoutMode}
           title="進行度定義"
-          description="コンテンツグループごとのストーリー進行度定義を管理します。表示順と表示名を定義し、SaveData の候補元になります。"
-          actions={
+          description="コンテンツグループごとのストーリー進行度定義を管理します。表示順と表示名を定義し、セーブデータで選択できる進行度の候補になります。"
+          filters={(
             <>
               <SelectField
                 id="def-content-group"
                 label="コンテンツグループ"
                 value={selectedContentGroupId}
+                placeholder={SELECT_PLACEHOLDER}
                 options={contentGroupOptions}
                 onChange={setSelectedContentGroupId}
               />
+              <p className="text-sm leading-6 text-[var(--color-text-muted)]">選択したコンテンツグループの進行度定義を表示します。</p>
+            </>
+          )}
+          actions={
+            <>
               <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
                 {pageMode === 'edit' ? (
                   <CustomButton variant="accent" disabled={!selectedContentGroupId} onClick={() => openDefinitionDialog(null)}>
@@ -825,17 +809,21 @@ export default function StoryProgressManager() {
 
         <SectionCard
           layoutMode={layoutMode}
-          title="作品別 override"
-          description="ゲームソフトマスタ単位で、ラベルの上書きや無効化を設定します。"
-          actions={
-            <SelectField
-              id="ovr-software-master"
-              label="ゲームソフトマスタ"
-              value={selectedGameSoftwareMasterId}
-              options={softwareMasterOptions}
-              onChange={setSelectedGameSoftwareMasterId}
-            />
-          }
+          title="作品別設定"
+          description="ゲームソフトマスタ単位で、表示名の上書きや項目の無効化を設定します。"
+          filters={(
+            <>
+              <SelectField
+                id="ovr-software-master"
+                label="ゲームソフトマスタ"
+                value={selectedGameSoftwareMasterId}
+                placeholder={SELECT_PLACEHOLDER}
+                options={softwareMasterOptions}
+                onChange={setSelectedGameSoftwareMasterId}
+              />
+              <p className="text-sm leading-6 text-[var(--color-text-muted)]">選択した作品の作品別設定と、下の最終結果プレビューを表示します。</p>
+            </>
+          )}
         >
           <DataTable<OverrideRow>
             columns={[
@@ -864,14 +852,14 @@ export default function StoryProgressManager() {
             data={overrideRows}
             height={DATA_TABLE_DEFAULT_PAGE_HEIGHT}
             rowKey="id"
-            emptyMessage="override 対象がありません。"
+            emptyMessage="作品別設定の対象となる進行度定義がありません。"
           />
         </SectionCard>
 
         <SectionCard
           layoutMode={layoutMode}
-          title="resolved プレビュー"
-          description="公開 story-progress-schema API から取得した、作品ごとの最終的な進行度候補を確認します。"
+          title="最終結果プレビュー"
+          description="作品別設定を反映した、セーブデータ入力時に表示される進行度の候補を確認します。"
         >
           {resolvedSchema ? (
             <DataTable<PreviewRow> columns={previewColumns} data={previewRows} height={DATA_TABLE_DEFAULT_PAGE_HEIGHT} rowKey="id" emptyMessage="候補がありません。" />
@@ -931,7 +919,7 @@ export default function StoryProgressManager() {
           {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
           {success ? <CustomMessageArea variant="success">{success}</CustomMessageArea> : null}
           <div className="space-y-2">
-            <CustomLabel htmlFor="def-key">progressKey</CustomLabel>
+            <CustomLabel htmlFor="def-key">進行度キー</CustomLabel>
             <CustomTextBox id="def-key" value={definitionFormState.progressKey} onChange={(event) => setDefinitionFormState((current) => ({ ...current, progressKey: event.target.value }))} displayOnly={pageMode === 'view' && !!editingDefinition} />
           </div>
           <div className="space-y-2">
@@ -958,7 +946,7 @@ export default function StoryProgressManager() {
         open={overrideDialogOpen}
         onClose={() => setOverrideDialogOpen(false)}
         closeDisabled={isPending}
-        title={pageMode === 'view' ? 'override の詳細' : editingOverride ? 'override の編集' : 'override の新規設定'}
+        title={pageMode === 'view' ? '作品別設定の詳細' : editingOverride ? '作品別設定の編集' : '作品別設定の新規作成'}
         footer={
           pageMode === 'view' ? (
             <DialogFooterLayout
@@ -994,16 +982,16 @@ export default function StoryProgressManager() {
           {overrideDialogSuccess ? <CustomMessageArea variant="success">{overrideDialogSuccess}</CustomMessageArea> : null}
           {overrideTargetDefinition ? (
             <div className="select-none rounded bg-[var(--color-base-70-light)] p-3 text-sm">
-              <p>progressKey: {overrideTargetDefinition.progressKey}</p>
-              <p>基本ラベル: {overrideTargetDefinition.label}</p>
+              <p>進行度キー: {overrideTargetDefinition.progressKey}</p>
+              <p>基本の表示名: {overrideTargetDefinition.label}</p>
             </div>
           ) : null}
           <div className="space-y-2">
-            <CustomLabel htmlFor="ovr-label">override ラベル</CustomLabel>
+            <CustomLabel htmlFor="ovr-label">上書きする表示名</CustomLabel>
             <CustomTextBox id="ovr-label" value={overrideFormState.overrideLabel} onChange={(event) => setOverrideFormState((current) => ({ ...current, overrideLabel: event.target.value }))} displayOnly={pageMode === 'view'} />
           </div>
           <div className="space-y-2">
-            <CustomLabel htmlFor="ovr-description">override 説明</CustomLabel>
+            <CustomLabel htmlFor="ovr-description">上書きする説明</CustomLabel>
             <CustomTextArea id="ovr-description" value={overrideFormState.overrideDescription} onChange={(event) => setOverrideFormState((current) => ({ ...current, overrideDescription: event.target.value }))} displayOnly={pageMode === 'view'} />
           </div>
           <label className="flex items-center gap-3 text-sm text-[var(--foreground)]">

@@ -1,13 +1,13 @@
 export const uiResources = {
   common: {
     close: '閉じる',
-    loading: 'Loading...',
+    loading: '読み込み中...',
   },
   loader: {
-    label: 'Loading...',
+    label: '読み込み中...',
   },
   loadingOverlay: {
-    message: 'Loading...',
+    message: '読み込み中...',
   },
   dataTable: {
     emptyMessage: 'データがありません',

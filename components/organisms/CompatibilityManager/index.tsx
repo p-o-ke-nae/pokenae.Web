@@ -156,9 +156,9 @@ export default function CompatibilityManager() {
 
   return (
     <PageFrame
-      eyebrowLabel="Compatibility"
+      eyebrowLabel=""
       title="ゲーム機カテゴリ互換設定"
-      description="互換性は片方向です。host カテゴリが受け入れる supported カテゴリを設定します。例: Switch2（host）が Switch（supported）のソフトを実行できる場合、Switch2 側に Switch を追加します。"
+      description="互換性は片方向です。実行側のカテゴリが受け入れるカテゴリを設定します。例: Switch2 で Switch のソフトを実行できる場合、Switch2 側に Switch を追加します。"
       actions={(
         <Link href="/game-management" className="button-link button-link--secondary">
           ダッシュボードへ戻る
@@ -177,7 +177,7 @@ export default function CompatibilityManager() {
               <div className="space-y-4">
                 <CustomHeader level={2}>ゲーム機分類</CustomHeader>
                 <p className="text-sm leading-6 text-[var(--color-text-muted)]">
-                  互換設定を編集するカテゴリ（host）を選択してください。
+                  互換設定を編集する実行側のカテゴリを選択してください。
                 </p>
                 <div className="space-y-2">
                   {categories.map((category) => (
@@ -219,12 +219,12 @@ export default function CompatibilityManager() {
                   <div className="space-y-2">
                     <CustomHeader level={2}>{selectedHostCategory.name} の互換設定</CustomHeader>
                     <p className="text-sm leading-6 text-[var(--color-text-muted)]">
-                      このカテゴリ（host）が受け入れるカテゴリ（supported）を選択してください。チェックされたカテゴリのソフトを、このカテゴリのゲーム機で実行・保存できるようになります。
+                      このカテゴリのゲーム機で受け入れるカテゴリを選択してください。チェックされたカテゴリのソフトを、このカテゴリのゲーム機で実行・保存できるようになります。
                     </p>
                   </div>
 
                   <div className="space-y-3">
-                    <CustomLabel>受け入れ対象カテゴリ (supported)</CustomLabel>
+                    <CustomLabel>受け入れ対象カテゴリ</CustomLabel>
                     <div className="grid gap-3 sm:grid-cols-2">
                       {categories.map((category) => {
                         const isSelf = category.id === selectedHostCategoryId;

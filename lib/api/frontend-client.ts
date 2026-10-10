@@ -5,10 +5,14 @@
 
 import type { ApiResponse, HttpMethod } from '@/lib/types/api';
 import type { ApiServiceName } from '@/lib/config/api-config';
-import { getSession } from 'next-auth/react';
 import resources from '@/lib/resources';
 
 const RETRYABLE_CODES = new Set(['API_STARTING', 'HTTP_502', 'HTTP_503', 'HTTP_504']);
+// サーバー側（api-client.ts）でも起動待ちリトライを行うため、ブラウザ側は1回だけ再試行する。
+// 多段リトライによる起動中 API・Next.js への要求集中を避ける。
+const GET_MAX_ATTEMPTS = 2;
+const DEFAULT_RETRY_DELAY_MS = 2000;
+const MAX_RETRY_DELAY_MS = 10000;
 
 function delay(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -26,13 +30,13 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-function getRetryDelay(response: Response, attempt: number): number {
+function getRetryDelay(response: Response): number {
   const retryAfter = response.headers.get('retry-after');
   const retryAfterSeconds = retryAfter ? Number(retryAfter) : Number.NaN;
   if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-    return retryAfterSeconds * 1000;
+    return Math.min(retryAfterSeconds * 1000, MAX_RETRY_DELAY_MS);
   }
-  return [1000, 2000, 4000][attempt] ?? 4000;
+  return DEFAULT_RETRY_DELAY_MS;
 }
 
 export interface FrontendApiClientOptions {
@@ -40,12 +44,6 @@ export interface FrontendApiClientOptions {
   body?: unknown;
   headers?: Record<string, string>;
   signal?: AbortSignal;
-  /**
-   * Google認証情報を含めるかどうか
-   * デフォルト: true（undefined時もtrueとして扱われる）
-   * バックエンドAPIでスプレッドシートアクセスが必要な場合はtrueのままにしてください
-   */
-  includeAuth?: boolean;
 }
 
 /**
@@ -71,20 +69,11 @@ export class FrontendApiClient {
       ...options.headers,
     };
 
-    // Google認証情報をヘッダーに追加
-    if (options.includeAuth !== false) { // デフォルトでtrueとして扱う
-      try {
-        const session = await getSession();
-        if (session?.accessToken) {
-          headers['Authorization'] = `Bearer ${session.accessToken}`;
-          headers['X-Google-Access-Token'] = session.accessToken;
-        }
-      } catch (error) {
-        console.warn('Failed to get session for API request:', error);
-      }
-    }
+    // 認証トークンはサーバー側（API Route）がサーバーセッションから付与する。
+    // ここで getSession() を呼ぶと要求ごとに /api/auth/session が発生し、
+    // 他タブへのセッション更新通知で一覧の再読込が連鎖するため呼ばない。
 
-    const maxAttempts = method === 'GET' ? 4 : 1;
+    const maxAttempts = method === 'GET' ? GET_MAX_ATTEMPTS : 1;
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       try {
@@ -122,13 +111,13 @@ export class FrontendApiClient {
         && !apiResponse.success
         && RETRYABLE_CODES.has(apiResponse.error.code)
       ) {
-        await delay(getRetryDelay(response, attempt), options.signal);
+        await delay(getRetryDelay(response), options.signal);
         continue;
       }
       return apiResponse;
       } catch (error) {
         if (method === 'GET' && attempt < maxAttempts - 1 && !options.signal?.aborted) {
-          await delay([1000, 2000, 4000][attempt] ?? 4000, options.signal).catch(() => undefined);
+          await delay(DEFAULT_RETRY_DELAY_MS, options.signal).catch(() => undefined);
           continue;
         }
         return {

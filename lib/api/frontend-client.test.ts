@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FrontendApiClient } from './frontend-client';
 
+const getSessionMock = vi.hoisted(() => vi.fn(async () => null));
+
 vi.mock('next-auth/react', () => ({
-  getSession: vi.fn(async () => null),
+  getSession: getSessionMock,
 }));
 
 const originalFetch = global.fetch;
@@ -16,6 +18,7 @@ describe('FrontendApiClient', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    getSessionMock.mockClear();
     global.fetch = originalFetch;
   });
 
@@ -27,10 +30,37 @@ describe('FrontendApiClient', () => {
 
     const client = new FrontendApiClient('game-library-api');
     const promise = client.get('/api/SaveDatas');
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(2000);
 
     await expect(promise).resolves.toEqual({ success: true, data: { ok: true } });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries GET only once to avoid piling requests onto a starting API', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => Response.json(
+      { success: false, error: { code: 'API_STARTING', message: 'starting' } },
+      { status: 503 },
+    ));
+    global.fetch = fetchMock as typeof fetch;
+
+    const client = new FrontendApiClient('game-library-api');
+    const promise = client.get('/api/SaveDatas');
+    await vi.advanceTimersByTimeAsync(30000);
+
+    await expect(promise).resolves.toMatchObject({ success: false, error: { code: 'API_STARTING' } });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not fetch the client session for each request', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ success: true, data: [] }));
+    global.fetch = fetchMock as typeof fetch;
+
+    const client = new FrontendApiClient('game-library-api');
+    await client.get('/api/SaveDatas');
+
+    expect(getSessionMock).not.toHaveBeenCalled();
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.headers).not.toHaveProperty('Authorization');
   });
 
   it('does not retry non-GET requests', async () => {

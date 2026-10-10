@@ -125,7 +125,7 @@ type ChoiceOptionFormState = {
 
 const choiceSetColumns: DataTableColumn<ChoiceSetRow>[] = [
   { key: 'id', header: 'ID', width: '5rem', sortable: true, sortValue: (value) => Number(value ?? 0) },
-  { key: 'choiceSetKey', header: 'choiceSetKey', sortable: true, filterable: true },
+  { key: 'choiceSetKey', header: '選択肢セットキー', sortable: true, filterable: true },
   { key: 'label', header: '表示名', sortable: true, filterable: true },
   { key: 'description', header: '説明', filterable: true },
   { key: 'status', header: '状態' },
@@ -133,7 +133,7 @@ const choiceSetColumns: DataTableColumn<ChoiceSetRow>[] = [
 
 const choiceOptionColumns: DataTableColumn<ChoiceOptionRow>[] = [
   { key: 'id', header: 'ID', width: '5rem', sortable: true, sortValue: (value) => Number(value ?? 0) },
-  { key: 'optionKey', header: 'optionKey', sortable: true, filterable: true },
+  { key: 'optionKey', header: '候補キー', sortable: true, filterable: true },
   { key: 'label', header: '表示名', sortable: true, filterable: true },
   { key: 'displayOrder', header: '順序', sortable: true, sortValue: (value) => Number(value ?? 0) },
   { key: 'status', header: '状態' },
@@ -360,7 +360,7 @@ export default function ChoiceSetManager() {
     setSuccess(null);
 
     if (!choiceSetForm.choiceSetKey.trim() || !choiceSetForm.label.trim()) {
-      setError('choiceSetKey と表示名は必須です。');
+      setError('選択肢セットキーと表示名は必須です。');
       return;
     }
 
@@ -439,7 +439,7 @@ export default function ChoiceSetManager() {
       return;
     }
     if (!choiceOptionForm.optionKey.trim() || !choiceOptionForm.label.trim()) {
-      setError('optionKey と表示名は必須です。');
+      setError('候補キーと表示名は必須です。');
       return;
     }
     if (!editingChoiceOption) {
@@ -619,9 +619,9 @@ export default function ChoiceSetManager() {
 
   return (
     <PageFrame
-      eyebrowLabel="Choice Set Management"
+      eyebrowLabel=""
       title="共有選択肢セット管理"
-      description="複数の SaveDataFieldDefinition（SingleSelect）で共有できる候補値セットを管理します。"
+      description="複数のセーブデータ項目（単一選択）で共有できる候補値セットを管理します。"
       layoutMode={layoutMode}
       actions={(
         <>
@@ -804,7 +804,7 @@ export default function ChoiceSetManager() {
             {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
             {success ? <CustomMessageArea variant="success">{success}</CustomMessageArea> : null}
             <div className="space-y-2">
-              <CustomLabel htmlFor="choice-set-key">choiceSetKey</CustomLabel>
+              <CustomLabel htmlFor="choice-set-key">選択肢セットキー</CustomLabel>
               <CustomTextBox id="choice-set-key" value={choiceSetForm.choiceSetKey} onChange={(event) => setChoiceSetForm((current) => ({ ...current, choiceSetKey: event.target.value }))} displayOnly={pageMode === 'view' && !!editingChoiceSet} />
             </div>
             <div className="space-y-2">
@@ -867,7 +867,7 @@ export default function ChoiceSetManager() {
             {error ? <CustomMessageArea variant="error">{error}</CustomMessageArea> : null}
             {success ? <CustomMessageArea variant="success">{success}</CustomMessageArea> : null}
             <div className="space-y-2">
-              <CustomLabel htmlFor="choice-option-key">optionKey</CustomLabel>
+              <CustomLabel htmlFor="choice-option-key">候補キー</CustomLabel>
               <CustomTextBox id="choice-option-key" value={choiceOptionForm.optionKey} onChange={(event) => setChoiceOptionForm((current) => ({ ...current, optionKey: event.target.value }))} displayOnly={pageMode === 'view' && !!editingChoiceOption} />
             </div>
             <div className="space-y-2">

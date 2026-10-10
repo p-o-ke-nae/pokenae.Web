@@ -43,6 +43,9 @@ import {
   trialBatchUpdateDisplayOrder,
 } from '@/lib/game-management/trial';
 import { useResponsiveLayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
+import { useSessionState } from '@/lib/hooks/useSessionState';
+import { useScrollRestoration } from '@/lib/hooks/useScrollRestoration';
+import { clearSessionCacheByPrefix, readSessionCache, writeSessionCache } from '@/lib/session-cache';
 import type {
   MaintenanceHealthFilter,
   ManagementLookups,
@@ -391,15 +394,16 @@ export function GameManagementDashboard({
     tagDefinitions?: TagDefinition[];
   }) {
     const { data: session } = useSession();
-    const isTrial = !session?.user;
+    const hasSessionUser = Boolean(session?.user);
+    const isTrial = !hasSessionUser;
     const [authError, setAuthError] = useState<string | null>(null);
-    const [authLoading, setAuthLoading] = useState(requiresAdmin && Boolean(session?.user));
+    const [authLoading, setAuthLoading] = useState(requiresAdmin && hasSessionUser);
     const displayKeys = resourceKeys ?? ADMIN_RESOURCE_ORDER;
-    const effectiveAuthError = requiresAdmin && session?.user ? authError : null;
-    const effectiveAuthLoading = requiresAdmin && session?.user ? authLoading : false;
+    const effectiveAuthError = requiresAdmin && hasSessionUser ? authError : null;
+    const effectiveAuthLoading = requiresAdmin && hasSessionUser ? authLoading : false;
 
     useEffect(() => {
-      if (!requiresAdmin || !session?.user) {
+      if (!requiresAdmin || !hasSessionUser) {
         return;
       }
 
@@ -438,7 +442,7 @@ export function GameManagementDashboard({
       return () => {
         cancelled = true;
       };
-    }, [requiresAdmin, session?.user]);
+    }, [requiresAdmin, hasSessionUser]);
 
     return (
       <PageFrame
@@ -517,18 +521,23 @@ export function GameManagementDashboard({
     basePath?: string;
     scope?: 'admin' | 'user';
   }) {
-    const { data: session } = useSession();
+    const { data: session, status: sessionStatus } = useSession();
     const searchParams = useSearchParams();
-    const isTrial = scope === 'user' && !session?.user;
+    const sessionReady = sessionStatus !== 'loading';
+    const hasSessionUser = Boolean(session?.user);
+    // セッション再取得でオブジェクト参照が変わっても再検索しないよう、プリミティブ値に正規化する
+    const sessionUserKey = session?.user ? (session.user.email ?? session.user.name ?? 'signed-in') : '';
+    const isTrial = scope === 'user' && !hasSessionUser;
     const definition = getResourceDefinition(resourceKey);
     const [lookups, setLookups] = useState<ManagementLookups | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [errorCode, setErrorCode] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    const [authLoading, setAuthLoading] = useState(scope === 'admin' && Boolean(session?.user));
+    const [authLoading, setAuthLoading] = useState(scope === 'admin' && hasSessionUser);
     const [storyProgressLabels, setStoryProgressLabels] = useState<StoryProgressLabelMap>({});
-    const [selectedContentGroupId, setSelectedContentGroupId] = useState('');
-    const [includeDeletedSaveDatas, setIncludeDeletedSaveDatas] = useState(false);
+    const viewStateKey = `game-management:${scope}:${resourceKey}`;
+    const [selectedContentGroupId, setSelectedContentGroupId] = useSessionState(`${viewStateKey}:contentGroup`, '');
+    const [includeDeletedSaveDatas, setIncludeDeletedSaveDatas] = useSessionState(`${viewStateKey}:includeDeleted`, false);
     const [saveDataSchemas, setSaveDataSchemas] = useState<Record<number, SaveDataSchemaDto>>({});
     const [saveDataFieldHeaders, setSaveDataFieldHeaders] = useState<SaveDataListFieldHeader[]>([]);
     const [saveDataSchemaLoading, setSaveDataSchemaLoading] = useState(false);
@@ -536,7 +545,7 @@ export function GameManagementDashboard({
 
     const [localRowOrder, setLocalRowOrder] = useState<number[] | null>(null);
     const [isDirty, setIsDirty] = useState(false);
-    const [sortState, setSortState] = useState<SortState | null>(null);
+    const [sortState, setSortState] = useSessionState<SortState | null>(`${viewStateKey}:sort`, null);
     const [filteredCount, setFilteredCount] = useState<number | null>(null);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
@@ -547,25 +556,52 @@ export function GameManagementDashboard({
     const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>([]);
     const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
     const [pageMode, setPageMode] = useState<PageMode>('view');
-    const [maintenanceHealthFilter, setMaintenanceHealthFilter] = useState<MaintenanceHealthFilter>('All');
+    const [maintenanceHealthFilter, setMaintenanceHealthFilter] = useSessionState<MaintenanceHealthFilter>(`${viewStateKey}:maintenance`, 'All');
     const layoutMode = useResponsiveLayoutMode();
     const [bulkEditorOpen, setBulkEditorOpen] = useState(false);
     const [bulkEditorTargetIds, setBulkEditorTargetIds] = useState<number[]>([]);
     const [accountMoveTarget, setAccountMoveTarget] = useState<AccountDto | null>(null);
     const prefillAppliedRef = useRef(false);
     const apiStartingReloadCountRef = useRef(0);
+    // useSessionState の復元 effect より後に宣言し、復元後の条件で初回読込させる
+    const [viewStateRestored, setViewStateRestored] = useState(false);
+    useEffect(() => {
+      setViewStateRestored(true);
+    }, []);
 
     const softwareMasterDefinition = useMemo(() => getResourceDefinition('game-software-masters'), []);
 
-  const load = useCallback(async () => {
+  const lookupsCacheKey = scope === 'admin'
+    ? 'game-management:lookups:admin'
+    : `game-management:lookups:user:${supportsMaintenance(resourceKey) ? maintenanceHealthFilter : 'All'}:${resourceKey === 'save-datas' && includeDeletedSaveDatas ? 'with-deleted' : 'active'}`;
+
+  const load = useCallback(async (options: { preferCache?: boolean } = {}) => {
+    if (options.preferCache && !isTrial && sessionUserKey) {
+      const cached = readSessionCache<ManagementLookups>(lookupsCacheKey, sessionUserKey);
+      if (cached) {
+        setLookups(cached);
+        setError(null);
+        setErrorCode(null);
+        setLoading(false);
+        setAuthLoading(false);
+        return;
+      }
+    }
+
     setLoading(true);
-    setAuthLoading(scope === 'admin' && Boolean(session?.user));
+    setAuthLoading(scope === 'admin' && Boolean(sessionUserKey));
+    if (!options.preferCache) {
+      // 手動再読込・保存後は他画面の一覧キャッシュも古くなるため破棄する
+      clearSessionCacheByPrefix('game-management:lookups:');
+      clearSessionCacheByPrefix('game-management:save-data-search-schema:');
+      clearSessionCacheByPrefix('game-management:story-progress-labels:');
+      clearSessionCacheByPrefix('game-management:save-data-schemas:');
+    }
     setError(null);
     setErrorCode(null);
     setSaveError(null);
     setIsDirty(false);
     setLocalRowOrder(null);
-    setSortState(null);
     setSelectedRowKeys([]);
 
     try {
@@ -588,6 +624,9 @@ export function GameManagementDashboard({
         });
       }
       setLookups(result);
+      if (!isTrial && sessionUserKey) {
+        writeSessionCache(lookupsCacheKey, sessionUserKey, result);
+      }
     } catch (loadError) {
       setError(getGameManagementErrorMessage(loadError, {
         fallback: resources.gameManagement.errors.listLoad,
@@ -598,11 +637,15 @@ export function GameManagementDashboard({
       setLoading(false);
       setAuthLoading(false);
     }
-  }, [includeDeletedSaveDatas, isTrial, maintenanceHealthFilter, resourceKey, scope, session?.user]);
+  }, [includeDeletedSaveDatas, isTrial, lookupsCacheKey, maintenanceHealthFilter, resourceKey, scope, sessionUserKey]);
 
+  // 一度表示した一覧はタブ内で保持し、手動の再読込・保存操作時のみ再取得する
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!sessionReady || !viewStateRestored) return;
+    void load({ preferCache: true });
+  }, [load, sessionReady, viewStateRestored]);
+
+  useScrollRestoration(viewStateKey, Boolean(lookups) && !loading);
 
   useEffect(() => {
     if (errorCode !== 'API_STARTING') {
@@ -642,14 +685,13 @@ export function GameManagementDashboard({
 
   useEffect(() => {
     if (resourceKey !== 'save-datas') {
-      setSelectedContentGroupId('');
       return;
     }
 
-    if (selectedContentGroupId && !saveDataContentGroupOptions.some((option) => option.value === selectedContentGroupId)) {
+    if (lookups && selectedContentGroupId && !saveDataContentGroupOptions.some((option) => option.value === selectedContentGroupId)) {
       setSelectedContentGroupId('');
     }
-  }, [resourceKey, saveDataContentGroupOptions, selectedContentGroupId]);
+  }, [lookups, resourceKey, saveDataContentGroupOptions, selectedContentGroupId, setSelectedContentGroupId]);
 
   const selectedContentGroupIdNumber = useMemo(() => {
     if (resourceKey !== 'save-datas' || !selectedContentGroupId) {
@@ -685,6 +727,12 @@ export function GameManagementDashboard({
     }
 
     let cancelled = false;
+    const labelsCacheKey = `game-management:story-progress-labels:${[...masterIds].sort((a, b) => a - b).join(',')}`;
+    const cachedLabels = readSessionCache<StoryProgressLabelMap>(labelsCacheKey, '');
+    if (cachedLabels) {
+      setStoryProgressLabels(cachedLabels);
+      return;
+    }
 
     const loadStoryProgressLabels = async () => {
       const entries = await Promise.allSettled(masterIds.map(async (gameSoftwareMasterId) => {
@@ -697,8 +745,10 @@ export function GameManagementDashboard({
       }
 
       const nextLabels: StoryProgressLabelMap = {};
+      let allFulfilled = true;
       for (const entry of entries) {
         if (entry.status !== 'fulfilled') {
+          allFulfilled = false;
           continue;
         }
         for (const [key, label] of entry.value) {
@@ -706,6 +756,9 @@ export function GameManagementDashboard({
         }
       }
       setStoryProgressLabels(nextLabels);
+      if (allFulfilled) {
+        writeSessionCache(labelsCacheKey, '', nextLabels);
+      }
     };
 
     void loadStoryProgressLabels();
@@ -758,6 +811,16 @@ export function GameManagementDashboard({
 
     let cancelled = false;
 
+    const schemasCacheKey = `game-management:save-data-schemas:${[...masterIds].sort((a, b) => a - b).join(',')}`;
+    const cachedSchemas = readSessionCache<Record<number, SaveDataSchemaDto>>(schemasCacheKey, '');
+    if (cachedSchemas) {
+      setSaveDataSchemas(cachedSchemas);
+      setSaveDataFieldHeaders(buildSaveDataFieldHeadersFromSchemas(Object.values(cachedSchemas)));
+      setSaveDataSchemaLoading(false);
+      setSaveDataSchemaError(null);
+      return;
+    }
+
     const loadSaveDataSchemas = async () => {
       setSaveDataSchemas({});
       setSaveDataFieldHeaders([]);
@@ -793,6 +856,9 @@ export function GameManagementDashboard({
       setSaveDataSchemas(nextSchemas);
       setSaveDataFieldHeaders(nextHeaders);
       setSaveDataSchemaLoading(false);
+      if (failedSchemaCount === 0) {
+        writeSessionCache(schemasCacheKey, '', nextSchemas);
+      }
       setSaveDataSchemaError(
         failedSchemaCount === 0
           ? null
@@ -859,15 +925,12 @@ export function GameManagementDashboard({
     setDisplayedRowIds(rows.map((row) => row.id));
   }, [rows]);
 
-  useEffect(() => {
-    if (resourceKey !== 'save-datas') {
-      return;
-    }
-
+  const handleContentGroupFilterChange = useCallback((value: string) => {
+    setSelectedContentGroupId(value);
     setSortState(null);
     setFilteredCount(null);
     setDisplayedRowIds([]);
-  }, [resourceKey, selectedContentGroupId, dynamicColumnSignature]);
+  }, [setSelectedContentGroupId, setSortState]);
 
   // 並び替え有効判定: 編集モード＋ソートなし＋フィルタなし
   const isContentGroupFilterActive = resourceKey === 'save-datas' && selectedContentGroupIdNumber != null;
@@ -955,8 +1018,8 @@ export function GameManagementDashboard({
       return false;
     }
 
-    return editorDefinition.scope === 'user' && !session?.user;
-  }, [editorDefinition, session?.user]);
+    return editorDefinition.scope === 'user' && !hasSessionUser;
+  }, [editorDefinition, hasSessionUser]);
 
   // 行移動ハンドラ
   const handleRowMove = useCallback((fromIndex: number, toIndex: number) => {
@@ -1314,9 +1377,9 @@ export function GameManagementDashboard({
           {isTrial && <TrialBanner />}
         </div>
       ) : null}
-        {loading || authLoading ? (
+        {(loading || authLoading) && !lookups ? (
           <p className="tool-muted text-sm" role="status">{authLoading ? '権限を確認しています...' : '一覧を読み込んでいます...'}</p>
-        ) : (
+        ) : !lookups ? null : (
           <>
             {supportsMaintenance(resourceKey) || resourceKey === 'save-datas' ? (
               <PageSection title="絞り込み">
@@ -1354,7 +1417,7 @@ export function GameManagementDashboard({
                     <CustomComboBox
                       id="save-data-content-group-filter"
                       value={selectedContentGroupId}
-                      onChange={(event) => setSelectedContentGroupId(event.target.value)}
+                      onChange={(event) => handleContentGroupFilterChange(event.target.value)}
                     >
                       <option value="">すべての分類</option>
                       {saveDataContentGroupOptions.map((option) => (
@@ -1383,6 +1446,9 @@ export function GameManagementDashboard({
               <div className="tool-toolbar__meta">
                 <PageModeToggle mode={pageMode} onChange={setPageMode} />
                 <span>表示件数: {rows.length} 件</span>
+                {loading && lookups ? (
+                  <span className="text-xs text-[var(--color-text-muted)]" role="status">最新の一覧を取得しています...</span>
+                ) : null}
                 {selectedVisibleRowCount > 0 && reorderEnabled ? (
                   <span className="text-xs text-[var(--color-text-muted)]">
                     選択中: {selectedVisibleRowCount} 件（Shift+クリックで範囲選択、上下移動でまとめて並び替え）
@@ -1434,6 +1500,7 @@ export function GameManagementDashboard({
               sortState={sortState}
               onSortChange={setSortState}
               onFilteredDataChange={handleFilteredDataChange}
+              persistStateKey={`${viewStateKey}:table:${dataTableKey}`}
             />
             </PageSection>
           </>
