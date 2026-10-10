@@ -5,7 +5,6 @@ import Link from 'next/link';
 import CustomButton from '@/components/atoms/CustomButton';
 import PageModeToggle from '@/components/atoms/PageModeToggle';
 import CustomCheckBox from '@/components/atoms/CustomCheckBox';
-import CustomComboBox from '@/components/atoms/CustomComboBox';
 import CustomHeader from '@/components/atoms/CustomHeader';
 import CustomLabel from '@/components/atoms/CustomLabel';
 import CustomMessageArea from '@/components/atoms/CustomMessageArea';
@@ -16,7 +15,7 @@ import ResponsiveActionGroup from '@/components/molecules/ResponsiveActionGroup'
 import { moveSelectedItemsByOne, moveSelectedItemsToTarget } from '@/components/molecules/DataTable/selection-utils';
 import Dialog, { DialogFooterLayout } from '@/components/molecules/Dialog';
 import RowMoveButtons from '@/components/organisms/GameManagement/RowMoveButtons';
-import { PageFrame } from '@/components/organisms/GameManagement/shared';
+import { PageFrame, SelectField as SharedSelectField } from '@/components/organisms/GameManagement/shared';
 import { useLoadingOverlay } from '@/contexts/LoadingOverlayContext';
 import {
   buildCatalogAssignmentPlan,
@@ -408,13 +407,8 @@ function createOverrideFormState(override: SaveDataFieldOverrideDto | null): Ove
 }
 
 function SelectField({
-  id,
-  label,
-  value,
-  options,
-  onChange,
-  displayOnly = false,
   placeholder = '',
+  ...props
 }: {
   id: string;
   label: string;
@@ -424,22 +418,14 @@ function SelectField({
   displayOnly?: boolean;
   placeholder?: string;
 }) {
-  return (
-    <div className="space-y-2">
-      <CustomLabel htmlFor={id}>{label}</CustomLabel>
-      <CustomComboBox id={id} value={value} onChange={(event) => onChange(event.target.value)} displayOnly={displayOnly}>
-        <option value="">{placeholder}</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </CustomComboBox>
-    </div>
-  );
+  return <SharedSelectField {...props} placeholder={placeholder || '選択してください'} />;
 }
 
-function SectionCard({ title, description, actions, layoutMode, children }: { title: string; description: string; actions?: React.ReactNode; layoutMode: LayoutMode; children: React.ReactNode }) {
+/**
+ * 絞り込み用のプルダウンは見出しの操作ボタン列に置くと、選択した表示名の長さで
+ * 幅が変わってレイアウトが崩れるため、一覧画面と同じ tool-filter 枠に配置する。
+ */
+function SectionCard({ title, description, actions, filters, layoutMode, children }: { title: string; description: string; actions?: React.ReactNode; filters?: React.ReactNode; layoutMode: LayoutMode; children: React.ReactNode }) {
   const headerLayoutClasses = 'tool-section__header';
 
   return (
@@ -455,6 +441,7 @@ function SectionCard({ title, description, actions, layoutMode, children }: { ti
           </ResponsiveActionGroup>
         ) : null}
       </div>
+      {filters ? <div className="tool-filter">{filters}</div> : null}
       {children}
     </section>
   );
@@ -1866,16 +1853,18 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
               layoutMode={layoutMode}
               title={texts.sections.assignedDefinitions.title}
               description={texts.sections.assignedDefinitions.description}
+              filters={
+                <SelectField
+                  id="content-group"
+                  label={texts.form.gameSoftwareCategoryLabel}
+                  value={selectedContentGroupId}
+                  placeholder={texts.common.selectPrompt}
+                  options={availableGameSoftwareCategories.map((item) => ({ value: String(item.id), label: item.name }))}
+                  onChange={setSelectedContentGroupId}
+                />
+              }
               actions={
                 <>
-                  <SelectField
-                    id="content-group"
-                    label={texts.form.gameSoftwareCategoryLabel}
-                    value={selectedContentGroupId}
-                    placeholder={texts.common.selectPrompt}
-                    options={availableGameSoftwareCategories.map((item) => ({ value: String(item.id), label: item.name }))}
-                    onChange={setSelectedContentGroupId}
-                  />
                   {pageMode === 'edit' ? (
                     <ResponsiveActionGroup layoutMode={layoutMode} mobileColumns={1} align="end">
                       <CustomButton disabled={selectedAssignedDefinitionCount === 0} onClick={openCopyDialog}>{texts.buttons.updateAssignmentSettings}</CustomButton>
@@ -1986,7 +1975,7 @@ export default function SaveDataSchemaManager({ texts }: { texts: SaveDataSchema
               layoutMode={layoutMode}
               title={texts.sections.overrides.title}
               description={texts.sections.overrides.description}
-              actions={
+              filters={
                 <SelectField
                   id="game-software-master"
                   label={texts.form.gameSoftwareMasterLabel}

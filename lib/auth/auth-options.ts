@@ -6,41 +6,100 @@
 import { AuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 
-/**
- * Googleのトークンエンドポイントを使用してアクセストークンをリフレッシュする
- * リフレッシュトークンが存在し、アクセストークンの有効期限が切れている場合に呼び出される
- */
-async function refreshAccessToken(token: {
+type RefreshableToken = {
   accessToken?: string;
   refreshToken?: string;
   accessTokenExpires?: number;
   error?: string;
-}) {
+};
+
+type RefreshedTokenSet = {
+  accessToken: string;
+  accessTokenExpires: number;
+  refreshToken?: string;
+};
+
+/** 有効期限のこの秒数前から更新する（期限ぎりぎりの要求が API 側で失効するのを防ぐ） */
+const ACCESS_TOKEN_REFRESH_MARGIN_SECONDS = 5 * 60;
+
+/**
+ * Route Handler の getServerSession では更新後の JWT を Cookie に書き戻せないため、
+ * 同じリフレッシュトークンによる更新結果をプロセス内で共有し、
+ * 期限切れ後に要求ごと・並行要求ごとに Google へ更新通信が発生しないようにする。
+ */
+const refreshResults = new Map<string, Promise<RefreshedTokenSet>>();
+
+function nowSeconds(): number {
+  return Math.floor(Date.now() / 1000);
+}
+
+function needsRefresh(expiresAt: number | undefined): boolean {
+  return !expiresAt || nowSeconds() >= expiresAt - ACCESS_TOKEN_REFRESH_MARGIN_SECONDS;
+}
+
+async function requestTokenRefresh(refreshToken: string): Promise<RefreshedTokenSet> {
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: getRequiredEnv('GOOGLE_CLIENT_ID'),
+      client_secret: getRequiredEnv('GOOGLE_CLIENT_SECRET'),
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
+
+  const refreshedTokens = await response.json();
+
+  if (!response.ok) {
+    throw new Error(refreshedTokens.error || 'トークンのリフレッシュに失敗しました');
+  }
+
+  return {
+    accessToken: refreshedTokens.access_token,
+    // 新しい有効期限を設定（expires_in は秒数）
+    accessTokenExpires: nowSeconds() + refreshedTokens.expires_in,
+    // リフレッシュトークンは新しいものが返された場合のみ更新
+    refreshToken: refreshedTokens.refresh_token,
+  };
+}
+
+function getSharedRefresh(refreshToken: string): Promise<RefreshedTokenSet> {
+  const existing = refreshResults.get(refreshToken);
+  if (existing) {
+    return existing;
+  }
+
+  const promise = requestTokenRefresh(refreshToken);
+  refreshResults.set(refreshToken, promise);
+  promise.then(
+    (result) => {
+      // 更新結果は次の更新時期まで共有し、その後は破棄する
+      const ttlMs = Math.max(0, (result.accessTokenExpires - ACCESS_TOKEN_REFRESH_MARGIN_SECONDS - nowSeconds()) * 1000);
+      setTimeout(() => {
+        if (refreshResults.get(refreshToken) === promise) refreshResults.delete(refreshToken);
+      }, ttlMs).unref?.();
+    },
+    () => {
+      refreshResults.delete(refreshToken);
+    },
+  );
+  return promise;
+}
+
+/**
+ * Googleのトークンエンドポイントを使用してアクセストークンをリフレッシュする
+ * リフレッシュトークンが存在し、アクセストークンの有効期限が近い・切れている場合に呼び出される
+ */
+async function refreshAccessToken(token: RefreshableToken) {
   try {
-    const response = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: getRequiredEnv('GOOGLE_CLIENT_ID'),
-        client_secret: getRequiredEnv('GOOGLE_CLIENT_SECRET'),
-        grant_type: 'refresh_token',
-        refresh_token: token.refreshToken || '',
-      }),
-    });
-
-    const refreshedTokens = await response.json();
-
-    if (!response.ok) {
-      throw new Error(refreshedTokens.error || 'トークンのリフレッシュに失敗しました');
-    }
-
+    const refreshed = await getSharedRefresh(token.refreshToken || '');
     return {
       ...token,
-      accessToken: refreshedTokens.access_token,
-      // 新しい有効期限を設定（expires_in は秒数）
-      accessTokenExpires: Math.floor(Date.now() / 1000) + refreshedTokens.expires_in,
-      // リフレッシュトークンは新しいものが返された場合のみ更新
-      refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
+      accessToken: refreshed.accessToken,
+      accessTokenExpires: refreshed.accessTokenExpires,
+      refreshToken: refreshed.refreshToken ?? token.refreshToken,
       error: undefined,
     };
   } catch (error) {
@@ -114,12 +173,12 @@ export function getAuthOptions(): AuthOptions {
           };
         }
 
-        // アクセストークンがまだ有効な場合はそのまま返す
-        if (token.accessTokenExpires && Date.now() / 1000 < token.accessTokenExpires) {
+        // アクセストークンが十分に有効な場合はそのまま返す
+        if (!needsRefresh(token.accessTokenExpires)) {
           return token;
         }
 
-        // アクセストークンが期限切れの場合、リフレッシュを試行
+        // 有効期限が近い・切れている場合、リフレッシュを試行
         if (token.refreshToken) {
           return await refreshAccessToken(token);
         }
@@ -127,10 +186,9 @@ export function getAuthOptions(): AuthOptions {
         return token;
       },
       async session({ session, token }) {
-        // セッションにアクセストークンを含める
-        // これによりクライアント側でアクセストークンを利用可能にする
+        // API Route がサーバー側でアクセストークンを付与するため、
+        // リフレッシュトークンはクライアントへ公開しない
         session.accessToken = token.accessToken as string;
-        session.refreshToken = token.refreshToken as string;
         // トークンリフレッシュエラーをセッションに伝播
         if (token.error) {
           session.error = token.error as string;

@@ -37,6 +37,7 @@ import { formatSaveStorageType } from '@/lib/game-management/save-storage-type';
 import { buildTrialUserData } from '@/lib/game-management/trial';
 import type { ManagementLookups, SaveDataSchemaDto, StoryProgressSchemaDto } from '@/lib/game-management/types';
 import { useResponsiveLayoutMode } from '@/lib/hooks/useResponsiveLayoutMode';
+import { clearSessionCacheByPrefix, readSessionCache, writeSessionCache } from '@/lib/session-cache';
 import resources from '@/lib/resources';
 import { getResourceDefinition } from '@/lib/game-management/resources';
 import EditorDialog from './EditorDialog';
@@ -48,6 +49,8 @@ import {
   getMemoryCardDisplay,
 } from './helpers';
 import { PageFrame, PageSection, TrialBanner } from './shared';
+
+const SCHEMA_PAIR_CACHE_PREFIX = 'game-management:save-data-search-schema:';
 
 function getStorageSummary(saveData: ManagementLookups['saveDatas'][number], lookups: ManagementLookups): string {
   switch (saveData.saveStorageType) {
@@ -87,7 +90,8 @@ function getFieldDefaultOperator(field: SaveDataSearchFieldOption): SaveDataSear
 export default function SaveDataSearchPage() {
   const { data: session, status: sessionStatus } = useSession();
   const sessionReady = sessionStatus !== 'loading';
-  const isTrial = !session?.user;
+  const sessionUserKey = session?.user ? (session.user.email ?? session.user.name ?? 'signed-in') : '';
+  const isTrial = !sessionUserKey;
   const expectedLookupsSource: SaveDataSearchLookupsSource = isTrial ? 'trial' : 'authenticated';
   const layoutMode = useResponsiveLayoutMode();
   const [lookups, setLookups] = useState<ManagementLookups | null>(null);
@@ -115,20 +119,34 @@ export default function SaveDataSearchPage() {
   const apiStartingReloadCountRef = useRef(0);
   const saveDataDefinition = useMemo(() => getResourceDefinition('save-datas'), []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options: { preferCache?: boolean } = {}) => {
     if (!sessionReady) return;
     const source: SaveDataSearchLookupsSource = isTrial ? 'trial' : 'authenticated';
+    const lookupsCacheKey = `game-management:lookups:user:All:${includeDeleted ? 'with-deleted' : 'active'}`;
     const requestId = loadRequestRef.current + 1;
     loadRequestRef.current = requestId;
     schemaRequestGenerationRef.current += 1;
-    setLoading(true);
     setError(null);
     setErrorCode(null);
+    setSchemaLoadErrors({});
+    setSchemaLoadingIds([]);
+    if (options.preferCache && !isTrial) {
+      const cached = readSessionCache<ManagementLookups>(lookupsCacheKey, sessionUserKey);
+      if (cached) {
+        setLookups(cached);
+        setLookupsSource(source);
+        setLoading(false);
+        return;
+      }
+    }
+    if (!options.preferCache) {
+      clearSessionCacheByPrefix(SCHEMA_PAIR_CACHE_PREFIX);
+      clearSessionCacheByPrefix('game-management:lookups:');
+    }
+    setLoading(true);
     setLookupsSource(null);
     setSaveDataSchemas({});
     setStoryProgressSchemas({});
-    setSchemaLoadErrors({});
-    setSchemaLoadingIds([]);
     try {
       const result = isTrial
         ? { ...await fetchPublicMasterLookups(), ...buildTrialUserData({ includeDeletedSaveDatas: includeDeleted }) }
@@ -136,6 +154,9 @@ export default function SaveDataSearchPage() {
       if (requestId !== loadRequestRef.current) return;
       setLookups(result);
       setLookupsSource(source);
+      if (!isTrial) {
+        writeSessionCache(lookupsCacheKey, sessionUserKey, result);
+      }
     } catch (loadError) {
       if (requestId !== loadRequestRef.current) return;
       setError(getGameManagementErrorMessage(loadError, {
@@ -145,7 +166,7 @@ export default function SaveDataSearchPage() {
     } finally {
       if (requestId === loadRequestRef.current) setLoading(false);
     }
-  }, [includeDeleted, isTrial, sessionReady]);
+  }, [includeDeleted, isTrial, sessionReady, sessionUserKey]);
 
   useEffect(() => {
     if (errorCode !== 'API_STARTING') {
@@ -159,8 +180,9 @@ export default function SaveDataSearchPage() {
   }, [errorCode, load]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!urlInitialized) return;
+    void load({ preferCache: true });
+  }, [load, urlInitialized]);
 
   useEffect(() => {
     const restoredCriteria = restoreSaveDataSearchCriteria(window.location.search);
@@ -195,10 +217,16 @@ export default function SaveDataSearchPage() {
       for (let index = 0; index < pendingIds.length; index += 8) {
         const batch = pendingIds.slice(index, index + 8);
         const batchResults = await Promise.allSettled(batch.map(async (masterId) => {
+          const cacheKey = `${SCHEMA_PAIR_CACHE_PREFIX}${masterId}`;
+          const cached = readSessionCache<{ schema: SaveDataSchemaDto; storyProgressSchema: StoryProgressSchemaDto }>(cacheKey, '');
+          if (cached) {
+            return { masterId, ...cached };
+          }
           const [schema, storyProgressSchema] = await Promise.all([
             fetchPublicSaveDataSchema(masterId),
             fetchPublicStoryProgressSchema(masterId),
           ]);
+          writeSessionCache(cacheKey, '', { schema, storyProgressSchema });
           return { masterId, schema, storyProgressSchema };
         }));
         if (generation !== schemaRequestGenerationRef.current) return;

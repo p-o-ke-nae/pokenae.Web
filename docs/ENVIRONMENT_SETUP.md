@@ -95,7 +95,8 @@ ACA の min replicas 0 構成では、コールドスタート中に game-librar
 502/503/504 またはタイムアウトを返すことがあります。Next.js 側は 1 リクエストあたり
 最大 45 秒の範囲で GET のみ再試行し、復帰待ちの最終応答は `API_STARTING`（503）として返します。
 そのため nginx の既定 `proxy_read_timeout 60s` でも、通常は Next 側の応答が先に返ります。
-ブラウザ側の GET 再試行と UI の自動再読込で、45 秒を超えるコールドスタートを継続して待機します。
+ブラウザ側の GET 再試行（1 回のみ、Retry-After は最大 10 秒）と UI の自動再読込で、45 秒を超えるコールドスタートを継続して待機します。
+API 側は startup probe の初期待機を 3 秒に短縮し、ReadyToRun で起動時間を短縮しています（gamelibrarytool `docs/production-azure-setup.md`）。
 VPS のリバースプロキシには安全余裕として次を推奨します。
 
 ```nginx
@@ -106,6 +107,23 @@ proxy_send_timeout 90s;
 
 Next コンテナ自体の再起動中にリバースプロキシが返す 502 は、API コールドスタート
 とは別系統です。コンテナヘルスチェックとデプロイ時の起動確認で切り分けてください。
+
+Docker は unhealthy になってもコンテナを再起動しないため、`docker-compose.prod.yml` の
+ヘルスチェックは `/api/health` が連続 4 回（約 2 分）失敗すると Node.js プロセスを停止し、
+`restart: always` で自動復旧させます（ハング・メモリ逼迫による 502 継続の自己回復）。
+発動時はコンテナログに `[healthcheck] ... restarting Node.js process` が出力されます。
+
+502 発生時の VPS 上の切り分けコマンド:
+
+```bash
+docker inspect pokenae-web-prod --format 'restarts={{.RestartCount}} oom={{.State.OOMKilled}} started={{.State.StartedAt}} health={{.State.Health.Status}}'
+docker events --since 24h --filter container=pokenae-web-prod --filter event=die --filter event=oom --filter event=health_status
+docker logs --since 2h pokenae-web-prod 2>&1 | grep -Ei 'healthcheck|heap|error|killed' | tail -n 50
+docker stats --no-stream pokenae-web-prod
+free -h; swapon --show
+journalctl -k --since '24 hours ago' | grep -i -E 'oom|killed process'
+tail -n 100 /var/log/nginx/error.log   # "connect() failed (111)" は Next 停止中、"upstream timed out" はハング/過負荷
+```
 
 #### Environment Secrets
 
