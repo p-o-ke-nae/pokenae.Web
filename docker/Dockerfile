@@ -1,5 +1,5 @@
 # Stage 1: Dependencies
-FROM node:20-alpine AS deps
+FROM node:24.22.1-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
@@ -7,7 +7,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 # Stage 2: Dev (デバッグ環境用 - ホットリロードでコーディングしながら動作確認)
-FROM node:20-alpine AS dev
+FROM node:24.22.1-alpine AS dev
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -49,7 +49,7 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["npx", "next", "dev", "--hostname", "0.0.0.0", "--webpack"]
 
 # Stage 3: Entrypoint test
-FROM node:20-alpine AS entrypoint-test
+FROM node:24.22.1-alpine AS entrypoint-test
 
 RUN apk add --no-cache su-exec \
     && addgroup -S -g 1001 nodejs \
@@ -68,7 +68,7 @@ RUN sed -i 's/\r$//' \
     && /usr/local/bin/entrypoint.test.sh
 
 # Stage 4: Builder (本番ビルド用)
-FROM node:20-alpine AS builder
+FROM node:24.22.1-alpine AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -89,7 +89,7 @@ ENV NEXT_PUBLIC_ENVIRONMENT=$NEXT_PUBLIC_ENVIRONMENT
 RUN npm run build
 
 # Stage 5: Runner (本番実行用)
-FROM node:20-alpine AS runner
+FROM node:24.22.1-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
